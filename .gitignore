@@ -1,0 +1,53 @@
+# Coding-assistant files: local only, never committed
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.impeccable/
+
+# Course paperwork (submitted through Teams, not as source code)
+course/
+
+# Secrets and environments
+.env
+.env.*
+!.env.example
+*.token
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Builds and releases
+agent/build/*
+!agent/build/kinlan-agent.spec
+agent/dist/
+*.exe
+*.apk
+*.aab
+
+# Mobile
+node_modules/
+mobile/dist/
+mobile/.expo/
+mobile/android/
+mobile/ios/
+
+# Data and media
+docs/backups/
+*.dump
+*.sql.gz
+*.mp4
+*.mov
+
+# OS and editors
+Thumbs.db
+.DS_Store
+.vscode/
+
+# Logs
+*.log
