@@ -100,7 +100,7 @@ Written with the Impeccable `shape` flow (Sprint 1, Nov 7, 2026). These say **wh
 
 ## Open decisions for DESIGN.md (not decided here)
 
-- Visual direction: palette (beyond the status colors), typeface (Roboto or Inter), shape, elevation and motion.
+- ~~Visual direction~~ **Decided Nov 7: Status Lights** (`docs/design/direction.md`). Palette, type and the signature light strip are fixed there; exact dark-theme values are set during the build.
 - How the Diagnose ladder looks (the brief fixes only its structure and states).
 - How the network map looks: node shapes, link styles and how a broken link is drawn (the brief fixes only its structure, states and accessibility).
 - Chart styling, within the accessibility rules above.

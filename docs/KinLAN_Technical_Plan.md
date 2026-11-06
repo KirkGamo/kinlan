@@ -497,9 +497,9 @@ Use Neon's **pooled** connection string (the host containing `-pooler`) with SQL
 
 **Neon skills scope:** KinLAN uses Neon **only as managed PostgreSQL**. The installed `neon-auth`, `neon-functions`, `neon-realtime`, `neon-object-storage` and `neon-ai-gateway` skills cover products the plan doesn't use: login is the API's own (Section 4.2), the API runs on Render (Section 10.2), and live views use polling (Section 6.3). CLAUDE.md tells the coding agent not to adopt them.
 
-**Single source of truth: `DESIGN.md`.**
+**Single source of truth: `DESIGN.md`**, written from the built app at the end of Sprint 3. Until then the visual reference is the **direction contract** in `docs/design/direction.md` (chosen Nov 7: **Status Lights**, a row of five labelled lights for This PC, Router, Provider, DNS and Web, on a graphite shell). Impeccable writes DESIGN.md from the built world rather than before it, so the rules describe what shipped.
 - Don't run ui-ux-pro-max with `--persist`. It would create a competing `design-system/MASTER.md`.
-- `mobile/src/theme/` (the MD3 theme, status colors, spacing) is generated from the DESIGN.md tokens and must never disagree with them.
+- `mobile/src/theme/` (the MD3 theme, status colors, spacing) is built from the direction contract in Sprint 3, and DESIGN.md then documents it; the two must never disagree.
 - **Path note:** ui-ux-pro-max's SKILL.md shows `${CLAUDE_PLUGIN_ROOT}/…`, which isn't set for a project install. Run it as `python .claude/skills/ui-ux-pro-max/scripts/search.py …` from the repository root.
 
 ### 8.2 Design language decisions (inputs to DESIGN.md)
@@ -529,9 +529,10 @@ Use Neon's **pooled** connection string (the host containing `-pooler`) with SQL
 | **Sprint 0** (Nov 6–8) | Capture product facts: users, roles, tasks, tone, platforms (Android + web), accessibility goals | `/impeccable init` | `PRODUCT.md` |
 | **Sprint 1** (evenings) | Research direction | `python .claude/skills/ui-ux-pro-max/scripts/search.py "network monitoring dashboard real-time status mobile" --design-system --density 8 -p "KinLAN"` · `… "status indicator color blind" --domain ux` · `… "line chart time series latency" --domain chart` · `… "list performance navigation" --stack react-native` | Notes compared against MD3. Pick palette, type and density. |
 | Sprint 1 | Brief each key screen before designing it: Overview, Device detail, Diagnose, Onboarding/Pairing, Alerts | `/impeccable shape overview` (and so on) | Confirmed briefs, saved in `docs/design/briefs/` |
-| Sprint 1–2 | Create the design system | `/impeccable` new-work flow for the app's visual identity (writes DESIGN.md with YAML tokens and prose) | `DESIGN.md` |
-| Sprint 1 (by Nov 15) | Wireframes and mockups of the 5 key screens | Figma, following DESIGN.md | Screenshots for the progress report and Chapter 2 |
-| **Sprint 3** (Nov 22–28) | Generate the theme from DESIGN.md | Coding agent | `mobile/src/theme/{colors,typography,spacing,status}.ts` |
+| Sprint 1 (done Nov 7) | Choose the visual world | Impeccable new-work flow: `concept-seed`, decision page, direction contract | `docs/design/direction.md` (Status Lights) |
+| Sprint 1 (by Nov 15) | Wireframes and mockups of the 5 key screens | Figma, following the direction contract | Screenshots for the progress report and Chapter 2 |
+| **Sprint 3** (Nov 22–28) | Build the theme from the direction contract | Coding agent | `mobile/src/theme/{colors,typography,spacing,status}.ts` |
+| End of Sprint 3 | Finish review, then document the built design system | Impeccable finish reviewer, then `/impeccable document` | `DESIGN.md` |
 | Sprint 3, per screen | Build → check → fix | Code with **vercel-react-native-skills** loaded (FlatList/FlashList virtualization, memoized items, native stack, Pressable, safe areas, expo-image). Then `/impeccable audit <screen>` (native audit: accessibility, performance, theming, layout, platform). | A working screen with its audit findings fixed |
 | Sprint 3 | Copy and empty/first-run states | `/impeccable clarify` (labels, errors) · `/impeccable onboard onboarding` (pairing flow, empty states) | Better text and first-run experience |
 | **Sprint 4** (Nov 29–Dec 4) | Edge cases: offline, errors, long names, large text, 200 devices | `/impeccable harden` | A robust app |
@@ -545,7 +546,7 @@ Use Neon's **pooled** connection string (the host containing `-pooler`) with SQL
 - Turn it on in Sprint 3 if you want automatic checks, and leave it off otherwise. It only changes your local settings. `impeccable hooks off` disables it, and `impeccable hooks reset` removes its entries completely.
 
 ### 8.4 Rules for the coding agent (also in CLAUDE.md)
-1. Read `DESIGN.md` before any UI change. Never hard-code a color, size or spacing value; import from `src/theme`.
+1. Read `DESIGN.md` (or, until it exists, `docs/design/direction.md`) before any UI change. Never hard-code a color, size or spacing value; import from `src/theme`.
 2. Load `vercel-react-native-skills` for any work in `mobile/`.
 3. Every new screen needs: a shape brief, all four states (loading, empty, error, stale), accessibility labels on icon buttons, and an `/impeccable audit` with no critical findings.
 4. Status is never shown by color alone.
@@ -819,7 +820,7 @@ Write each chapter of the report **at the end of the sprint it covers**, not in 
 - [ ] `netinfo`, `discovery` (ARP + fallback), `monitor`, `pingtest`, `diagnose`, the local SQLite buffer, and `run --local`, which prints results with `rich` tables.
 - [ ] Unit tests for the parsers, the diagnose decision logic and the health score.
 - [ ] Wireshark captures of the scan and the diagnose.
-- [ ] Design: ui-ux-pro-max research, `/impeccable shape` for the 5 key screens, first DESIGN.md draft.
+- [x] Design: ui-ux-pro-max research, `/impeccable shape` briefs for the 5 key screens, visual direction chosen (Status Lights).
 - [ ] **By Sun Nov 15 (needed for the progress report):** Figma mockups of the 5 key screens, and the ERD from Section 5.2 drawn in draw.io.
 - [ ] **Done when:** `kinlan-agent run --local` shows devices, latency, loss and a diagnose result on your home network.
 
@@ -838,9 +839,10 @@ Write each chapter of the report **at the end of the sprint it covers**, not in 
 - [ ] **Done when:** two agents (home + a second network) upload to the live API and data is visible in `/docs` and in pgAdmin.
 
 ### Sprint 3 — Mobile app (Sun Nov 22 – Sat Nov 28)
-- [ ] Theme from DESIGN.md; auth screens; onboarding/pairing; Overview; Devices + Device detail with ping test; network map (List | Map); Diagnose screen; Site detail charts; Alerts; Settings (members, invites, thresholds).
+- [ ] Theme from the direction contract; auth screens; onboarding/pairing; Overview; Devices + Device detail with ping test; network map (List | Map); Diagnose screen; Site detail charts; Alerts; Settings (members, invites, thresholds).
 - [ ] Development build on your phone; push notifications end to end.
 - [ ] Per screen: vercel-react-native-skills while coding, then `/impeccable audit`, `clarify` and `onboard` for the first-run flow.
+- [ ] End of sprint: Impeccable finish review against the direction contract, then `/impeccable document` writes DESIGN.md from the built app.
 - [ ] **Done when:** a second user joins with an invite code on another phone, sees the same site, and receives a "new device" push.
 
 ### Sprint 4 — Finish, test, document (Sun Nov 29 – Fri Dec 4)
@@ -950,7 +952,8 @@ Course instructions and the proposal are in course/ (local only).
 - Work on a branch named `type/scope-short-description`, open a PR to `main`, and squash-merge.
 
 ## Frontend / design
-- DESIGN.md is the single source of truth for visual design. Read it before any UI change.
+- DESIGN.md is the single source of truth for visual design once it exists (end of Sprint 3).
+  Until then, read the direction contract in docs/design/direction.md before any UI change.
   Never hard-code colors/sizes; import from mobile/src/theme.
 - Load the vercel-react-native-skills skill for any work in mobile/.
 - New screen: /impeccable shape first; implement loading/empty/error/stale states;
