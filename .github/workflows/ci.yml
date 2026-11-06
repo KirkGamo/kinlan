@@ -56,8 +56,8 @@ jobs:
       - run: python -m pytest -q
 
   mobile:
-    # Skipped until the Expo app is created in Sprint 3.
-    if: ${{ hashFiles('mobile/package.json') != '' }}
+    # Steps are skipped until the Expo app (mobile/package.json) is created in Sprint 3.
+    # hashFiles() is only allowed in step-level conditions, not in a job-level `if`.
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -65,10 +65,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
+        if: ${{ hashFiles('mobile/package.json') != '' }}
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: mobile/package-lock.json
-      - run: npm ci
-      - run: npx tsc --noEmit
-      - run: npx eslint .
+      - if: ${{ hashFiles('mobile/package.json') != '' }}
+        run: npm ci
+      - if: ${{ hashFiles('mobile/package.json') != '' }}
+        run: npx tsc --noEmit
+      - if: ${{ hashFiles('mobile/package.json') != '' }}
+        run: npx eslint .
