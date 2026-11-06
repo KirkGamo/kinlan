@@ -11,6 +11,8 @@ import ctypes
 import socket
 import struct
 import sys
+import time
+from dataclasses import dataclass
 
 AVAILABLE = sys.platform == "win32"
 
@@ -54,6 +56,62 @@ if AVAILABLE:  # pragma: no cover - exercised on Windows only
     ]
     _iphlpapi.SendARP.restype = wintypes.DWORD
 
+    class _IP_OPTION_INFORMATION(ctypes.Structure):  # noqa: N801
+        _fields_ = [
+            ("Ttl", ctypes.c_ubyte),
+            ("Tos", ctypes.c_ubyte),
+            ("Flags", ctypes.c_ubyte),
+            ("OptionsSize", ctypes.c_ubyte),
+            ("OptionsData", ctypes.c_void_p),
+        ]
+
+    class _ICMP_ECHO_REPLY(ctypes.Structure):  # noqa: N801
+        _fields_ = [
+            ("Address", wintypes.ULONG),
+            ("Status", wintypes.ULONG),
+            ("RoundTripTime", wintypes.ULONG),
+            ("DataSize", ctypes.c_ushort),
+            ("Reserved", ctypes.c_ushort),
+            ("Data", ctypes.c_void_p),
+            ("Options", _IP_OPTION_INFORMATION),
+        ]
+
+    _iphlpapi.IcmpCreateFile.argtypes = []
+    _iphlpapi.IcmpCreateFile.restype = wintypes.HANDLE
+    _iphlpapi.IcmpCloseHandle.argtypes = [wintypes.HANDLE]
+    _iphlpapi.IcmpCloseHandle.restype = wintypes.BOOL
+    _iphlpapi.IcmpSendEcho.argtypes = [
+        wintypes.HANDLE,
+        wintypes.ULONG,
+        ctypes.c_void_p,
+        wintypes.WORD,
+        ctypes.POINTER(_IP_OPTION_INFORMATION),
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        wintypes.DWORD,
+    ]
+    _iphlpapi.IcmpSendEcho.restype = wintypes.DWORD
+
+# IP_STATUS codes returned by IcmpSendEcho (ipexport.h), the ones worth naming.
+ICMP_STATUS = {
+    0: "success",
+    11002: "destination network unreachable",
+    11003: "destination host unreachable",
+    11010: "timed out",
+    11013: "TTL expired in transit",
+    11050: "general failure",
+}
+
+
+@dataclass(frozen=True)
+class EchoReply:
+    """The result of one ICMP echo request."""
+
+    ok: bool
+    rtt_ms: float | None  # None when there was no reply
+    ttl: int | None = None
+    status: str = "success"
+
 
 def _to_dword(ip: str) -> int:
     """IPv4 dotted string -> DWORD in network byte order, as iphlpapi expects."""
@@ -93,3 +151,37 @@ def send_arp(ip: str) -> str | None:
     if length.value != 6:
         return None
     return ":".join(f"{b:02x}" for b in mac[:6])
+
+
+_PAYLOAD = b"kinlan-echo-0123456789abcdefghij"  # 32 bytes, the same size Windows ping uses
+
+
+def icmp_echo(ip: str, timeout_ms: int = 1000) -> EchoReply:
+    """Send one ICMP echo request to ``ip`` through Windows and wait for the reply.
+
+    Windows reports round-trip times in whole milliseconds; replies faster than 1 ms
+    (common on a LAN) are timed with ``perf_counter`` instead, so they aren't shown as 0.
+    """
+    if not AVAILABLE:
+        raise OSError("IcmpSendEcho is only available on Windows")
+    handle = _iphlpapi.IcmpCreateFile()
+    if not handle or handle == ctypes.c_void_p(-1).value:
+        raise OSError(ctypes.get_last_error(), "IcmpCreateFile failed")
+    reply_size = ctypes.sizeof(_ICMP_ECHO_REPLY) + len(_PAYLOAD) + 8
+    buffer = ctypes.create_string_buffer(reply_size)
+    try:
+        started = time.perf_counter()
+        count = _iphlpapi.IcmpSendEcho(
+            handle, _to_dword(ip), _PAYLOAD, len(_PAYLOAD), None, buffer, reply_size, timeout_ms
+        )
+        elapsed_ms = (time.perf_counter() - started) * 1000
+    finally:
+        _iphlpapi.IcmpCloseHandle(handle)
+    reply = _ICMP_ECHO_REPLY.from_buffer(buffer)
+    if count == 0:
+        return EchoReply(ok=False, rtt_ms=None, status="timed out")
+    if reply.Status != 0:
+        status = ICMP_STATUS.get(reply.Status, f"IP status {reply.Status}")
+        return EchoReply(ok=False, rtt_ms=None, status=status)
+    rtt = float(reply.RoundTripTime) if reply.RoundTripTime >= 1 else round(elapsed_ms, 2)
+    return EchoReply(ok=True, rtt_ms=rtt, ttl=reply.Options.Ttl)
