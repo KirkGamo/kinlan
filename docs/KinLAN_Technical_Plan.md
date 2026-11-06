@@ -420,7 +420,10 @@ Use Neon's **pooled** connection string (the host containing `-pooler`) with SQL
 (onboarding)  Create a Circle → Create first site → Pairing code + agent download link → "Waiting for agent…" (live)
 (tabs)
   ├─ Overview   Site cards: grade, status chip, internet latency, unknown-device count, last seen
-  ├─ Devices    Site picker · filter Online/Unknown/All · device cards (name, vendor, IP, trusted badge)
+  ├─ Devices    Site picker · filter Online/Unknown/All · List | Map switch
+  │             List: device cards (name, vendor, IP, trusted badge)
+  │             Map: logical star (router at the center, internet above, devices around it), live latency on links,
+  │             broken link drawn during an outage; drawn with react-native-svg (docs/design/briefs.md, section 2)
   ├─ Alerts     Grouped by site · severity chip · acknowledge (swipe or button)
   └─ Settings   Account · Circle & members · Invite code · Alert thresholds · Notifications · Theme · About
 (stacks)
@@ -433,7 +436,7 @@ Use Neon's **pooled** connection string (the host containing `-pooler`) with SQL
                    (uses react-native-tcp-socket, a native module: works in the dev build and APK, hidden on web)
 ```
 **Required features in the app:**
-- **Discovery:** the Devices tab and the site's network info.
+- **Discovery:** the Devices tab (list and network map) and the site's network info.
 - **Connectivity:** Ping test and Diagnose.
 - **Statistics:** Device detail and Site detail.
 - **Report:** the Report screen.
@@ -835,7 +838,7 @@ Write each chapter of the report **at the end of the sprint it covers**, not in 
 - [ ] **Done when:** two agents (home + a second network) upload to the live API and data is visible in `/docs` and in pgAdmin.
 
 ### Sprint 3 — Mobile app (Sun Nov 22 – Sat Nov 28)
-- [ ] Theme from DESIGN.md; auth screens; onboarding/pairing; Overview; Devices + Device detail with ping test; Diagnose screen; Site detail charts; Alerts; Settings (members, invites, thresholds).
+- [ ] Theme from DESIGN.md; auth screens; onboarding/pairing; Overview; Devices + Device detail with ping test; network map (List | Map); Diagnose screen; Site detail charts; Alerts; Settings (members, invites, thresholds).
 - [ ] Development build on your phone; push notifications end to end.
 - [ ] Per screen: vercel-react-native-skills while coding, then `/impeccable audit`, `clarify` and `onboard` for the first-run flow.
 - [ ] **Done when:** a second user joins with an invite code on another phone, sees the same site, and receives a "new device" push.
@@ -881,7 +884,7 @@ Write each chapter of the report **at the end of the sprint it covers**, not in 
 | Ch. 5 Conclusions & Recommendations | What worked, limitations (Npcap licensing, unsigned exe, free-tier limits), future work (iOS release, WebSocket channel, SNMP for routers, router API integration to block devices) |
 | Source code | Repository + README (install, run, deploy) + commented code (docstrings on every module and public function) |
 | Slides (10–15) | Title · Overview · Problem · Objectives · Methodology (Agile sprints) · Architecture (Section 1 diagram) · Features · Demonstration · Results (Section 9) · Conclusion |
-| Demo video | Script: agent install & pair → app login → devices/new-device alert → ping test → diagnose with the cable unplugged → charts → invite a viewer → PDF report → test results |
+| Demo video | Script: agent install & pair → app login → devices and network map/new-device alert → ping test → diagnose with the cable unplugged → charts → invite a viewer → PDF report → test results |
 
 **Grading coverage:**
 - **Functionality (30):** Sections 3–6.
@@ -893,6 +896,7 @@ Write each chapter of the report **at the end of the sprint it covers**, not in 
 - **Innovation (5):**
   - multi-user cloud platform with a mobile app and push alerts
   - layered troubleshooter
+  - network map that shows where an outage breaks the path
   - offline buffer
   - health grade
 
@@ -901,7 +905,7 @@ Write each chapter of the report **at the end of the sprint it covers**, not in 
 ## 13. Risks and fallbacks
 | Risk | Likelihood | Fallback |
 |---|---|---|
-| Behind schedule | High | **Cut in this order:** web build → "Test from this phone" → port check → Tkinter agent window → PDF (keep a plain-text/CSV report). Never cut: the 5 required features, auth/roles, the live API, the APK. |
+| Behind schedule | High | **Cut in this order:** web build → network map → "Test from this phone" → port check → Tkinter agent window → PDF (keep a plain-text/CSV report). Never cut: the 5 required features, auth/roles, the live API, the APK. |
 | Neon free compute limits (the database never idles because agents upload constantly) | Medium | Check the current free-tier limits when signing up. If they're exceeded, raise the upload interval to 60 s, or move to Supabase's free PostgreSQL. Only `DATABASE_URL` changes, because the schema is managed by Alembic. |
 | Render free instance sleeps or restarts | Medium | Agents and the uptime check keep it awake. Agents buffer locally, so a restart loses nothing. |
 | EAS free build quota | Low–Medium | Build locally with `expo run:android` (may need JDK 17) |

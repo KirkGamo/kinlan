@@ -3,6 +3,7 @@
 Written with the Impeccable `shape` flow (Sprint 1, Nov 7, 2026). These say **what each screen must do and how it behaves**, not how it looks: the visual direction (color, type, shape) is decided in DESIGN.md.
 
 **Confirmed in the interview:**
+- The Devices tab adds a **network map** as a List | Map switch (added Nov 7 at the user's request).
 - A caretaker usually watches **1 site, sometimes 2–3**.
 - The home screen answers **"Is anything wrong now?"** first.
 - Push alerts **buzz only for outages and security**; latency and loss warnings stay in the app.
@@ -43,13 +44,22 @@ Written with the Impeccable `shape` flow (Sprint 1, Nov 7, 2026). These say **wh
   - Groups in order: **Needs review** (new untrusted devices after the baseline, and the one-time baseline review), **Online**, **Offline**.
   - Each row: display name (custom name, else hostname, else manufacturer), manufacturer, IP, status chip, trusted badge.
   - Filter chips (All / Needs review / Online / Offline). No search needed below about 40 devices.
+- **Map (a List | Map switch on the Devices tab; the list stays the default):**
+  - A **logical network map**: the router at the center, the internet above it, and every device as a node around the router (a star, which is what one local network is).
+  - **Links carry live numbers:** internet latency and loss on the router-to-internet link, router latency on the agent PC's link.
+  - **Each node:** a type icon (router, PC, phone, unknown), the display name, and its status chip (Online, Offline, New); the agent's PC is marked.
+  - **Tapping a node** opens its Device detail; the filter chips apply to the map too.
+  - **Outages show where the break is:** during a provider outage the router-to-internet link is drawn broken; when the router itself isn't responding, the agent PC's link is. The same location the Diagnose root cause names.
+  - **Labelled honestly:** a caption says it shows which devices share the network, not how they're wired. ARP can't tell Wi-Fi from cable or see extenders.
+  - **Range:** readable up to about 30 devices in one ring; beyond that, offline devices collapse into one "+N offline" node.
+  - **Accessibility:** the map is an alternative view, never the only one. Screen readers get a text summary ("Router, 6 devices online, 1 new, internet 25 ms") and every action stays available from the list.
 - **Detail:**
   - Identity: name (editable), manufacturer, MAC, IP, first and last seen. A "Private address" device explains in one line that the phone hides its real hardware address.
   - Actions (owners and admins): **Mark as trusted**, **Rename**, **Ping test**.
   - Ping test result card: plain line first ("Responds well: 2 ms average, no loss"), the numbers on tap (sent/received, min/avg/max, jitter).
   - Ping history and any **risky open ports** with plain advice ("Telnet sends passwords unencrypted. Turn it off on this device.").
 - **States:** online, offline, needs review, ping running, ping timed out (agent offline), viewer read-only. Range: 1–60 devices.
-- **Must not:** suggest KinLAN can block a device (it can't; there's no router integration).
+- **Must not:** suggest KinLAN can block a device (it can't; there's no router integration); present the map as a physical wiring diagram.
 
 ## 3. Diagnose
 
@@ -92,4 +102,5 @@ Written with the Impeccable `shape` flow (Sprint 1, Nov 7, 2026). These say **wh
 
 - Visual direction: palette (beyond the status colors), typeface (Roboto or Inter), shape, elevation and motion.
 - How the Diagnose ladder looks (the brief fixes only its structure and states).
+- How the network map looks: node shapes, link styles and how a broken link is drawn (the brief fixes only its structure, states and accessibility).
 - Chart styling, within the accessibility rules above.
