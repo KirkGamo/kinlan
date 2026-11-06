@@ -18,7 +18,7 @@ from kinlan_agent import __version__
 # Sprint in which each subcommand gets implemented, shown until it exists.
 _PLANNED_IN = {
     "pair": "Sprint 2",
-    "run": "Sprint 1",
+    "run": "Sprint 2 (use 'run --local' until then)",
     "install": "Sprint 4",
     "uninstall": "Sprint 4",
     "status": "Sprint 2",
@@ -41,6 +41,18 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="print results in the terminal without connecting to the cloud",
     )
+    run.add_argument(
+        "--ticks",
+        type=int,
+        default=None,
+        help="with --local: stop after this many monitor ticks (default: until Ctrl+C)",
+    )
+    run.add_argument(
+        "--interval",
+        type=float,
+        default=10.0,
+        help="with --local: seconds between monitor ticks (default: 10)",
+    )
     sub.add_parser("install", help="start the agent automatically at boot")
     sub.add_parser("uninstall", help="remove the startup task")
     sub.add_parser("status", help="show pairing and upload status")
@@ -50,6 +62,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch to the chosen subcommand. Returns an exit code."""
     args = build_parser().parse_args(argv)
+    if args.command == "run" and args.local:
+        from kinlan_agent.local import run_local  # imported here: it loads Rich and Scapy
+
+        run_local(ticks=args.ticks, interval_s=args.interval)
+        return 0
     print(
         f"kinlan-agent {args.command}: not implemented yet "
         f"(planned for {_PLANNED_IN[args.command]}).",
