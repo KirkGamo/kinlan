@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     env: str = "development"
-    database_url: str = "postgresql+psycopg://postgres@localhost:5432/kinlan_dev"
+    database_url: str = "postgresql+psycopg://postgres@localhost:5433/kinlan_dev"
     jwt_secret: str = "change-me-in-.env"
     cors_origins: list[str] = ["http://localhost:8081"]
     expo_access_token: str | None = None
