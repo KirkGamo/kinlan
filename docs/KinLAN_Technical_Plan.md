@@ -132,7 +132,7 @@ For the final zip, `/SourceCode` = a clean copy of the repository. Make it with 
 | Step | Command / action |
 |---|---|
 | Install Python 3.12 | Download from python.org (keep 3.10 alongside), then use `py -3.12 -m venv .venv` in `agent/` and `server/` |
-| Agent dependencies | `pip install scapy icmplib dnspython httpx psutil pywin32 mac-vendor-lookup pydantic-settings rich pyinstaller pytest ruff` |
+| Agent dependencies | `pip install scapy icmplib dnspython httpx psutil pywin32 pydantic-settings rich pyinstaller pytest ruff` |
 | Server dependencies | `pip install "fastapi[standard]" "sqlalchemy>=2" alembic "psycopg[binary]" pyjwt "pwdlib[argon2]" pydantic-settings slowapi apscheduler reportlab matplotlib httpx pytest ruff` |
 | Mobile app | `npx create-expo-app@latest mobile`, then `npx expo install expo-router react-native-paper react-native-svg expo-secure-store expo-notifications expo-device expo-dev-client expo-sharing expo-file-system` and `npm i @tanstack/react-query react-native-gifted-charts react-native-tcp-socket zod` |
 | Pin versions | After installing, run `pip freeze > requirements.txt` in `agent/` and `server/`, and move pytest, ruff and pyinstaller into `requirements-dev.txt`. The mobile app is pinned by `package-lock.json`. Commit all of them. |
@@ -157,9 +157,9 @@ For the final zip, `/SourceCode` = a clean copy of the repository. Make it with 
 ### 3.2 Modules
 | Module | Responsibility | Key techniques |
 |---|---|---|
-| `netinfo.py` | Local IP, subnet mask, CIDR range, default gateway, DNS servers, interface name/MAC | UDP-socket trick: `connect(("1.1.1.1", 80))` then `getsockname()` gives the outbound IP without sending packets. `psutil.net_if_addrs()` gives the netmask, `ipaddress.ip_network(...)` the range, and `scapy.conf.route.route("0.0.0.0")` the gateway. |
-| `discovery.py` | Find active devices, with MAC, vendor and hostname | **Primary:** scapy ARP sweep `srp(Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=cidr), timeout=2)`. **Fallback** (no Npcap): an ICMP sweep, then parse `arp -a`. Vendor lookup from a bundled IEEE OUI list. Hostname from reverse DNS (`socket.gethostbyaddr`, 1 s timeout). Ranges larger than /22 are limited to the host's /24. **Interface:** scan only on the adapter whose IP equals the outbound IP from `netinfo`, so virtual adapters (Docker, Hyper-V, VirtualBox) are ignored. **Online rule:** a device is *online* if it answered in the latest scan, and *offline* after missing 2 scans in a row (about 10 min). |
-| `monitor.py` | Continuous latency and packet-loss sampling | `icmplib.async_ping` (privileged mode), **1 echo per target every 10 s**. Targets are the gateway and `1.1.1.1`; a second public target, `8.8.8.8`, confirms an outage. |
+| `netinfo.py` | Local IP, subnet mask, CIDR range, default gateway, DNS servers, interface name/MAC | UDP-socket trick: `connect(("8.8.8.8", 80))` then `getsockname()` gives the outbound IP without sending packets. `psutil.net_if_addrs()` gives the netmask and adapter MAC, `ipaddress` the range, Windows `GetBestRoute` (iphlpapi, no admin rights needed) the gateway with Scapy's route table as fallback, and dnspython the DNS servers. Windows calls live in `winapi.py`. |
+| `discovery.py` | Find active devices, with MAC, vendor and hostname | **Primary:** scapy ARP sweep `srp(Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=cidr), timeout=2, retry=2)`. The two resends matter: in testing, a single pass missed phones in power-saving mode on 2 of 3 scans. **Fallback** (no Npcap): Windows `SendARP` for every host address, 64 in parallel (no admin rights needed). Vendor lookup from the bundled IEEE OUI list `kinlan_agent/data/oui.txt` (about 38,000 prefixes); randomized phone MACs (locally administered bit set) are labeled "Private address". Hostnames from reverse DNS **asked of the router**, which knows DHCP names; for private IPs only local-looking names are kept (no dot, or `.local`/`.lan`/`.home`), because ISP DNS servers answer with unrelated public names. Ranges larger than /22 are limited to the host's /24. **Interface:** scan only on the adapter whose IP equals the outbound IP from `netinfo`, so virtual adapters (Docker, Hyper-V, VirtualBox) are ignored. **Online rule:** a device is *online* if it answered in the latest scan, and *offline* after missing 2 scans in a row (about 10 min). |
+| `monitor.py` | Continuous latency and packet-loss sampling | Windows `IcmpSendEcho` (iphlpapi: works without admin rights; icmplib on other systems), **1 echo per target every 10 s**. Targets are the gateway and `8.8.8.8`; a second public target, `9.9.9.9`, confirms an outage. **Target check at startup:** the agent pings each candidate (8.8.8.8, 9.9.9.9, 1.1.1.1, 208.67.222.222) and uses the first two that answer, because some networks block certain resolvers. On the developer's home network, 1.1.1.1 and 1.0.0.1 are blocked for both ICMP and TCP (tested Nov 7). |
 | `pingtest.py` | Ping test of one selected device (required Feature 2) | N echoes (default 10, interval 0.5 s). Returns sent/received, loss %, min/avg/max/jitter. |
 | `diagnose.py` | Layered troubleshooter (on demand or automatic on outage) | Six ordered steps, each with a pass/fail result, a time in ms and an explanation (Section 3.3) |
 | `portcheck.py` | Risky-port check for known devices | `asyncio.open_connection` with a 0.5 s timeout, 100 at a time. Ports: 21 FTP, 23 Telnet, 445 SMB, 3389 RDP, 5900 VNC, 80/8080 HTTP admin pages (shown as info). Runs on demand and once daily. |
@@ -175,14 +175,14 @@ For the final zip, `/SourceCode` = a clean copy of the repository. Make it with 
 | 1 | The adapter is up and has a non-APIPA IPv4 address (not 169.254.x.x) | Physical / Data link | Cable unplugged, Wi-Fi disconnected, or DHCP failed |
 | 2 | ARP for the gateway resolves | Data link | Not really on the network (wrong Wi-Fi or VLAN) |
 | 3 | ICMP to the gateway succeeds (3 echoes, ≤ 1 failure) | Network (LAN) | Router down or overloaded, weak Wi-Fi |
-| 4 | ICMP to 1.1.1.1 **and** 8.8.8.8 (3 echoes each) | Network (WAN) | ISP outage, or the router's internet connection is down |
-| 5 | DNS query for `example.com` to the system resolver, timed | Application (DNS) | DNS server problem. The internet works but names don't load. Suggest switching to 1.1.1.1. |
-| 6 | TCP connect to `1.1.1.1:443`, then an HTTPS `HEAD https://www.google.com/generate_204` | Transport / Application | Firewall or captive portal blocking the web |
+| 4 | ICMP to both internet targets, 8.8.8.8 **and** 9.9.9.9 by default (3 echoes each) | Network (WAN) | ISP outage, or the router's internet connection is down |
+| 5 | DNS query for `example.com` to the system resolver, timed | Application (DNS) | DNS server problem. The internet works but names don't load. Suggest a public DNS server such as 8.8.8.8 or 9.9.9.9. |
+| 6 | TCP connect to `8.8.8.8:443`, then an HTTPS `HEAD https://www.google.com/generate_204` | Transport / Application | Firewall or captive portal blocking the web |
 
 The diagnosis stops at the **first failing step** and reports that step as the root cause. Later steps are shown as "skipped". The whole result is stored, so it appears in the history and in reports.
 
 ### 3.4 Outage detection (agent side)
-- **Down:** 3 consecutive failed samples to `1.1.1.1` and the confirmation to `8.8.8.8` also fails. The cause depends on the gateway:
+- **Down:** 3 consecutive failed samples to the main internet target and the confirmation target also fails. The cause depends on the gateway:
   - gateway still OK → `cause = isp`
   - gateway failing too → `cause = lan`
 - **Up:** 2 consecutive successes.
@@ -212,7 +212,7 @@ agent_id = "…"                                 # set at pairing
 monitor_interval_s = 10
 upload_interval_s = 30
 scan_interval_s = 300
-internet_targets = ["1.1.1.1", "8.8.8.8"]
+internet_targets = ["8.8.8.8", "9.9.9.9", "1.1.1.1", "208.67.222.222"]  # first two that answer are used
 port_check_time = "03:00"
 max_scan_prefix = 22
 log_level = "INFO"
@@ -221,7 +221,7 @@ Every value has a default in `config.py` (pydantic-settings), so a missing key n
 
 ### 3.8 Packaging
 - **Build:** `pyinstaller build/kinlan-agent.spec --onefile` produces `KinLAN-Agent.exe`, with the OUI list bundled. It's published on **GitHub Releases**.
-- **Npcap:** its free license doesn't allow bundling it in your installer. The README tells users to install Npcap (or Wireshark). Without it, the agent falls back to ICMP + `arp -a`, so it still works.
+- **Npcap:** its free license doesn't allow bundling it in your installer. The README tells users to install Npcap (or Wireshark). Without it, the agent falls back to Windows `SendARP`, so it still works (about 14 s per /24 instead of 7 s).
 - **Unsigned executable:** Windows SmartScreen will warn about the `.exe`. Document "More info → Run anyway" in the README and mention it in the defense.
 - **Optional:** a small Tkinter status window that shows the pairing state, last upload, grade and a "Run diagnose" button, styled with the DESIGN.md colors.
 
@@ -294,7 +294,7 @@ A command not picked up within 2 minutes becomes `expired`, and the app shows *"
 {
   "batch_id": "3f0c…", "agent_version": "1.0.0", "sent_at": "2026-11-20T10:00:30Z",
   "netinfo": {"local_ip": "192.168.1.23", "cidr": "192.168.1.0/24", "gateway": "192.168.1.1"},
-  "samples": [{"ts": "2026-11-20T10:00:00Z", "target": "internet", "ip": "1.1.1.1", "rtt_ms": 18.4, "ok": true}],
+  "samples": [{"ts": "2026-11-20T10:00:00Z", "target": "internet", "ip": "8.8.8.8", "rtt_ms": 18.4, "ok": true}],
   "devices": [{"mac": "a4:5e:60:…", "ip": "192.168.1.5", "hostname": "DESKTOP-ABC", "vendor": "Apple"}],
   "outages": [{"started_at": "…", "ended_at": "…", "cause": "isp"}],
   "port_findings": [{"mac": "…", "port": 23, "service": "telnet"}]
@@ -429,7 +429,7 @@ Use Neon's **pooled** connection string (the host containing `-pooler`) with SQL
   Diagnose         6-step list with live status (pending → running → pass/fail) and the root-cause card
   Report           Pick range → Generate → Preview/Share PDF
   Join             Enter invite code
-  Phone test       "Test from this phone": TCP connect timing to the gateway and 1.1.1.1:443, compared with the agent
+  Phone test       "Test from this phone": TCP connect timing to the gateway and 8.8.8.8:443, compared with the agent
                    (uses react-native-tcp-socket, a native module: works in the dev build and APK, hidden on web)
 ```
 **Required features in the app:**
@@ -906,7 +906,7 @@ Write each chapter of the report **at the end of the sprint it covers**, not in 
 | Render free instance sleeps or restarts | Medium | Agents and the uptime check keep it awake. Agents buffer locally, so a restart loses nothing. |
 | EAS free build quota | Low–Medium | Build locally with `expo run:android` (may need JDK 17) |
 | Push setup (FCM) is time-consuming | Medium | Configured in Sprint 2, while the server is being built |
-| Npcap missing on the test PC | Medium | ICMP + `arp -a` fallback already designed in |
+| Npcap missing on the test PC | Medium | Windows `SendARP` fallback, built and tested in Sprint 1 |
 | ICMP blocked by some devices or Windows firewalls | High | ARP discovery finds them anyway. In the defense, explain why ARP is more reliable than ping inside a LAN. |
 | Router or ISP blocks the outage test | Low | Simulate it by disabling the router's WAN, or by unplugging the router–modem cable |
 | Local-only files lost (not in Git) | Low | The skills can be downloaded again from their GitHub repositories, and the `CLAUDE.md` text is in Appendix A. Optionally keep a copy of `.claude/` in a private cloud folder. |

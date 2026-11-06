@@ -33,7 +33,7 @@ flowchart LR
     end
 
     PUSH["Expo Push → FCM"]
-    NET(("Internet<br/>1.1.1.1 · 8.8.8.8 · DNS"))
+    NET(("Internet<br/>8.8.8.8 · 9.9.9.9 · DNS"))
 
     GW --- NET
     AG -- "HTTPS POST /agent/ingest (every 30 s)" --> API
@@ -95,12 +95,12 @@ flowchart TD
     C -- No --> P["Ask for 6-digit pairing code<br/>Show consent prompt"] --> PR["POST /agent/pair<br/>Save encrypted token"] --> B["Baseline scan<br/>(no alerts)"] --> L
     C -- Yes --> L["Start periodic tasks"]
 
-    L --> M["Every 10 s: ping gateway and 1.1.1.1"]
+    L --> M["Every 10 s: ping gateway and 8.8.8.8"]
     L --> SC["Every 5 min: ARP scan"]
     L --> U["Every 30 s: upload outbox"]
     L --> CP["Continuously: long-poll for commands"]
 
-    M --> F{3 failures in a row<br/>and 8.8.8.8 fails?}
+    M --> F{3 failures in a row<br/>and 9.9.9.9 fails?}
     F -- No --> W1["Write sample to SQLite outbox"]
     F -- Yes --> G{Gateway OK?}
     G -- Yes --> O1["Open outage: cause = ISP"]
@@ -130,10 +130,10 @@ flowchart TD
     T2 -- No --> R2["Root cause: data link<br/>Wrong Wi-Fi or VLAN"]
     T2 -- Yes --> T3{"3. Gateway answers ping?"}
     T3 -- No --> R3["Root cause: network (LAN)<br/>Router down or weak Wi-Fi"]
-    T3 -- Yes --> T4{"4. 1.1.1.1 and 8.8.8.8<br/>answer ping?"}
+    T3 -- Yes --> T4{"4. 8.8.8.8 and 9.9.9.9<br/>answer ping?"}
     T4 -- No --> R4["Root cause: network (WAN)<br/>ISP outage"]
     T4 -- Yes --> T5{"5. DNS lookup works?"}
-    T5 -- No --> R5["Root cause: application (DNS)<br/>Suggest 1.1.1.1"]
+    T5 -- No --> R5["Root cause: application (DNS)<br/>Suggest 8.8.8.8 or 9.9.9.9"]
     T5 -- Yes --> T6{"6. TCP 443 + HTTPS<br/>request work?"}
     T6 -- No --> R6["Root cause: transport / application<br/>Firewall or captive portal"]
     T6 -- Yes --> OK["All layers healthy"]
