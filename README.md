@@ -39,10 +39,10 @@ uvicorn app.main:app --reload # API docs at http://localhost:8000/docs
 pytest
 ```
 
-**Local databases** (PostgreSQL asks for your password):
+**Local databases** on PostgreSQL 15, which listens on port **5433** on this machine (PostgreSQL asks for your password):
 ```bash
-createdb -U postgres kinlan_dev
-createdb -U postgres kinlan_test
+createdb -U postgres -h localhost -p 5433 kinlan_dev
+createdb -U postgres -h localhost -p 5433 kinlan_test
 ```
 
 **Git hooks** (once per clone):
