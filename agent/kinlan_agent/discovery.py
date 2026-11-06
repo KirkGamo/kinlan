@@ -66,6 +66,15 @@ class ScanResult:
     errors: list[str] = field(default_factory=list)
 
 
+def arp_targets(network: ipaddress.IPv4Network) -> list[str]:
+    """Host addresses to ask: the network and broadcast addresses can never answer.
+
+    A Wireshark capture of an early version showed .0 and .255 being asked three times
+    each per /24 scan; this keeps every request useful.
+    """
+    return [str(ip) for ip in network.hosts()]
+
+
 def arp_scan_scapy(
     network: ipaddress.IPv4Network,
     iface: str | None,
@@ -80,7 +89,7 @@ def arp_scan_scapy(
     from scapy.sendrecv import srp
 
     answered, _unanswered = srp(
-        Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=str(network)),
+        Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=arp_targets(network)),
         iface=iface,
         timeout=timeout,
         retry=retries,
@@ -98,7 +107,7 @@ def arp_scan_windows(
 
     ``send_arp`` is injectable for tests. Returns ``{ip: mac}`` for hosts that answered.
     """
-    hosts = [str(ip) for ip in network.hosts()]
+    hosts = arp_targets(network)
     with ThreadPoolExecutor(max_workers=workers) as pool:
         macs = list(pool.map(send_arp, hosts))
     return {ip: normalize_mac(mac) for ip, mac in zip(hosts, macs, strict=True) if mac}
