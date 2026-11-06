@@ -28,6 +28,12 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
+Try the agent on your own network, with no cloud connection (Ctrl+C to stop):
+```bash
+python -m kinlan_agent run --local
+```
+It shows this PC's network, the devices on it, a six-step diagnose, and a live monitor with the health grade. No administrator rights are needed; with Npcap installed (it comes with Wireshark) the device scan takes about 7 s instead of 14 s.
+
 **Server**
 ```bash
 cd server
@@ -58,4 +64,4 @@ git config core.hooksPath .githooks
 
 ## Status
 
-Sprint 0 (setup). See [CHANGELOG.md](CHANGELOG.md).
+Sprint 1 (agent core). See [CHANGELOG.md](CHANGELOG.md).
