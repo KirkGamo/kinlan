@@ -1,6 +1,6 @@
 #!/bin/sh
 # Refuses commits that stage coding-assistant files or obvious secrets.
-blocked=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '(^|/)(\.claude/|\.impeccable/|CLAUDE(\.local)?\.md$|\.env$|.*\.token$)')
+blocked=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '(^|/)(\.claude/|\.impeccable/|CLAUDE(\.local)?\.md$|skills-lock\.json$|\.env$|.*\.token$)')
 if [ -n "$blocked" ]; then
   echo "pre-commit: these files must stay local and can't be committed:" >&2
   echo "$blocked" | sed 's/^/  /' >&2
