@@ -184,3 +184,10 @@ def test_resolve_hostnames_asks_the_gateway_when_given(monkeypatch):
     names = discovery.resolve_hostnames(["192.168.1.16"], gateway="192.168.1.1")
     assert asked["server"] == "192.168.1.1"
     assert names == {"192.168.1.16": "phone"}
+
+
+def test_arp_targets_exclude_network_and_broadcast_addresses():
+    targets = discovery.arp_targets(ipaddress.ip_network("192.168.1.0/24"))
+    assert len(targets) == 254
+    assert targets[0] == "192.168.1.1" and targets[-1] == "192.168.1.254"
+    assert "192.168.1.0" not in targets and "192.168.1.255" not in targets
