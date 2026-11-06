@@ -91,7 +91,7 @@ When a site's internet is down, its agent **cannot reach the cloud**, so it can'
 ### 2.1 Monorepo layout
 **Workspace:** `C:\Users\Acer\school\Network and Communications\kinlan\` is both the working folder for every coding session and the repository root (run `git init` there). It already contains `.claude/` (the design skills), `docs/` (this plan) and `course/` (the instructions and the proposal).
 
-**Local-only files:** `.claude/`, `CLAUDE.md` and `.impeccable/` are coding-assistant files. They live in the repository folder on your laptop but are **git-ignored**, so they never appear in the commit history, on GitHub, or in the submission. `course/` is local too: the instruction PDFs, the proposal and the report drafts are submitted through Teams, not as source code.
+**Local-only files:** `.claude/`, `CLAUDE.md`, `.impeccable/` and `skills-lock.json` are coding-assistant files. They live in the repository folder on your laptop but are **git-ignored**, so they never appear in the commit history, on GitHub, or in the submission. `course/` is local too: the instruction PDFs, the proposal and the report drafts are submitted through Teams, not as source code.
 ```
 kinlan/
 ├── .claude/skills/            # LOCAL ONLY (git-ignored): impeccable, ui-ux-pro-max, vercel-react-native-skills, web-design-guidelines
@@ -490,6 +490,9 @@ Use Neon's **pooled** connection string (the host containing `-pooler`) with SQL
 | **ui-ux-pro-max** | Research library: palettes, font pairings, chart choices, UX rules, React Native–specific rules | Nothing persisted. Its results feed into DESIGN.md. |
 | **vercel-react-native-skills** | Engineering rules while writing React Native code (lists, animation, navigation, images, state) | Code that follows the rules |
 | **web-design-guidelines** | Final check of the **web build** against Vercel's Web Interface Guidelines | A findings list (`file:line`) |
+| **neon, neon-postgres** (from `npx neon skills -y`) | Neon CLI setup and PostgreSQL practice: pooled vs direct connections, migrations, branching, restore | Database setup and operations only |
+
+**Neon skills scope:** KinLAN uses Neon **only as managed PostgreSQL**. The installed `neon-auth`, `neon-functions`, `neon-realtime`, `neon-object-storage` and `neon-ai-gateway` skills cover products the plan doesn't use: login is the API's own (Section 4.2), the API runs on Render (Section 10.2), and live views use polling (Section 6.3). CLAUDE.md tells the coding agent not to adopt them.
 
 **Single source of truth: `DESIGN.md`.**
 - Don't run ui-ux-pro-max with `--persist`. It would create a competing `design-system/MASTER.md`.
@@ -634,7 +637,7 @@ chore(repo): add commit-msg hook and PR template
   - `.venv/` or `node_modules/`
   - build output (`dist/`, `build/`, `*.exe`, `*.apk`)
   - database dumps or videos
-  - coding-assistant files: `.claude/`, `CLAUDE.md`, `CLAUDE.local.md`, `.impeccable/`
+  - coding-assistant files: `.claude/`, `CLAUDE.md`, `CLAUDE.local.md`, `.impeccable/`, `skills-lock.json`
 
   APKs and the agent `.exe` go on **GitHub Releases**; the video goes only in the submission zip.
 
@@ -684,6 +687,7 @@ fi
 CLAUDE.md
 CLAUDE.local.md
 .impeccable/
+skills-lock.json
 
 # Course paperwork (submitted through Teams, not as source code)
 course/
@@ -739,7 +743,7 @@ Thumbs.db
 ```sh
 #!/bin/sh
 # Refuses commits that stage coding-assistant files or obvious secrets.
-blocked=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '(^|/)(\.claude/|\.impeccable/|CLAUDE(\.local)?\.md$|\.env$|.*\.token$)')
+blocked=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '(^|/)(\.claude/|\.impeccable/|CLAUDE(\.local)?\.md$|skills-lock\.json$|\.env$|.*\.token$)')
 if [ -n "$blocked" ]; then
   echo "pre-commit: these files must stay local and can't be committed:" >&2
   echo "$blocked" | sed 's/^/  /' >&2
@@ -929,12 +933,16 @@ Course instructions and the proposal are in course/ (local only).
 - Every query on site data must be scoped by the caller's Circle membership. Add an isolation test for new endpoints.
 - Never commit .env, tokens, Firebase credentials, or database dumps.
 - Agent code must run on Windows 11 as admin and degrade gracefully without Npcap.
+- Neon is used only as managed PostgreSQL. Use the neon and neon-postgres skills for database setup,
+  connections and branching. Don't adopt Neon Auth, Functions, Realtime, Object Storage or AI Gateway:
+  login is our FastAPI JWT auth, the API runs on Render, and live views use polling.
+- Ask before installing anything globally (for example `npm i -g neon`).
 
 ## Git
 - Conventional Commits: `type(scope): subject`, first line ≤ 72 characters (technical plan, Section 10.1). Scopes: agent, server, mobile, db, design, docs, ci, repo.
 - Never add AI attribution to commits or PRs: no `Co-Authored-By: Claude …` trailer, no "Generated with Claude Code" line. The commit-msg hook rejects them.
 - One logical change per commit. Never commit secrets, `.env`, `.venv`, `node_modules`, builds, APKs, videos or database dumps.
-- Never commit `.claude/`, `CLAUDE.md`, `CLAUDE.local.md` or `.impeccable/`. They're git-ignored, and the pre-commit hook blocks them. Never use `git add -f` or `--no-verify` to get around this.
+- Never commit `.claude/`, `CLAUDE.md`, `CLAUDE.local.md`, `.impeccable/` or `skills-lock.json`. They're git-ignored, and the pre-commit hook blocks them. Never use `git add -f` or `--no-verify` to get around this.
 - Work on a branch named `type/scope-short-description`, open a PR to `main`, and squash-merge.
 
 ## Frontend / design
