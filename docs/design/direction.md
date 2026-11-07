@@ -60,6 +60,42 @@ Easings: decelerate `cubic-bezier(0.05, 0.7, 0.1, 1)` for arrivals, standard `cu
 
 **Reduce Motion:** every movement becomes a 120 ms fade, loops stop, and results appear at once.
 
+## Type, spacing and hierarchy (Nov 7)
+
+Nine type roles replace the 36 ad-hoc styles the first prototype used. Each maps to a Material 3 role and is set in Manrope; sizes are in sp, so they follow the phone's text-size setting. In the app they become `mobile/src/theme/typography.ts`.
+
+| Role | Size / line | Weight | Tracking | Used for |
+|---|---|---|---|---|
+| Display (M3 display small) | 36 / 40 | 800 | −0.035 em | The health score |
+| Headline (M3 headline medium) | 28 / 34 | 800 | −0.02 em | Tab-screen titles, the verdict, the Diagnose root cause |
+| Title large | 22 / 28 | 800 | −0.012 em | Site name in the Overview header, sheet titles, pushed-screen titles |
+| Title | 16 / 22 | 700 | 0 | Row, person and check titles |
+| Body | 15 / 22 | 500 | 0 | Sentences: verdict text, sheet text, steps, empty states |
+| Body small | 13 / 18 | 500 | 0 | Secondary lines, facts, captions, the chart readout |
+| Label | 15 / 20 | 800 | 0 | Buttons and the Diagnose FAB |
+| Label small | 12 / 16 | 700 | 0 | Chips, the navigation bar, small controls |
+| Silkscreen | 11 / 14 | 800, uppercase | +0.12 em | Section labels, light names, map link labels (`docs/design/brand.md`) |
+
+- **One headline per screen.** On Overview the verdict is the headline; the site name steps down to Title large so the two never compete.
+- **Light text on black gets one step more weight:** body text is 500, not 400.
+- **Light names** are capped at 10.5 sp: the strip is a fixed five-column instrument, like navigation-bar labels. Their values scale normally.
+- **Line breaks:** headings balance (`text-wrap: balance`), sentences avoid a lone last word (`pretty`), and device names never break at their hyphen.
+- **Map labels** are 12 (names) and 11 (captions) at the map's drawn size, never smaller.
+- **Status chips** carry a drawn icon (check, dot, triangle, dash) plus a word; never a text glyph.
+
+**Spacing** follows a 4-dp grid: 4, 8, 12, 16, 20, 24, 32. Spacing is in dp, so it does not grow with text size.
+
+| Token | Value | Where |
+|---|---|---|
+| Gutter | 16 dp | Screen side margins (Material compact) |
+| Card padding | 20 dp | Inside cards and sheets; the verdict card gets 24 dp on top |
+| Item gap | 8 dp | Between rows of one group |
+| Section gap | 32 dp above a section label, 12 dp below | More space above a heading than below it |
+| Row | 68 dp minimum height, 12 × 16 padding | Every list row |
+| Touch targets | 44–56 dp | Buttons 52, FAB 56, small buttons and filters 44/36 inside a 48 dp row |
+
+**Alerts** stack text above a footer row that holds the status chip (left) and the action (right), so the action never squeezes the message.
+
 ## Brand system
 
 The brand layer on top of this direction is in `docs/design/brand.md` (mark, wordmark, silkscreen labels, perforation on the verdict card and splash only, people-first devices, voice, signature moments). Two rules from it bind every screen: only status lights glow, and avatars never use the status colors.
@@ -87,5 +123,6 @@ Measured against WCAG 2.1 (PRODUCT.md requires 4.5:1 for text and 3:1 for icons 
 | Yellow text on card | 12.80:1 | Pass |
 | Orange / green / red text on card | 8.79:1 / 8.94:1 / 5.30:1 | Pass |
 | Red light on black | 5.78:1 | Pass |
+| Black text on red (failed-step number, alert badge) | 5.78:1 (white on red failed at 3.4:1) | Pass |
 | Unlit ring #5E5E66 on black | 3.06:1 (#48484F failed at 2.17:1) | Pass |
 | Dim grey #71717A on card | 3.74:1 | **Fails for text**: not used for text |
