@@ -24,5 +24,5 @@ def test_run_accepts_local_flag():
 
 
 def test_unimplemented_command_exits_with_code_2(capsys):
-    assert main(["status"]) == 2
+    assert main(["install"]) == 2
     assert "not implemented yet" in capsys.readouterr().err
