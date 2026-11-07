@@ -514,7 +514,7 @@ Use Neon's **pooled** connection string (the host containing `-pooler`) with SQL
   - `offline` — help-circle — "Unknown"
   - `info` — information — "New"
 - **Contrast:** text ≥ 4.5:1, icons and large text ≥ 3:1, checked in both themes.
-- **Typography:** Manrope (bold, tightly tracked headlines and big numbers), on the MD3 type scale. Use tabular figures (`fontVariant: ['tabular-nums']`) for all metrics. Sizes in sp/dp so they scale with the phone's text-size setting.
+- **Typography:** Manrope (bold, tightly tracked headlines and big numbers), on nine MD3-based roles (display 36, headline 28, title large 22, title 16, body 15, body small 13, label 15, label small 12, silkscreen 11) and a 4-dp spacing grid; full tables in `docs/design/direction.md`. Use tabular figures (`fontVariant: ['tabular-nums']`) for all metrics. Sizes in sp/dp so they scale with the phone's text-size setting.
 - **Spacing and shape:** 4/8 dp grid; corner radius from MD3 shape tokens. Touch targets ≥ 48 dp (Android) / 44 pt (iOS).
 - **Motion:** smooth and purposeful, built with Reanimated on the UI thread (transform and opacity only): 120 ms presses, 220 ms in-place changes, 350 ms screen transitions, and the signature light ignition (110 ms stagger). Full table in `docs/design/direction.md`. Reduce Motion turns everything into 120 ms fades with no loops.
 - **Charts:**
