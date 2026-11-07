@@ -28,7 +28,16 @@ class Base(DeclarativeBase):
 @lru_cache
 def get_engine() -> Engine:
     """One engine per process. pre_ping replaces connections Neon dropped while idle."""
-    engine = create_engine(get_settings().database_url, pool_pre_ping=True, pool_size=5)
+    settings = get_settings()
+    # Through Neon's PgBouncer, skip psycopg's server-side prepared statements: they belong to one
+    # server connection, and transaction pooling may hand the next query a different one.
+    connect_args = {"prepare_threshold": None} if settings.pooled else {}
+    engine = create_engine(
+        settings.database_url, pool_pre_ping=True, pool_size=5, connect_args=connect_args
+    )
+
+    if settings.pooled:
+        return engine  # Neon computes already run in UTC, and SET wouldn't survive the pooler
 
     @event.listens_for(engine, "connect")
     def _utc(dbapi_connection, _record) -> None:

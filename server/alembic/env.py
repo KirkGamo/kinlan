@@ -13,9 +13,10 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# A caller (the test suite) may pass its own URL; otherwise use the app's settings.
+# A caller (the test suite) may pass its own URL; otherwise the app's settings, preferring the
+# direct (unpooled) Neon string: migrations need a real session, not PgBouncer transactions.
 if not config.get_main_option("sqlalchemy.url"):
-    config.set_main_option("sqlalchemy.url", get_settings().database_url.replace("%", "%%"))
+    config.set_main_option("sqlalchemy.url", get_settings().migration_url.replace("%", "%%"))
 
 target_metadata = Base.metadata
 
