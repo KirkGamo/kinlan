@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.errors import ApiError
-from app.models import Membership, Role, User
+from app.models import Membership, Role, Site, User
 
 RANK = {Role.viewer: 0, Role.admin: 1, Role.owner: 2}
 ROLE_WORD = {Role.viewer: "a viewer", Role.admin: "an admin", Role.owner: "an owner"}
@@ -32,3 +32,14 @@ def owner_count(db: Session, circle_id: uuid.UUID) -> int:
         .select_from(Membership)
         .where(Membership.circle_id == circle_id, Membership.role == Role.owner)
     )
+
+
+def require_site(db: Session, user: User, site_id: uuid.UUID, min_role: Role) -> Site:
+    """Return the site if the caller's role in its Circle is high enough, else 404 / 403."""
+    site = db.get(Site, site_id)
+    if site is None or db.get(Membership, (site.circle_id, user.id)) is None:
+        raise ApiError(
+            404, "site_not_found", "That site doesn't exist or you're not in its Circle."
+        )
+    require_role(db, user, site.circle_id, min_role)
+    return site

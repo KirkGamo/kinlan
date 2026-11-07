@@ -68,3 +68,39 @@ def client():
 
     with TestClient(create_app()) as c:
         yield c
+
+
+# ---------------------------------------------------------------- people
+
+API = "/api/v1"
+
+
+class Person:
+    """A registered user and their auth header."""
+
+    def __init__(self, client, name: str):
+        email = f"{name.lower()}@example.com"
+        r = client.post(
+            f"{API}/auth/register",
+            json={"email": email, "password": "long enough password", "display_name": name},
+        )
+        assert r.status_code == 201, r.text
+        self.h = {"Authorization": f"Bearer {r.json()['access_token']}"}
+        self.id = client.get(f"{API}/me", headers=self.h).json()["id"]
+        self.name = name
+
+
+@pytest.fixture
+def ana(client):
+    return Person(client, "Ana")
+
+
+@pytest.fixture
+def jun(client):
+    return Person(client, "Jun")
+
+
+@pytest.fixture
+def eve(client):
+    """Someone in a different Circle entirely."""
+    return Person(client, "Eve")
