@@ -514,14 +514,15 @@ Use Neon's **pooled** connection string (the host containing `-pooler`) with SQL
   - `offline` — help-circle — "Unknown"
   - `info` — information — "New"
 - **Contrast:** text ≥ 4.5:1, icons and large text ≥ 3:1, checked in both themes.
-- **Typography:** Roboto (MD3 type scale) or Inter. Use tabular figures (`fontVariant: ['tabular-nums']`) for all metrics. Sizes in sp/dp so they scale with the phone's text-size setting.
+- **Typography:** Manrope (bold, tightly tracked headlines and big numbers), on the MD3 type scale. Use tabular figures (`fontVariant: ['tabular-nums']`) for all metrics. Sizes in sp/dp so they scale with the phone's text-size setting.
 - **Spacing and shape:** 4/8 dp grid; corner radius from MD3 shape tokens. Touch targets ≥ 48 dp (Android) / 44 pt (iOS).
-- **Motion:** subtle only (status changes, chart transitions, 150–250 ms). Respect the phone's Reduce Motion setting.
+- **Motion:** smooth and purposeful, built with Reanimated on the UI thread (transform and opacity only): 120 ms presses, 220 ms in-place changes, 350 ms screen transitions, and the signature light ignition (110 ms stagger). Full table in `docs/design/direction.md`. Reduce Motion turns everything into 120 ms fades with no loops.
 - **Charts:**
   - Use line charts for latency and bar charts for loss per hour.
   - Gateway vs internet use two colors that colorblind users can tell apart, plus different dash styles.
   - Use the same colors in every chart, the PDF report and the slides.
-- **Theme:** light and dark, following the phone's setting, with a manual override in Settings.
+- **Theme:** dark-first (near-black with signal yellow, the user's choice on Nov 7); a light theme is optional later. Yellow is brand and selection only and never means a status.
+- **Prototype:** `docs/design/prototype/index.html` shows every screen and the motion system.
 
 ### 8.3 Workflow by phase
 | When | Step | Skill / command | Output |
