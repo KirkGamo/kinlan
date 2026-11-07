@@ -263,7 +263,7 @@ Every value has a default in `config.py` (pydantic-settings), so a missing key n
 | Auth | `POST /auth/register` · `POST /auth/login` · `POST /auth/refresh` · `POST /auth/logout` · `GET /me` · `DELETE /me` |
 | Circles | `GET/POST /circles` · `GET /circles/{circle}/members` · `PATCH/DELETE /circles/{circle}/members/{user}` · `POST /circles/{circle}/invites` (returns an 8-character code, 7-day expiry) · `POST /invites/accept` |
 | Sites | `GET/POST /circles/{circle}/sites` · `GET/PATCH/DELETE /sites/{site}` · `GET /sites/{site}/summary` (grade, status, current latency, counts) · `POST /sites/{site}/pairing-code` |
-| Devices | `GET /sites/{site}/devices?status=online\|unknown` · `GET/PATCH /devices/{device}` (name, trusted) · `GET /devices/{device}/ping-tests` |
+| Devices | `GET /sites/{site}/devices?status=online\|unknown` · `GET/PATCH /devices/{device}` (name, type, trusted) · `GET /devices/{device}/ping-tests` |
 | Metrics | `GET /sites/{site}/latency?range=1h\|24h\|7d\|30d&target=gateway\|internet` (raw or hourly data, chosen automatically) · `GET /sites/{site}/outages` |
 | Commands | `POST /sites/{site}/commands {type, params}` · `GET /commands/{id}` |
 | Alerts | `GET /sites/{site}/alerts` · `POST /alerts/{id}/ack` · `GET/PATCH /sites/{site}/alert-settings` |
@@ -373,7 +373,7 @@ Use Neon's **pooled** connection string (the host containing `-pooler`) with SQL
 | `alert_settings` | site_id (PK), latency_ms, loss_pct, offline_seconds, notify_new_device bool | |
 | `pairing_codes` | id, site_id, code_hash, expires_at, used_at | |
 | `agents` | id, site_id, token_hash (unique), hostname, os, version, last_seen_at, revoked_at | |
-| `devices` | id, site_id, mac, ip (inet), hostname, vendor, custom_name, trusted bool, baseline bool, first_seen_at, last_seen_at, online bool | unique(site_id, mac) |
+| `devices` | id, site_id, mac, ip (inet), hostname, vendor, device_type (router, computer, laptop, phone, tv, printer, unknown; inferred from vendor and hostname, editable), custom_name, trusted bool, baseline bool, first_seen_at, last_seen_at, online bool | unique(site_id, mac) |
 | `ping_samples` | id bigserial, site_id, target enum(gateway, internet), ip inet, ts, rtt_ms real null, ok bool | index(site_id, target, ts desc) |
 | `ping_hourly` | site_id, target, hour, avg_ms, min_ms, max_ms, loss_pct, samples | PK(site_id, target, hour) |
 | `ping_tests` | id, device_id, ts, sent, received, loss_pct, min_ms, avg_ms, max_ms, jitter_ms | index(device_id, ts desc) |
@@ -428,7 +428,7 @@ Use Neon's **pooled** connection string (the host containing `-pooler`) with SQL
   └─ Settings   Account · Circle & members · Invite code · Alert thresholds · Notifications · Theme · About
 (stacks)
   Site detail      Latency chart (1h/24h/7d/30d, gateway vs internet), loss chart, outage log, "Why this grade?"
-  Device detail    Info, rename/trust, "Ping test" (live result), ping history, open-port findings
+  Device detail    Bottom sheet from the list or map: info, rename/type/trust, "Ping test" (live replies), ping history, open-port findings
   Diagnose         6-step list with live status (pending → running → pass/fail) and the root-cause card
   Report           Pick range → Generate → Preview/Share PDF
   Join             Enter invite code

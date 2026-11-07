@@ -48,6 +48,10 @@ Only transform and opacity animate (Reanimated on the UI thread in the app).
 | Latency chart | Line draws, then the yellow fade appears | 1.2 s |
 | Network map | Nodes pop in; the broken internet link's dashes march | 500 ms each, 60 ms stagger; 1.4 s loop |
 | Pairing code | Digits flip in; the waiting dot ripples | 520 ms, 60 ms stagger; 1.6 s loop |
+| Bottom sheet (device, layer, invite) | Slides up over a fading scrim | 350 ms decelerate; closes the same way |
+| Map selection | Yellow ring scales in; other nodes dim | 220 ms |
+| Ping on the map | A dot travels the link and back for each echo; lost echoes turn red and fade | 260 ms each way |
+| Toast | Rises 20 dp and fades in; leaves after 1.8 s | 220 ms |
 
 Easings: decelerate `cubic-bezier(0.05, 0.7, 0.1, 1)` for arrivals, standard `cubic-bezier(0.2, 0, 0, 1)` for changes in place, accelerate `cubic-bezier(0.3, 0, 0.8, 0.15)` for exits.
 

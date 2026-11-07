@@ -47,16 +47,17 @@ Written with the Impeccable `shape` flow (Sprint 1, Nov 7, 2026). These say **wh
 - **Map (a List | Map switch on the Devices tab; the list stays the default):**
   - A **logical network map**: the router at the center, the internet above it, and every device as a node around the router (a star, which is what one local network is).
   - **Links carry live numbers:** internet latency and loss on the router-to-internet link, router latency on the agent PC's link.
-  - **Each node:** a type icon (router, PC, phone, unknown), the display name, and its status chip (Online, Offline, New); the agent's PC is marked.
-  - **Tapping a node** opens its Device detail; the filter chips apply to the map too.
+  - **Each node:** a type icon (router, computer, laptop, phone, TV, printer, unknown; the device type is inferred from the manufacturer and hostname and can be changed in Device detail), the display name, and a status ring and badge (Online, Offline, New); the agent's PC is marked.
+  - **Tapping a node** selects it (yellow ring, its link turns yellow, the other nodes dim) and opens Device detail as a bottom sheet; closing the sheet clears the selection. Nodes are focusable and open with Enter or Space. The filter chips dim the nodes that don't match.
+  - **Ping test on the map:** while a ping runs, each echo is drawn as a dot travelling along the device's link and back; a lost echo turns red and fades. Under Reduce Motion the dots are skipped and only the reply cells fill in.
   - **Outages show where the break is:** during a provider outage the router-to-internet link is drawn broken; when the router itself isn't responding, the agent PC's link is. The same location the Diagnose root cause names.
   - **Labelled honestly:** a caption says it shows which devices share the network, not how they're wired. ARP can't tell Wi-Fi from cable or see extenders.
   - **Range:** readable up to about 30 devices in one ring; beyond that, offline devices collapse into one "+N offline" node.
   - **Accessibility:** the map is an alternative view, never the only one. Screen readers get a text summary ("Router, 6 devices online, 1 new, internet 25 ms") and every action stays available from the list.
 - **Detail:**
-  - Identity: name (editable), manufacturer, MAC, IP, first and last seen. A "Private address" device explains in one line that the phone hides its real hardware address.
+  - Identity: name and device type (both editable), manufacturer, MAC, IP, first and last seen. A "Private address" device explains in one line that the phone hides its real hardware address.
   - Actions (owners and admins): **Mark as trusted**, **Rename**, **Ping test**.
-  - Ping test result card: plain line first ("Responds well: 2 ms average, no loss"), the numbers on tap (sent/received, min/avg/max, jitter).
+  - Ping test result card: five reply cells fill in live, then the plain line ("Responds well", "Responds, but unevenly", "isn't answering") and the numbers (replies, average, max, loss).
   - Ping history and any **risky open ports** with plain advice ("Telnet sends passwords unencrypted. Turn it off on this device.").
 - **States:** online, offline, needs review, ping running, ping timed out (agent offline), viewer read-only. Range: 1–60 devices.
 - **Must not:** suggest KinLAN can block a device (it can't; there's no router integration); present the map as a physical wiring diagram.
@@ -98,9 +99,30 @@ Written with the Impeccable `shape` flow (Sprint 1, Nov 7, 2026). These say **wh
 
 ---
 
+## Interaction model (Nov 7, all screens)
+
+Everything that shows a status can be tapped to explain it or act on it. The prototype (`docs/design/prototype/index.html`) implements each of these.
+
+| Element | Tap or gesture | Result |
+|---|---|---|
+| Status light (Overview) | Tap | Layer sheet: what the layer checks, its state now, what that means, Run diagnose |
+| Site name (header) | Tap | Site switcher menu with each site's state; switching re-runs the light ignition |
+| Open problem row | Tap | Outage: opens Diagnose. New device: opens its Device detail |
+| "Why this grade?" | Tap | Expands the deductions in place (each with its points) |
+| Latency chart | Drag (or hover on web) | Crosshair and readout for that hour; "no reply" during an outage |
+| Device row or map node | Tap | Device detail sheet: ping test, mark as trusted, rename, change type |
+| Internet node | Tap | Outage summary with Run diagnose |
+| Diagnose rung | Tap | Expands the technical detail of that check |
+| Alert | Acknowledge, or Review for a new device | Acknowledged alerts slide out and move to Resolved; the badge counts down |
+| Notification switch | Tap | Toggles, with a confirming toast |
+| Invite a member | Tap | Invite sheet with the code and Copy |
+| Copy code (pairing, invite) | Tap | "Copied" toast |
+
+Sheets close with the close button, a tap on the scrim, Esc, or the Android back gesture, and return focus to what opened them. Pull to refresh stays on Overview, Devices and Alerts (`docs/design/research.md`).
+
 ## Open decisions for DESIGN.md (not decided here)
 
 - ~~Visual direction~~ **Decided Nov 7: Status Lights** (`docs/design/direction.md`). Palette, type and the signature light strip are fixed there; exact dark-theme values are set during the build.
 - How the Diagnose ladder looks (the brief fixes only its structure and states).
-- How the network map looks: node shapes, link styles and how a broken link is drawn (the brief fixes only its structure, states and accessibility).
+- ~~How the network map looks~~ **Drawn in the prototype (Nov 7):** type icons in rings, status badges, a red marching dashed link for an outage, a yellow selection ring.
 - Chart styling, within the accessibility rules above.
