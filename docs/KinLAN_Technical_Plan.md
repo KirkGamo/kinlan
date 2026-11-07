@@ -806,24 +806,24 @@ Keep a short `CHANGELOG.md` with one section per tag (Added / Changed / Fixed), 
 Write each chapter of the report **at the end of the sprint it covers**, not in the last week.
 
 ### Sprint 0 — Setup (Fri Nov 6 – Sun Nov 8)
-- [ ] Submit the proposal (Week 14).
-- [ ] Create the `kinlan` GitHub repo and set it up as in Section 10.1:
+- [ ] Submit the proposal (Week 14). *Moved to Sprint 2 (#4).*
+- [x] Create the `kinlan` GitHub repo and set it up as in Section 10.1:
   - monorepo skeleton, CLAUDE.md, `.gitignore`, `.gitattributes`, `CHANGELOG.md`
   - commit-msg and pre-commit hooks (`git config core.hooksPath .githooks`), PR template, branch protection on `main`
   - Issues with labels, and milestones Sprint 0–4
   - a CI workflow that runs on every push
   - run `git init` in the `kinlan` workspace, and create `CLAUDE.md` from Appendix A there. Check with `git status`: `.claude/`, `CLAUDE.md` and `course/` must not appear.
-- [ ] Install Python 3.12 and both virtual environments; create the local databases; sign up for Neon, Render, Expo and Firebase.
-- [ ] `/impeccable init` → PRODUCT.md.
-- [ ] Draft Chapter 2 diagrams: architecture (Section 1), use case diagram (actors Owner, Admin, Viewer, Agent, Scheduler), and the main flowchart (agent loop + diagnose).
+- [x] Install Python 3.12 and both virtual environments; create the local databases; sign up for Neon, Render, Expo and Firebase.
+- [x] `/impeccable init` → PRODUCT.md.
+- [x] Draft Chapter 2 diagrams: architecture (Section 1), use case diagram (actors Owner, Admin, Viewer, Agent, Scheduler), and the main flowchart (agent loop + diagnose).
 
 ### Sprint 1 — Agent core (Mon Nov 9 – Sat Nov 14)
-- [ ] `netinfo`, `discovery` (ARP + fallback), `monitor`, `pingtest`, `diagnose`, the local SQLite buffer, and `run --local`, which prints results with `rich` tables.
-- [ ] Unit tests for the parsers, the diagnose decision logic and the health score.
-- [ ] Wireshark captures of the scan and the diagnose.
+- [x] `netinfo`, `discovery` (ARP + fallback), `monitor`, `pingtest`, `diagnose`, the local SQLite buffer, and `run --local`, which prints results with `rich` tables.
+- [x] Unit tests for the parsers, the diagnose decision logic and the health score.
+- [x] Wireshark captures of the scan and the diagnose.
 - [x] Design: ui-ux-pro-max research, `/impeccable shape` briefs for the 5 key screens, visual direction chosen (Status Lights).
-- [ ] **By Sun Nov 15 (needed for the progress report):** Figma mockups of the 5 key screens, and the ERD from Section 5.2 drawn in draw.io.
-- [ ] **Done when:** `kinlan-agent run --local` shows devices, latency, loss and a diagnose result on your home network.
+- [x] **By Sun Nov 15 (needed for the progress report):** Figma mockups of the 5 key screens, and the ERD from Section 5.2 drawn in draw.io. *Done Nov 7: the ERD in draw.io; the screens as the interactive prototype `docs/design/prototype/index.html`, since Figma's Starter plan hit its limit after Overview and Devices.*
+- [x] **Done when:** `kinlan-agent run --local` shows devices, latency, loss and a diagnose result on your home network.
 
 ### Sprint 2 — Server, database and connection (Sun Nov 15 – Sat Nov 21)
 - [ ] **Sun–Mon, before the progress report:** SQLAlchemy models + first Alembic migration; auth (register/login/refresh), so the `/docs` page has real endpoints to screenshot.
