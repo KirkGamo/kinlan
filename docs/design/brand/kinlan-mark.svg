@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 16 120 50" width="240" height="100" role="img" aria-label="KinLAN mark">
+  <!-- Five status lights bent into an arc: the modem's light strip, and part of a Circle. Yellow #FFD60A. -->
+  <g fill="#FFD60A">
+    <circle cx="14" cy="51.4" r="9"/>
+    <circle cx="34.6" cy="35.6" r="9"/>
+    <circle cx="60" cy="30" r="9"/>
+    <circle cx="85.4" cy="35.6" r="9"/>
+    <circle cx="106" cy="51.4" r="9"/>
+  </g>
+</svg>

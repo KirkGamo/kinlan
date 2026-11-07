@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="KinLAN app icon">
+  <!-- Android adaptive icon source: black ground, the five-light arc centred in the 66% safe zone. -->
+  <defs>
+    <pattern id="perf" width="36" height="36" patternUnits="userSpaceOnUse"><circle cx="18" cy="18" r="4" fill="#F5F5F7" fill-opacity=".06"/></pattern>
+    <radialGradient id="fade" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <mask id="m"><rect width="1024" height="1024" fill="url(#fade)"/></mask>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="#0B0B0C"/>
+  <rect width="1024" height="1024" rx="224" fill="url(#perf)" mask="url(#m)"/>
+  <g transform="translate(212 309) scale(5)" fill="#FFD60A">
+    <circle cx="14" cy="51.4" r="9"/><circle cx="34.6" cy="35.6" r="9"/><circle cx="60" cy="30" r="9"/><circle cx="85.4" cy="35.6" r="9"/><circle cx="106" cy="51.4" r="9"/>
+  </g>
+</svg>
