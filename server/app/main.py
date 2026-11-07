@@ -7,7 +7,7 @@ from app import __version__
 from app.config import get_settings
 from app.errors import install_error_handlers
 from app.ratelimit import install_rate_limiting
-from app.routers import auth
+from app.routers import auth, circles
 
 API_PREFIX = "/api/v1"
 
@@ -30,6 +30,7 @@ def create_app() -> FastAPI:
     install_error_handlers(app)
     install_rate_limiting(app)
     app.include_router(auth.router, prefix=API_PREFIX)
+    app.include_router(circles.router, prefix=API_PREFIX)
 
     @app.get("/healthz", tags=["system"])
     def healthz() -> dict[str, str]:
