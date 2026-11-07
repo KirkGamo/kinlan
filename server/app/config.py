@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me-in-.env"
     cors_origins: list[str] = ["http://localhost:8081"]
     expo_access_token: str | None = None
+    run_jobs: bool = True  # scheduled jobs; set RUN_JOBS=false on extra instances
 
 
 @lru_cache
