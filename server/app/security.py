@@ -59,3 +59,18 @@ def new_opaque_token() -> str:
 
 def sha256_hex(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
+
+
+# Invite codes: 8 characters from an alphabet without look-alikes (no 0/O, 1/I/L), shown as
+# K7QM-2RXP. Only the SHA-256 of the normalised code is stored.
+INVITE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def new_invite_code() -> str:
+    raw = "".join(secrets.choice(INVITE_ALPHABET) for _ in range(8))
+    return f"{raw[:4]}-{raw[4:]}"
+
+
+def normalise_code(code: str) -> str:
+    """Accept k7qm2rxp, K7QM-2RXP or ' k7qm 2rxp ' alike."""
+    return "".join(ch for ch in code.upper() if ch.isalnum())
