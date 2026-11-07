@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KinLAN Prototype</title>
+<meta name="description" content="Interactive, animated prototype of the KinLAN app in the yellow, orange and black Status Lights look. All data is synthetic.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ===== Tokens (contrast-checked, docs/design/direction.md) ===== */
+:root {
+  --bg: #0B0B0C; --card: #161618; --raised: #1F1F23; --border: #2C2C31;
+  --text: #F5F5F7; --text-2: #A1A1AA;
+  --yellow: #FFD60A; --on-yellow: #0B0B0C;
+  --green: #30D158; --orange: #FF9F0A; --red: #FF453A; --unlit: #2A2A2F; --unlit-ring: #5E5E66;
+  --page: #050505; --r-card: 24px; --r-pill: 999px;
+  --ease-out: cubic-bezier(0.05, 0.7, 0.1, 1); --ease-std: cubic-bezier(0.2, 0, 0, 1); --ease-in: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --t-press: 120ms; --t-small: 220ms; --t-screen: 350ms;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--page); color: var(--text); font-family: Manrope, Roboto, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+body { min-height: 100vh; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 24px 16px 40px; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; border-radius: 12px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 720px; }
+.toolbar button { padding: 8px 14px; border-radius: var(--r-pill); background: var(--raised); color: var(--text-2); font-size: 13px; font-weight: 600; border: 1px solid var(--border); transition: background var(--t-small) var(--ease-std), color var(--t-small) var(--ease-std); }
+.toolbar button:hover, .toolbar button[aria-pressed="true"] { background: var(--yellow); color: var(--on-yellow); border-color: var(--yellow); }
+.note { font-size: 12px; color: var(--text-2); text-align: center; max-width: 520px; }
+
+/* ===== Phone shell ===== */
+.phone { position: relative; width: 390px; max-width: 100%; height: 844px; border-radius: 48px; background: var(--bg); border: 10px solid #1A1A1C; box-shadow: 0 40px 80px rgba(0,0,0,.6); overflow: hidden; }
+.statusbar { height: 44px; display: flex; justify-content: space-between; align-items: center; padding: 0 26px; font-size: 14px; font-weight: 700; }
+.screens { position: absolute; inset: 44px 0 84px 0; }
+.screen { position: absolute; inset: 0; overflow-y: auto; padding: 0 16px 104px; scrollbar-width: none; opacity: 0; transform: translateY(12px); pointer-events: none; transition: opacity var(--t-screen) var(--ease-std), transform var(--t-screen) var(--ease-out); }
+.screen::-webkit-scrollbar { display: none; }
+.screen.on { opacity: 1; transform: none; pointer-events: auto; }
+.screen.pushed { transform: translateX(28px); } .screen.pushed.on { transform: none; }
+.head { display: flex; justify-content: space-between; align-items: center; padding: 8px 0 14px; }
+.head h1 { font-size: 26px; font-weight: 800; letter-spacing: -.5px; display: flex; align-items: center; gap: 6px; }
+.head .sub { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+.sitebtn { display: flex; align-items: center; gap: 6px; border-radius: 12px; padding: 2px 4px 2px 0; transition: transform var(--t-press) var(--ease-std); }
+.sitebtn:active { transform: scale(.97); }
+.sitebtn svg { transition: transform var(--t-small) var(--ease-out); } .sitebtn[aria-expanded="true"] svg { transform: rotate(180deg); }
+.iconbtn { width: 44px; height: 44px; border-radius: 50%; background: var(--raised); display: grid; place-items: center; transition: transform var(--t-press) var(--ease-std); flex: none; }
+.iconbtn:active { transform: scale(.92); } .avatar { background: var(--yellow); color: var(--on-yellow); font-weight: 800; font-size: 14px; }
+.menu { position: absolute; top: 56px; left: 0; width: 240px; background: var(--raised); border-radius: 20px; padding: 6px; box-shadow: 0 20px 40px rgba(0,0,0,.5); z-index: 8; opacity: 0; transform: translateY(-6px) scale(.98); transform-origin: top left; pointer-events: none; transition: opacity var(--t-small) var(--ease-std), transform var(--t-small) var(--ease-out); }
+.menu.open { opacity: 1; transform: none; pointer-events: auto; }
+.menu button { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 12px; border-radius: 14px; text-align: left; font-size: 14px; font-weight: 700; }
+.menu button:hover, .menu button[aria-checked="true"] { background: var(--card); }
+.menu small { display: block; font-size: 12px; font-weight: 500; color: var(--text-2); }
+
+/* ===== Status lights ===== */
+.strip { display: flex; justify-content: space-between; background: var(--card); border-radius: var(--r-card); padding: 14px 8px 10px; }
+.light { width: 64px; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 4px 0; border-radius: 16px; font-size: 10px; font-weight: 700; letter-spacing: .9px; text-transform: uppercase; color: var(--text-2); transition: background var(--t-small) var(--ease-std), transform var(--t-press) var(--ease-std); }
+.light:hover { background: var(--raised); } .light:active { transform: scale(.94); }
+.light .v { font-size: 11px; letter-spacing: 0; text-transform: none; font-weight: 600; }
+.dot { width: 20px; height: 20px; border-radius: 50%; background: var(--unlit); box-shadow: inset 0 0 0 2px var(--unlit-ring); position: relative; transition: background 260ms var(--ease-std), box-shadow 260ms var(--ease-std), transform 260ms var(--ease-out); }
+.dot::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; opacity: 0; }
+.light[data-s="pass"] .dot { background: var(--green); box-shadow: 0 0 0 4px rgba(48,209,88,.18); }
+.light[data-s="fail"] .dot { background: var(--red); box-shadow: 0 0 0 4px rgba(255,69,58,.22); }
+.light[data-s="checking"] .dot { background: var(--yellow); box-shadow: 0 0 0 4px rgba(255,214,10,.22); animation: checking 900ms var(--ease-std) infinite; }
+.light[data-s="fail"] { color: var(--text); }
+.light[data-s="fail"] .dot::after { box-shadow: 0 0 0 2px rgba(255,69,58,.45); animation: breathe 2.4s var(--ease-std) infinite; }
+.light.ignite .dot { transform: scale(1.18); }
+@keyframes checking { 50% { transform: scale(.82); box-shadow: 0 0 0 9px rgba(255,214,10,.06); } }
+@keyframes breathe { 0%, 100% { opacity: 0; transform: scale(.9); } 50% { opacity: 1; transform: scale(1.15); } }
+
+/* ===== Cards, rows, chips ===== */
+.card { background: var(--card); border-radius: var(--r-card); padding: 18px; margin-top: 12px; }
+.label { font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-2); margin: 22px 4px 8px; display: flex; justify-content: space-between; align-items: center; }
+.verdict h2 { font-size: 24px; font-weight: 800; letter-spacing: -.4px; margin: 10px 0 6px; line-height: 1.15; }
+.verdict p { color: var(--text-2); font-size: 14px; line-height: 1.45; }
+.meta { font-size: 12px; color: var(--text-2); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: var(--r-pill); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.c-down { background: rgba(255,69,58,.16); color: var(--red); } .c-new { background: rgba(255,159,10,.16); color: var(--orange); }
+.c-ok { background: rgba(48,209,88,.14); color: var(--green); } .c-unk { background: var(--raised); color: var(--text-2); }
+.row { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: var(--card); border-radius: 20px; padding: 14px 16px; margin-bottom: 8px; text-align: left; transition: transform var(--t-press) var(--ease-std), background var(--t-small) var(--ease-std), opacity var(--t-small) var(--ease-std); }
+button.row:hover { background: var(--raised); } button.row:active { transform: scale(.98); }
+.row b { font-size: 15px; font-weight: 700; display: block; } .row small { font-size: 12px; color: var(--text-2); display: block; margin-top: 2px; }
+.row .end { display: flex; align-items: center; gap: 8px; flex: none; }
+.stagger > * { opacity: 0; transform: translateY(10px); }
+.play .stagger > * { animation: rise 420ms var(--ease-out) forwards; }
+.play .stagger > *:nth-child(2) { animation-delay: 40ms; } .play .stagger > *:nth-child(3) { animation-delay: 80ms; } .play .stagger > *:nth-child(4) { animation-delay: 120ms; }
+.play .stagger > *:nth-child(5) { animation-delay: 160ms; } .play .stagger > *:nth-child(6) { animation-delay: 200ms; } .play .stagger > *:nth-child(n+7) { animation-delay: 240ms; }
+@keyframes rise { to { opacity: 1; transform: none; } }
+.empty { text-align: center; color: var(--text-2); font-size: 14px; padding: 24px 12px; }
+
+/* ===== Gauge, deductions, chart ===== */
+.gauge { display: flex; align-items: center; gap: 18px; }
+.gauge .arc { stroke-dasharray: 251; stroke-dashoffset: 251; transition: stroke-dashoffset 1100ms var(--ease-out); }
+.gauge .num { font-size: 34px; font-weight: 800; letter-spacing: -1px; } .gauge small { color: var(--text-2); font-size: 13px; display: block; }
+.why { color: var(--yellow); font-size: 13px; font-weight: 700; margin-top: 6px; display: inline-flex; align-items: center; gap: 4px; }
+.why svg { transition: transform var(--t-small) var(--ease-out); } .why[aria-expanded="true"] svg { transform: rotate(180deg); }
+.deductions { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--t-screen) var(--ease-out); }
+.deductions.open { grid-template-rows: 1fr; } .deductions > div { overflow: hidden; }
+.ded { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.ded:first-child { margin-top: 14px; } .ded span { color: var(--text-2); } .ded b { color: var(--red); flex: none; }
+.legend { display: flex; gap: 16px; font-size: 12px; color: var(--text-2); margin-bottom: 8px; }
+.legend i { display: inline-block; width: 18px; border-top: 2px solid var(--yellow); vertical-align: middle; margin-right: 6px; } .legend i.d { border-top: 2px dashed var(--text-2); }
+.chart svg { display: block; touch-action: none; cursor: crosshair; }
+.draw { stroke-dasharray: 900; stroke-dashoffset: 900; transition: stroke-dashoffset 1200ms var(--ease-out); }
+.fillarea { opacity: 0; transition: opacity 900ms 300ms var(--ease-std); }
+.played .draw { stroke-dashoffset: 0; } .played .fillarea { opacity: 1; }
+.scrub { opacity: 0; transition: opacity var(--t-press) var(--ease-std); } .scrubbing .scrub { opacity: 1; }
+.readout { font-size: 13px; font-weight: 700; margin-top: 8px; min-height: 18px; color: var(--text-2); }
+.readout b { color: var(--text); }
+
+/* ===== Buttons, FAB, segmented, filters, switch ===== */
+.fab { position: absolute; right: 16px; bottom: 100px; display: flex; align-items: center; gap: 8px; background: var(--yellow); color: var(--on-yellow); font-weight: 800; font-size: 15px; padding: 16px 22px; border-radius: var(--r-pill); box-shadow: 0 10px 30px rgba(255,214,10,.25); transition: transform var(--t-press) var(--ease-std), opacity var(--t-small) var(--ease-std); z-index: 5; }
+.fab:active { transform: scale(.95); } .fab.hide { opacity: 0; transform: translateY(16px) scale(.9); pointer-events: none; }
+.btn { width: 100%; padding: 15px; border-radius: var(--r-pill); background: var(--yellow); color: var(--on-yellow); font-weight: 800; font-size: 15px; transition: transform var(--t-press) var(--ease-std), opacity var(--t-small) var(--ease-std); }
+.btn:active { transform: scale(.97); } .btn.ghost { background: var(--raised); color: var(--text); } .btn:disabled { opacity: .6; cursor: default; }
+.btn.sm { width: auto; padding: 8px 14px; font-size: 13px; }
+.seg { display: flex; background: var(--card); border-radius: var(--r-pill); padding: 4px; position: relative; }
+.seg button { flex: 1; padding: 9px 0; border-radius: var(--r-pill); font-size: 13px; font-weight: 700; color: var(--text-2); position: relative; z-index: 1; transition: color var(--t-small) var(--ease-std); }
+.seg button[aria-selected="true"] { color: var(--on-yellow); }
+.seg .thumb { position: absolute; top: 4px; bottom: 4px; width: calc(50% - 4px); border-radius: var(--r-pill); background: var(--yellow); transition: transform var(--t-small) var(--ease-out); }
+.seg[data-i="1"] .thumb { transform: translateX(100%); }
+.filters { display: flex; gap: 8px; margin: 12px 0 0; overflow-x: auto; scrollbar-width: none; }
+.filters button { padding: 7px 14px; border-radius: var(--r-pill); background: var(--card); font-size: 13px; font-weight: 600; color: var(--text-2); white-space: nowrap; transition: background var(--t-small) var(--ease-std), color var(--t-small) var(--ease-std); }
+.filters button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+.switch { width: 52px; height: 32px; border-radius: 16px; background: var(--raised); box-shadow: inset 0 0 0 2px var(--unlit-ring); position: relative; flex: none; transition: background var(--t-small) var(--ease-std), box-shadow var(--t-small) var(--ease-std); }
+.switch::after { content: ""; position: absolute; top: 8px; left: 8px; width: 16px; height: 16px; border-radius: 50%; background: var(--text-2); transition: transform var(--t-small) var(--ease-out), background var(--t-small) var(--ease-std), width var(--t-small) var(--ease-std), height var(--t-small) var(--ease-std), top var(--t-small) var(--ease-std); }
+.switch[aria-checked="true"] { background: var(--yellow); box-shadow: none; }
+.switch[aria-checked="true"]::after { transform: translateX(20px); background: var(--on-yellow); width: 24px; height: 24px; top: 4px; left: 4px; }
+
+/* ===== Map ===== */
+.map .link-broken { animation: march 1.4s linear infinite; } @keyframes march { to { stroke-dashoffset: -26; } }
+.map .node { cursor: pointer; outline: none; opacity: 0; transition: opacity var(--t-small) var(--ease-std); }
+.play .map .node { animation: popin 500ms var(--ease-out) forwards; }
+@keyframes popin { from { opacity: 0; } to { opacity: 1; } }
+.map .disc { transform-box: fill-box; transform-origin: center; transition: transform var(--t-press) var(--ease-std); }
+.map .node:active .disc { transform: scale(.92); }
+.map .halo { fill: none; stroke: var(--yellow); stroke-width: 3; opacity: 0; transform-box: fill-box; transform-origin: center; transform: scale(.85); transition: opacity var(--t-small) var(--ease-std), transform var(--t-small) var(--ease-out); }
+.map .node:hover .halo, .map .node:focus-visible .halo { opacity: .45; transform: none; }
+.map .node.sel .halo { opacity: 1; transform: none; }
+.map .node.dim, .map.has-sel .node:not(.sel):not(.keep) { opacity: .28 !important; }
+.map .link { transition: stroke var(--t-small) var(--ease-std); } .map .link.sel { stroke: var(--yellow); stroke-width: 2.5; }
+.map .packet { fill: var(--yellow); } .map .packet.lost { fill: var(--red); }
+
+/* ===== Diagnose ===== */
+.rung { display: flex; gap: 14px; position: relative; padding-bottom: 14px; }
+.rung::before { content: ""; position: absolute; left: 15px; top: 34px; bottom: 0; width: 2px; background: var(--border); } .rung:last-child::before { display: none; }
+.rung .mark { width: 32px; height: 32px; border-radius: 50%; flex: none; display: grid; place-items: center; background: var(--raised); color: var(--text-2); font-size: 13px; font-weight: 800; transition: background 260ms var(--ease-std), color 260ms var(--ease-std), transform 260ms var(--ease-out); }
+.rung[data-s="checking"] .mark { background: var(--yellow); color: var(--on-yellow); transform: scale(1.08); }
+.rung[data-s="pass"] .mark { background: rgba(48,209,88,.16); color: var(--green); } .rung[data-s="fail"] .mark { background: var(--red); color: #fff; }
+.rung .body { flex: 1; background: var(--card); border-radius: 18px; padding: 12px 14px; text-align: left; transition: background var(--t-small) var(--ease-std); }
+.rung .body:hover { background: var(--raised); }
+.rung[data-s="fail"] .body { background: rgba(255,69,58,.1); box-shadow: inset 0 0 0 1px rgba(255,69,58,.4); }
+.rung[data-s="skipped"] .body { opacity: .55; }
+.rung b { font-size: 14px; display: block; } .rung small { display: block; font-size: 12px; color: var(--text-2); margin-top: 3px; }
+.rung .detail { font-size: 12px; color: var(--text-2); font-family: ui-monospace, Consolas, monospace; display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--t-small) var(--ease-out); }
+.rung .detail > span { overflow: hidden; } .rung.open .detail { grid-template-rows: 1fr; } .rung.open .detail > span { padding-top: 6px; }
+.cause { display: none; } .cause.show { display: block; animation: rise 420ms var(--ease-out) both; }
+
+/* ===== Pairing ===== */
+.code { display: flex; justify-content: center; gap: 8px; margin: 18px 0 6px; }
+.code span { width: 46px; height: 60px; border-radius: 14px; background: var(--raised); display: grid; place-items: center; font-size: 30px; font-weight: 800; opacity: 0; transform: translateY(14px) rotateX(70deg); }
+.play .code span { animation: flip 520ms var(--ease-out) forwards; }
+.play .code span:nth-child(2) { animation-delay: 60ms; } .play .code span:nth-child(3) { animation-delay: 120ms; } .play .code span:nth-child(5) { animation-delay: 180ms; } .play .code span:nth-child(6) { animation-delay: 240ms; } .play .code span:nth-child(7) { animation-delay: 300ms; }
+.code span.gap { width: 10px; background: none; } @keyframes flip { to { opacity: 1; transform: none; } }
+.waiting { display: flex; align-items: center; gap: 12px; }
+.pulse { width: 14px; height: 14px; border-radius: 50%; background: var(--yellow); position: relative; flex: none; transition: background var(--t-small) var(--ease-std); }
+.pulse::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: inherit; animation: ripple 1.6s var(--ease-out) infinite; }
+@keyframes ripple { to { transform: scale(3); opacity: 0; } }
+.steps { list-style: none; counter-reset: s; } .steps li { counter-increment: s; display: flex; gap: 12px; font-size: 14px; color: var(--text-2); padding: 8px 0; line-height: 1.4; }
+.steps li::before { content: counter(s); width: 24px; height: 24px; flex: none; border-radius: 50%; background: var(--raised); color: var(--text); font-size: 12px; font-weight: 800; display: grid; place-items: center; }
+.steps b { color: var(--text); }
+
+/* ===== Nav, sheet, toast ===== */
+.nav { position: absolute; left: 0; right: 0; bottom: 0; height: 84px; background: rgba(22,22,24,.92); backdrop-filter: blur(12px); display: flex; justify-content: space-around; align-items: flex-start; padding-top: 10px; border-top: 1px solid var(--border); z-index: 6; }
+.nav button { width: 76px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: var(--text-2); transition: color var(--t-small) var(--ease-std); }
+.nav .ic { width: 56px; height: 32px; border-radius: var(--r-pill); display: grid; place-items: center; position: relative; transition: background var(--t-small) var(--ease-std); }
+.nav button[aria-current="page"] { color: var(--text); } .nav button[aria-current="page"] .ic { background: var(--yellow); color: var(--on-yellow); }
+.nav .badge { position: absolute; top: 0; right: 12px; min-width: 16px; height: 16px; border-radius: 8px; background: var(--red); color: #fff; font-size: 10px; display: grid; place-items: center; padding: 0 4px; transition: transform var(--t-small) var(--ease-out); }
+.nav .badge.zero { transform: scale(0); }
+svg.i { width: 22px; height: 22px; fill: currentColor; }
+.scrim { position: absolute; inset: 0; background: rgba(0,0,0,.55); opacity: 0; pointer-events: none; transition: opacity var(--t-screen) var(--ease-std); z-index: 19; }
+.scrim.open { opacity: 1; pointer-events: auto; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--card); border-radius: 28px 28px 0 0; padding: 10px 20px 28px; z-index: 20; transform: translateY(105%); transition: transform var(--t-screen) var(--ease-out); box-shadow: 0 -20px 40px rgba(0,0,0,.5); max-height: 82%; overflow-y: auto; }
+.sheet.open { transform: none; }
+.sheet .grab { width: 36px; height: 4px; border-radius: 2px; background: var(--border); margin: 0 auto 14px; }
+.sheet .top { display: flex; gap: 14px; align-items: center; padding-right: 48px; }
+.sheet .ico { width: 52px; height: 52px; border-radius: 18px; background: var(--raised); display: grid; place-items: center; flex: none; }
+.sheet .ico svg { width: 28px; height: 28px; fill: var(--text); }
+.sheet h3 { font-size: 20px; font-weight: 800; letter-spacing: -.3px; }
+.sheet .text { color: var(--text-2); font-size: 14px; line-height: 1.45; margin-top: 14px; }
+.sheet .facts { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 16px 0; font-size: 13px; }
+.sheet .facts dt { color: var(--text-2); } .sheet .facts dd { font-weight: 600; text-align: right; }
+.sheet .result { background: var(--raised); border-radius: 18px; padding: 12px 14px; margin-bottom: 12px; font-size: 13px; }
+.sheet .result b { font-size: 15px; display: block; margin-bottom: 4px; }
+.sheet .replies { display: flex; gap: 6px; margin-top: 8px; }
+.sheet .replies span { flex: 1; height: 28px; border-radius: 8px; background: var(--card); display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--text-2); transition: background var(--t-small) var(--ease-std), color var(--t-small) var(--ease-std); }
+.sheet .replies span.ok { background: rgba(48,209,88,.16); color: var(--green); } .sheet .replies span.bad { background: rgba(255,69,58,.16); color: var(--red); }
+.sheet .actions { display: flex; gap: 8px; } .sheet .actions .btn { flex: 1; }
+.sheet .close { position: absolute; right: 16px; top: 18px; }
+.toast { position: absolute; left: 50%; bottom: 100px; transform: translate(-50%, 20px); background: var(--text); color: var(--bg); font-size: 14px; font-weight: 700; padding: 12px 18px; border-radius: var(--r-pill); opacity: 0; pointer-events: none; transition: opacity var(--t-small) var(--ease-std), transform var(--t-small) var(--ease-out); z-index: 30; white-space: nowrap; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ===== Reduce motion ===== */
+.reduced *, .reduced *::before, .reduced *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 120ms !important; }
+.reduced .screen, .reduced .screen.pushed { transform: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 120ms !important; }
+  .screen, .screen.pushed { transform: none !important; }
+}
+@media (max-width: 420px) { body { padding: 12px 0 24px; } .phone { border-width: 0; border-radius: 0; height: 100svh; } }
+</style>
+</head>
+<body>
+<div class="toolbar" role="group" aria-label="Prototype controls">
+  <button id="replay">Replay intro</button>
+  <button id="run">Run diagnose</button>
+  <button id="pair">Pairing screen</button>
+  <button id="motion" aria-pressed="false">Reduce motion</button>
+</div>
+<p class="note">KinLAN prototype · tap anything: lights, problems, devices, the chart, alerts, the site name · all data is synthetic</p>
+
+<div class="phone" id="phone">
+  <div class="statusbar"><span>9:48</span><span>LTE · 78%</span></div>
+  <div class="screens">
+
+    <!-- ===== OVERVIEW ===== -->
+    <section class="screen on" id="s-overview" aria-label="Overview">
+      <div class="head" style="position:relative">
+        <div>
+          <button class="sitebtn" id="site-btn" aria-haspopup="menu" aria-expanded="false"><h1 id="site-name">Home</h1><svg width="18" height="18" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z" fill="currentColor"/></svg></button>
+          <div class="sub" id="site-sub"></div>
+        </div>
+        <button class="iconbtn avatar" aria-label="Account">AM</button>
+        <div class="menu" id="site-menu" role="menu"></div>
+      </div>
+      <div class="strip" id="strip-overview" role="list" aria-label="Network path, tap a light for details"></div>
+      <div class="stagger" id="ov-body">
+        <div class="card verdict" id="verdict"></div>
+        <div class="label" id="problems-label">Open problems <span></span></div>
+        <div id="problems"></div>
+        <div class="label">Health</div>
+        <div class="card">
+          <div class="gauge">
+            <svg width="112" height="70" viewBox="0 0 112 70" aria-hidden="true"><path d="M16 62 A40 40 0 0 1 96 62" fill="none" stroke="#2A2A2F" stroke-width="10" stroke-linecap="round"/><path class="arc" id="arc" d="M16 62 A40 40 0 0 1 96 62" fill="none" stroke="#FFD60A" stroke-width="10" stroke-linecap="round" pathLength="251"/></svg>
+            <div><div class="num"><span id="score">0</span><span style="font-size:18px;color:var(--text-2)"> / 100 · <span id="grade">B</span></span></div><small id="grade-why"></small>
+              <button class="why" id="why" aria-expanded="false" aria-controls="deductions">Why this grade? <svg width="14" height="14" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z" fill="currentColor"/></svg></button></div>
+          </div>
+          <div class="deductions" id="deductions"><div id="ded-list"></div></div>
+        </div>
+        <div class="label">Connection · 24 h <span>drag to read</span></div>
+        <div class="card chart" id="chart">
+          <div class="legend"><span><i></i>Internet</span><span><i class="d"></i>Router</span></div>
+          <svg id="chart-svg" viewBox="0 0 320 130" width="100%" role="img"></svg>
+          <div class="readout" id="readout" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== DEVICES ===== -->
+    <section class="screen" id="s-devices" aria-label="Devices">
+      <div class="head"><div><h1>Devices</h1><div class="sub" id="dev-sub"></div></div><button class="iconbtn avatar" aria-label="Account">AM</button></div>
+      <div class="seg" id="seg" data-i="0" role="tablist"><span class="thumb"></span><button role="tab" aria-selected="true">List</button><button role="tab" aria-selected="false">Map</button></div>
+      <div class="filters" id="dev-filters" role="group" aria-label="Filter devices"></div>
+      <div id="dev-list" class="stagger"></div>
+      <div id="dev-map" hidden>
+        <div class="card map" id="map-card">
+          <svg id="map-svg" viewBox="0 0 340 384" width="100%" role="group" aria-label="Network map"></svg>
+          <p class="meta" style="margin-top:6px">Tap a device for details and a ping test. The map shows which devices share this network, not how they're wired.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== DIAGNOSE ===== -->
+    <section class="screen pushed" id="s-diagnose" aria-label="Diagnose">
+      <div class="head"><button class="iconbtn" id="back" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z"/></svg></button><div style="flex:1;margin-left:12px"><h1 style="font-size:22px">Diagnose</h1><div class="sub" id="diag-sub"></div></div></div>
+      <div class="strip" id="strip-diagnose" role="list" aria-label="Diagnose progress"></div>
+      <div class="card verdict cause" id="cause" aria-live="polite"></div>
+      <div class="label">The six checks <span>tap for details</span></div>
+      <div id="ladder"></div>
+      <button class="btn ghost" id="again" style="margin-top:8px">Run again</button>
+    </section>
+
+    <!-- ===== ALERTS ===== -->
+    <section class="screen" id="s-alerts" aria-label="Alerts">
+      <div class="head"><div><h1>Alerts</h1><div class="sub" id="alerts-sub"></div></div><button class="iconbtn avatar" aria-label="Account">AM</button></div>
+      <div class="filters" id="alert-filters" role="group" aria-label="Filter alerts"></div>
+      <div id="alert-list" class="stagger"></div>
+    </section>
+
+    <!-- ===== SETTINGS ===== -->
+    <section class="screen" id="s-settings" aria-label="Settings">
+      <div class="head"><div><h1>Settings</h1><div class="sub">Dela Cruz Home · Circle</div></div><button class="iconbtn avatar" aria-label="Account">AM</button></div>
+      <div class="stagger">
+        <div class="label">Circle members</div>
+        <div class="row"><div><b>Ana M.</b><small>Owner · you</small></div><span class="chip c-unk">Owner</span></div>
+        <div class="row"><div><b>Jun R.</b><small>Admin</small></div><span class="chip c-unk">Admin</span></div>
+        <div class="row"><div><b>Lito T.</b><small>Viewer</small></div><span class="chip c-unk">Viewer</span></div>
+        <button class="btn" id="invite" style="margin-top:8px">Invite a member</button>
+        <div class="label">Notifications</div>
+        <div class="row"><div><b>Outages</b><small>Site unreachable and back online</small></div><button class="switch" role="switch" aria-checked="true" aria-label="Outage alerts" data-name="Outage alerts"></button></div>
+        <div class="row"><div><b>New devices</b><small>Someone joins the network</small></div><button class="switch" role="switch" aria-checked="true" aria-label="New device alerts" data-name="New device alerts"></button></div>
+        <div class="row"><div><b>Slow internet</b><small>High latency or packet loss</small></div><button class="switch" role="switch" aria-checked="false" aria-label="Slow internet alerts" data-name="Slow internet alerts"></button></div>
+        <div class="label">Sites</div>
+        <button class="row" id="to-pair"><div><b>Add a site</b><small>Pair the agent on another PC</small></div><span class="chip c-new">+ Add</span></button>
+      </div>
+    </section>
+
+    <!-- ===== PAIRING ===== -->
+    <section class="screen pushed" id="s-pair" aria-label="Pair the agent">
+      <div class="head"><button class="iconbtn" id="back2" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z"/></svg></button><div style="flex:1;margin-left:12px"><h1 style="font-size:22px">Pair the agent</h1><div class="sub">Step 3 of 4 · Lab 3</div></div></div>
+      <div class="card" style="text-align:center">
+        <div class="meta" style="justify-content:center">Enter this code on the PC</div>
+        <div class="code" aria-label="Pairing code 482 913"><span>4</span><span>8</span><span>2</span><span class="gap"></span><span>9</span><span>1</span><span>3</span></div>
+        <div class="meta" style="justify-content:center">Expires in <b id="countdown" style="color:var(--yellow)">9:41</b></div>
+        <button class="btn ghost" id="copy" style="margin-top:14px">Copy code</button>
+      </div>
+      <div class="card waiting" aria-live="polite"><span class="pulse" id="pulse"></span><div><b id="wait-title">Waiting for the agent…</b><div class="meta" id="wait-sub">Keep this screen open</div></div></div>
+      <div class="label">On the PC</div>
+      <ol class="steps card">
+        <li><span>Download <b>KinLAN-Agent.exe</b> and run it.</span></li>
+        <li><span>Run <b>kinlan-agent pair</b> and type the code.</span></li>
+        <li><span>Accept: <b>only monitor networks you own or may monitor.</b></span></li>
+        <li><span>Review the devices KinLAN found.</span></li>
+      </ol>
+    </section>
+  </div>
+
+  <button class="fab" id="fab"><svg class="i" viewBox="0 0 24 24"><path d="M15.9 5c-.17 0-.32.09-.41.23l-.07.15-5.18 11.65c-.16.29-.26.61-.26.96 0 1.11.9 2.01 2.01 2.01.96 0 1.77-.68 1.96-1.59l.01-.03L16.4 5.5c0-.28-.22-.5-.5-.5zM1 9l2 2c2.880-2.88 6.79-4.08 10.53-3.620l1.19-2.68C9.89 3.84 4.74 5.27 1 9zm20 2l2-2c-1.64-1.64-3.55-2.82-5.590-3.57l-.53 2.82c1.5.62 2.9 1.53 4.12 2.75zm-4 4l2-2c-.8-.8-1.7-1.42-2.66-1.89l-.55 2.92c.42.27.83.59 1.21.97zM5 13l2 2c1.13-1.13 2.56-1.79 4.03-2l1.28-2.88c-2.63-.08-5.3.87-7.31 2.88z"/></svg>Diagnose</button>
+
+  <nav class="nav" aria-label="Main">
+    <button data-go="overview" aria-current="page"><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span>Overview</button>
+    <button data-go="devices"><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h18V4H4c-1.1 0-2 .9-2 2v11H0v3h14v-3H4V6zm19 2h-6c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V9c0-.55-.45-1-1-1zm-1 9h-4v-7h4v7z"/></svg></span>Devices</button>
+    <button data-go="alerts"><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.630 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg><span class="badge" id="badge">2</span></span>Alerts</button>
+    <button data-go="settings"><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87a.48.48 0 00.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 00-.12-.61l-2.01-1.58zM12 15.6a3.6 3.6 0 110-7.2 3.6 3.6 0 010 7.2z"/></svg></span>Settings</button>
+  </nav>
+
+  <div class="scrim" id="scrim"></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" aria-hidden="true">
+    <div class="grab"></div>
+    <button class="iconbtn close" id="sheet-close" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z"/></svg></button>
+    <div id="sheet-body"></div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+  let reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const wait = ms => new Promise(r => setTimeout(r, reduced ? 0 : ms));
+  const svgNS = "http://www.w3.org/2000/svg";
+
+  // ===================== Icons =====================
+  const ICONS = {
+    globe: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.060 5 7.41 0 2.08-.8 3.97-2.1 5.39z",
+    router: "M20.2 5.9l.8-.8C19.6 3.7 17.8 3 16 3s-3.6.7-5 2.1l.8.8C13 4.8 14.5 4.2 16 4.2s3 .6 4.2 1.7zm-.9.8c-.9-.9-2.1-1.4-3.3-1.4s-2.4.5-3.3 1.4l.8.8c.7-.7 1.6-1 2.5-1 .9 0 1.8.3 2.5 1l.8-.8zM19 13h-2V9h-2v4H5c-1.1 0-2 .9-2 2v4c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-4c0-1.1-.9-2-2-2zM8 18H6v-2h2v2zm3.5 0h-2v-2h2v2zm3.5 0h-2v-2h2v2z",
+    computer: "M21 2H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h7v2H8v2h8v-2h-2v-2h7c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H3V4h18v12z",
+    laptop: "M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z",
+    phone: "M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z",
+    tv: "M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z",
+    printer: "M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z",
+    layer: "M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z",
+    invite: "M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z",
+  };
+  const TYPE_NAME = { router: "Router", computer: "Computer", laptop: "Laptop", phone: "Phone", tv: "TV / media box", printer: "Printer", globe: "Internet" };
+  const RING = { ok: "#30D158", new: "#FF9F0A", down: "#FF453A", off: "#5E5E66" };
+  const CHIP = { ok: '<span class="chip c-ok">✓ Healthy</span>', new: '<span class="chip c-new">● New</span>', down: '<span class="chip c-down">▲ Down</span>', off: '<span class="chip c-unk">– Offline</span>', done: '<span class="chip c-ok">✓ Resolved</span>' };
+  const iconSvg = t => `<svg viewBox="0 0 24 24"><path d="${ICONS[t]}"/></svg>`;
+
+  // ===================== Synthetic data: two sites =====================
+  const hours = [...Array(25).keys()];
+  const SITES = {
+    home: {
+      name: "Home", circle: "Dela Cruz Home", agent: "DESKTOP-01",
+      lights: [["pass", "OK"], ["pass", "2 ms"], ["fail", "Down"], ["unlit", "Skipped"], ["unlit", "Skipped"]],
+      verdict: { chip: CHIP.down, meta: "Updated 10 s ago · seen by 2 of 3", title: "Internet down since 9:41", text: "Your router is fine, but your internet provider isn't responding." },
+      problems: [{ title: "Internet provider outage", sub: "7 min so far · wait, or call your provider", chip: CHIP.down, act: "diagnose" }, { title: "New device: Galaxy-A15", sub: "Samsung · 192.168.1.31 · review it", chip: CHIP.new, act: "device:galaxy" }],
+      score: 80, grade: "B", why: "The internet went down 1 time today.",
+      deductions: [["The internet went down 1 time today", 5], ["Some data got lost on the way to the internet (2.0% loss)", 10], ["1 new device nobody has marked as trusted", 5]],
+      internet: hours.map(h => h < 22 ? Math.round(24 + 8 * Math.sin(h / 2.2) + (h === 19 ? 30 : 0)) : null), router: hours.map(h => 2 + (h % 5 === 0 ? 1 : 0)), outageFrom: 22,
+      diag: ["pass", "pass", "pass", "fail", "skipped", "skipped"],
+      devices: [
+        { id: "internet", type: "globe", name: "Internet", status: "down" },
+        { id: "router", type: "router", name: "Router", status: "ok", vendor: "China Mobile IOT", ip: "192.168.1.1", mac: "64:f8:8a:xx:xx:xx", seen: "Online since 6:02", sub: "gateway", ms: [1, 2, 1, 3, 2] },
+        { id: "pc", type: "computer", name: "DESKTOP-01", status: "ok", vendor: "Intel", ip: "192.168.1.13", mac: "50:84:92:xx:xx:xx", seen: "This PC: runs the agent", sub: "runs the agent", ms: [0.4, 0.3, 0.4, 0.5, 0.3] },
+        { id: "galaxy", type: "phone", name: "Galaxy-A15", status: "new", vendor: "Samsung", ip: "192.168.1.31", mac: "a8:9c:ed:xx:xx:xx", seen: "Joined today at 9:12", sub: "review it", ms: [8, 12, 6, 9, 15] },
+        { id: "iphone", type: "phone", name: "Ana's iPhone", status: "ok", vendor: "Apple", ip: "192.168.1.19", mac: "08:c7:b5:xx:xx:xx", seen: "Online since 7:40", sub: "", ms: [3, 22, 4, 108, 5] },
+        { id: "tv", type: "tv", name: "Living-room TV box", short: "TV box", status: "ok", vendor: "ZTE", ip: "192.168.1.8", mac: "34:36:54:xx:xx:xx", seen: "Online since 6:02", sub: "", ms: [2, 3, 2, 2, 4] },
+        { id: "private", type: "phone", name: "Phone (private address)", short: "Phone", status: "ok", vendor: "Private address (randomized)", ip: "192.168.1.16", mac: "be:a6:36:xx:xx:xx", seen: "Online since 8:55", sub: "private address", ms: [6, 7, 5, 9, 6] },
+        { id: "printer", type: "printer", name: "Lab printer", status: "off", vendor: "HP", ip: "192.168.1.40", mac: "3c:2a:f4:xx:xx:xx", seen: "Last seen 8:05", sub: "offline since 8:05", ms: null },
+      ],
+      alerts: [
+        { id: "a1", title: "Home is unreachable", sub: "9:43 · the agent stopped reporting. Is the PC on?", status: "down", open: true },
+        { id: "a2", title: "New device joined", sub: "9:12 · Galaxy-A15 (Samsung). Review it", status: "new", open: true, device: "galaxy" },
+        { id: "a3", title: "Back online after 4 min 12 s", sub: "Yesterday 21:07 · internet provider outage", status: "done", open: false },
+        { id: "a4", title: "Telnet closed on 192.168.1.8", sub: "Nov 5 · risky port found and fixed", status: "done", open: false },
+      ],
+    },
+    lola: {
+      name: "Lola's house", circle: "Dela Cruz Home", agent: "LAPTOP-LOLA",
+      lights: [["pass", "OK"], ["pass", "3 ms"], ["pass", "31 ms"], ["pass", "18 ms"], ["pass", "OK"]],
+      verdict: { chip: CHIP.ok, meta: "Updated 8 s ago", title: "All good", text: "Every layer is working, from this PC to the web. Nothing needs attention." },
+      problems: [], score: 100, grade: "A", why: "No problems found in the last 24 hours.", deductions: [],
+      internet: hours.map(h => Math.round(30 + 4 * Math.sin(h / 3))), router: hours.map(() => 3), outageFrom: null,
+      diag: ["pass", "pass", "pass", "pass", "pass", "pass"],
+      devices: [
+        { id: "internet", type: "globe", name: "Internet", status: "ok" },
+        { id: "router", type: "router", name: "Router", status: "ok", vendor: "TP-Link", ip: "192.168.0.1", mac: "98:da:c4:xx:xx:xx", seen: "Online since yesterday", sub: "gateway", ms: [3, 3, 2, 4, 3] },
+        { id: "laptop", type: "laptop", name: "LAPTOP-LOLA", status: "ok", vendor: "Lenovo", ip: "192.168.0.10", mac: "54:e1:ad:xx:xx:xx", seen: "This PC: runs the agent", sub: "runs the agent", ms: [0.3, 0.4, 0.3, 0.3, 0.5] },
+        { id: "lphone", type: "phone", name: "Lola's phone", status: "ok", vendor: "Xiaomi", ip: "192.168.0.12", mac: "a4:50:46:xx:xx:xx", seen: "Online since 6:30", sub: "", ms: [5, 6, 5, 7, 5] },
+        { id: "ltv", type: "tv", name: "Smart TV", status: "ok", vendor: "Samsung", ip: "192.168.0.14", mac: "8c:79:f5:xx:xx:xx", seen: "Online since 18:00", sub: "", ms: [4, 4, 5, 4, 6] },
+      ],
+      alerts: [{ id: "b1", title: "Back online after 2 min 05 s", sub: "Nov 4 · power interruption", status: "done", open: false }],
+    },
+  };
+  let site = SITES.home;
+
+  // ===================== Toast & sheet =====================
+  let toastTimer;
+  function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 1800); }
+  let lastFocus = null, onSheetClose = null;
+  function openSheet(html, onClose) {
+    lastFocus = document.activeElement; onSheetClose = onClose || null;
+    $("#sheet-body").innerHTML = html;
+    $("#scrim").classList.add("open"); $("#sheet").classList.add("open"); $("#sheet").setAttribute("aria-hidden", "false");
+    setTimeout(() => $("#sheet-close").focus(), reduced ? 0 : 220);
+  }
+  function closeSheet() {
+    if (!$("#sheet").classList.contains("open")) return;
+    $("#scrim").classList.remove("open"); $("#sheet").classList.remove("open"); $("#sheet").setAttribute("aria-hidden", "true");
+    if (onSheetClose) onSheetClose();
+    if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
+  }
+  $("#sheet-close").addEventListener("click", closeSheet); $("#scrim").addEventListener("click", closeSheet);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") { closeSheet(); closeMenu(); } });
+  const sheetTop = (icon, title, subHtml) => `<div class="top"><div class="ico">${iconSvg(icon)}</div><div><h3 id="sheet-title">${title}</h3><div class="meta">${subHtml}</div></div></div>`;
+  const facts = rows => `<dl class="facts">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
+
+  // ===================== Status lights =====================
+  const LAYERS = [
+    ["This PC", "Network adapter", "Physical / data link", "The PC running the agent has a network connection and an address."],
+    ["Router", "Router (ARP and ping)", "Data link + network (LAN)", "The router answers on the local network: its MAC resolves with ARP and it replies to ping."],
+    ["Provider", "Internet provider", "Network (WAN)", "Traffic leaves your router and reaches the internet (8.8.8.8 and 9.9.9.9 answer ping)."],
+    ["DNS", "Name lookup", "Application (DNS)", "Website names turn into addresses through your DNS server."],
+    ["Web", "Secure web", "Transport + application", "A TCP connection to port 443 and an HTTPS request both work."],
+  ];
+  function buildStrip(el, interactive) {
+    el.innerHTML = LAYERS.map(([n], i) => `<button class="light" role="listitem" data-i="${i}" data-s="unlit"${interactive ? "" : ' tabindex="-1"'}><span class="dot"></span>${n}<span class="v">—</span></button>`).join("");
+    const lights = [...el.children];
+    if (interactive) lights.forEach((l, i) => l.addEventListener("click", () => openLayer(i)));
+    return lights;
+  }
+  function setLight(light, state, value) {
+    light.dataset.s = state; light.querySelector(".v").textContent = value;
+    light.setAttribute("aria-label", `${LAYERS[light.dataset.i][0]}: ${value}`);
+  }
+  async function ignite(lights, results) {
+    lights.forEach(l => setLight(l, "unlit", "—"));
+    for (let i = 0; i < lights.length; i++) {
+      await wait(110);
+      const [s, v] = results[i]; setLight(lights[i], s, v);
+      if (s !== "unlit") { lights[i].classList.add("ignite"); setTimeout(() => lights[i].classList.remove("ignite"), 260); }
+    }
+  }
+  function openLayer(i) {
+    const [, title, layer, what] = LAYERS[i], [s, v] = site.lights[i];
+    const status = { pass: CHIP.ok, fail: CHIP.down, unlit: CHIP.off.replace("Offline", "Not checked") }[s];
+    const note = s === "fail" ? "This is where your network breaks right now. Everything before it works; the checks after it can't run yet."
+      : s === "unlit" ? "Not checked, because an earlier layer failed." : "Working normally.";
+    openSheet(sheetTop("layer", title, `${status}<span>${layer}</span>`) + `<p class="text">${what}</p>` + facts([["Now", v], ["What it means", note]]) +
+      `<div class="actions"><button class="btn" id="layer-diag">Run diagnose</button></div>`);
+    $("#layer-diag").addEventListener("click", () => { closeSheet(); openDiagnose(); });
+  }
+
+  // ===================== Overview =====================
+  function renderOverview() {
+    $("#site-name").textContent = site.name; $("#site-sub").textContent = `${site.circle} · agent on ${site.agent}`;
+    const v = site.verdict;
+    $("#verdict").innerHTML = `<div class="meta">${v.chip}<span>${v.meta}</span></div><h2>${v.title}</h2><p>${v.text}</p>`;
+    $("#problems-label span").textContent = site.problems.length || "";
+    $("#problems").innerHTML = site.problems.length
+      ? site.problems.map((p, i) => `<button class="row" data-p="${i}"><div><b>${p.title}</b><small>${p.sub}</small></div><span class="end">${p.chip}</span></button>`).join("")
+      : `<div class="card empty">Nothing needs attention. KinLAN will tell you when something does.</div>`;
+    $$("#problems .row").forEach(r => r.addEventListener("click", () => {
+      const act = site.problems[r.dataset.p].act;
+      if (act === "diagnose") openDiagnose(); else if (act.startsWith("device:")) openDevice(act.split(":")[1]);
+    }));
+    $("#grade").textContent = site.grade; $("#grade-why").textContent = site.why;
+    $("#ded-list").innerHTML = site.deductions.length ? site.deductions.map(([t, p]) => `<div class="ded"><span>${t}</span><b>−${p}</b></div>`).join("") : `<div class="ded"><span>No deductions: every factor is healthy.</span><b style="color:var(--green)">0</b></div>`;
+    $("#deductions").classList.remove("open"); $("#why").setAttribute("aria-expanded", "false");
+    renderChart();
+  }
+  $("#why").addEventListener("click", e => { const open = $("#deductions").classList.toggle("open"); e.currentTarget.setAttribute("aria-expanded", open); });
+
+  // Chart with scrubbing
+  const CW = 320, X = i => i * (CW / 24), Y = ms => 110 - Math.min(ms, 90);
+  function path(series) {
+    let d = "", pen = false;
+    series.forEach((v, i) => { if (v == null) { pen = false; return; } d += `${pen ? "L" : "M"}${X(i).toFixed(1)} ${Y(v).toFixed(1)} `; pen = true; });
+    return d.trim();
+  }
+  function renderChart() {
+    const inet = site.internet, last = inet.reduce((a, v, i) => v != null ? i : a, 0);
+    const area = path(inet) + ` L${X(last)} 112 L0 112 Z`;
+    const out = site.outageFrom != null ? `<rect x="${X(site.outageFrom)}" y="6" width="${CW - X(site.outageFrom)}" height="106" rx="8" fill="rgba(255,69,58,.12)"/><line x1="${X(site.outageFrom)}" y1="6" x2="${X(site.outageFrom)}" y2="112" stroke="#FF453A" stroke-width="2"/><text x="${X(site.outageFrom) + 6}" y="20" fill="#FF453A" font-size="11" font-weight="700" font-family="Manrope">9:41</text>` : "";
+    $("#chart-svg").innerHTML = `<defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#FFD60A" stop-opacity=".35"/><stop offset="1" stop-color="#FFD60A" stop-opacity="0"/></linearGradient></defs>
+      <path class="fillarea" d="${area}" fill="url(#g)"/><path class="draw" d="${path(inet)}" fill="none" stroke="#FFD60A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path class="draw" d="${path(site.router)}" fill="none" stroke="#A1A1AA" stroke-width="2" stroke-dasharray="5 5"/>${out}
+      <g class="scrub"><line id="scrub-line" x1="0" x2="0" y1="6" y2="112" stroke="#F5F5F7" stroke-width="1"/><circle id="scrub-dot" r="5" fill="#FFD60A" stroke="#0B0B0C" stroke-width="2"/></g>
+      <g font-family="Manrope" font-size="10" fill="#A1A1AA"><text x="0" y="128">0:00</text><text x="${X(12)}" y="128" text-anchor="middle">12:00</text><text x="${CW}" y="128" text-anchor="end">now</text></g>`;
+    $("#chart-svg").setAttribute("aria-label", site.outageFrom != null ? "Latency over 24 hours: internet about 26 ms until 9:41, then no reply; router steady at 2 ms" : "Latency over 24 hours: internet about 30 ms, router 3 ms, no outages");
+    readout(null);
+  }
+  function readout(i) {
+    const r = $("#readout");
+    if (i == null) { const v = site.internet.filter(x => x != null); r.innerHTML = `Average internet <b>${Math.round(v.reduce((a, b) => a + b, 0) / v.length)} ms</b> · router <b>${site.router[0]} ms</b>`; return; }
+    const hour = i === 24 ? "now" : `${String(i).padStart(2, "0")}:00`, inet = site.internet[i];
+    r.innerHTML = `<b>${hour}</b> · internet ${inet == null ? '<b style="color:var(--red)">no reply</b>' : `<b>${inet} ms</b>`} · router <b>${site.router[i]} ms</b>`;
+  }
+  const chartSvg = $("#chart-svg");
+  function scrubAt(evt) {
+    const box = chartSvg.getBoundingClientRect(), x = (evt.clientX - box.left) / box.width * CW;
+    const i = Math.max(0, Math.min(24, Math.round(x / (CW / 24)))), v = site.internet[i];
+    $("#chart").classList.add("scrubbing");
+    $("#scrub-line").setAttribute("x1", X(i)); $("#scrub-line").setAttribute("x2", X(i));
+    $("#scrub-dot").setAttribute("cx", X(i)); $("#scrub-dot").setAttribute("cy", Y(v ?? site.router[i]));
+    $("#scrub-dot").setAttribute("fill", v == null ? "#FF453A" : "#FFD60A");
+    readout(i);
+  }
+  chartSvg.addEventListener("pointerdown", e => { chartSvg.setPointerCapture(e.pointerId); scrubAt(e); });
+  chartSvg.addEventListener("pointermove", e => { if (e.buttons || e.pointerType === "mouse") scrubAt(e); });
+  chartSvg.addEventListener("pointerleave", () => { $("#chart").classList.remove("scrubbing"); readout(null); });
+
+  // Count-up and intro
+  function countUp(el, to, ms = 900) {
+    if (reduced) { el.textContent = to; return; }
+    const t0 = performance.now();
+    const step = t => { const p = Math.min(1, (t - t0) / ms); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  }
+  const play = el => { el.classList.remove("play"); void el.offsetWidth; el.classList.add("play"); };
+  async function intro() {
+    $("#arc").style.strokeDashoffset = 251; $("#chart").classList.remove("played"); $("#score").textContent = 0;
+    play($("#s-overview"));
+    await ignite(overviewLights, site.lights);
+    await wait(80);
+    $("#arc").style.strokeDashoffset = 251 * (1 - site.score / 100);
+    countUp($("#score"), site.score); $("#chart").classList.add("played");
+  }
+
+  // Site switcher
+  function renderMenu() {
+    $("#site-menu").innerHTML = Object.entries(SITES).map(([k, s]) => `<button role="menuitemradio" aria-checked="${s === site}" data-k="${k}"><span>${s.name}<small>${s.problems.length ? `${s.problems.length} problems` : "All good"}</small></span>${s.problems.length ? CHIP.down : CHIP.ok}</button>`).join("");
+    $$("#site-menu button").forEach(b => b.addEventListener("click", () => { switchSite(b.dataset.k); closeMenu(); }));
+  }
+  function openMenu() { renderMenu(); $("#site-menu").classList.add("open"); $("#site-btn").setAttribute("aria-expanded", "true"); setTimeout(() => $("#site-menu button").focus(), 50); }
+  function closeMenu() { $("#site-menu").classList.remove("open"); $("#site-btn").setAttribute("aria-expanded", "false"); }
+  $("#site-btn").addEventListener("click", e => { e.stopPropagation(); $("#site-menu").classList.contains("open") ? closeMenu() : openMenu(); });
+  document.addEventListener("click", e => { if (!e.target.closest("#site-menu")) closeMenu(); });
+  function switchSite(k) {
+    if (SITES[k] === site) return;
+    site = SITES[k]; renderAll(); intro(); toast(`Switched to ${site.name}`);
+  }
+
+  // ===================== Devices: list + map =====================
+  let devFilter = "all", selected = null;
+  const FILTERS = [["all", "All"], ["new", "Needs review"], ["ok", "Online"], ["off", "Offline"]];
+  function renderDevFilters() {
+    $("#dev-filters").innerHTML = FILTERS.map(([k, l]) => `<button data-f="${k}" aria-pressed="${devFilter === k}">${l}</button>`).join("");
+    $$("#dev-filters button").forEach(b => b.addEventListener("click", () => { devFilter = b.dataset.f; renderDevFilters(); renderDevices(); play($("#s-devices")); }));
+  }
+  const realDevices = () => site.devices.filter(d => d.id !== "internet");
+  function renderDevices() {
+    const list = realDevices(), fresh = list.filter(d => d.status === "new").length, online = list.filter(d => d.status !== "off").length;
+    $("#dev-sub").textContent = `${list.length} devices · ${online} online${fresh ? ` · ${fresh} new` : ""}`;
+    const groups = [["new", "Needs review"], ["ok", "Online"], ["off", "Offline"]].filter(([k]) => devFilter === "all" || devFilter === k);
+    let html = "";
+    for (const [k, l] of groups) {
+      const items = list.filter(d => d.status === k);
+      if (!items.length) continue;
+      html += `<div class="label">${l}</div>` + items.map(d => `<button class="row" data-id="${d.id}"><div style="display:flex;gap:12px;align-items:center"><span class="iconbtn" style="width:40px;height:40px">${iconSvg(d.type).replace("<svg", '<svg class="i"')}</span><div><b>${d.name}</b><small>${d.vendor} · ${d.ip}${d.sub && d.status !== "ok" ? ` · ${d.sub}` : ""}</small></div></div><span class="end">${CHIP[d.status]}</span></button>`).join("");
+    }
+    $("#dev-list").innerHTML = html || `<div class="card empty">No devices match this filter.</div>`;
+    $$("#dev-list .row").forEach(r => r.addEventListener("click", () => openDevice(r.dataset.id)));
+    renderMap();
+  }
+  $$("#seg button").forEach((b, i) => b.addEventListener("click", () => {
+    $("#seg").dataset.i = i; $$("#seg button").forEach((x, j) => x.setAttribute("aria-selected", i === j));
+    $("#dev-list").hidden = i === 1; $("#dev-map").hidden = i === 0; play($("#s-devices"));
+  }));
+
+  // Map: router in the center, internet above, devices on a ring
+  const mapSvg = $("#map-svg");
+  function layout() {
+    const list = realDevices().filter(d => d.id !== "router"), pos = { router: [170, 196], internet: [170, 44] };
+    const angles = [205, 335, 160, 20, 115, 65, 250, 290].slice(0, list.length);
+    list.forEach((d, i) => { const a = angles[i] * Math.PI / 180; pos[d.id] = [170 + Math.cos(a) * 126, 196 - Math.sin(a) * 104]; });
+    return pos;
+  }
+  function renderMap() {
+    const pos = layout(), [rx, ry] = pos.router, inet = site.devices.find(d => d.id === "internet");
+    const links = realDevices().filter(d => d.id !== "router").map(d => { const [x, y] = pos[d.id]; return `<line class="link" data-id="${d.id}" x1="${rx}" y1="${ry}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#2C2C31" stroke-width="1.5"${d.status === "off" ? ' stroke-dasharray="3 5"' : ""}/>`; }).join("");
+    const up = inet.status !== "down";
+    const inetLink = `<line class="${up ? "" : "link-broken"}" x1="${rx}" y1="${ry - 28}" x2="170" y2="68" stroke="${up ? "#2C2C31" : "#FF453A"}" stroke-width="${up ? 1.5 : 2.5}"${up ? "" : ' stroke-dasharray="8 5"'}/>` + (up ? "" : `<rect x="184" y="76" width="118" height="22" rx="11" fill="rgba(255,69,58,.16)"/><text x="243" y="91" fill="#FF453A" font-size="11" font-weight="800" text-anchor="middle" font-family="Manrope">No reply since 9:41</text>`);
+    const visible = d => d.id === "router" || d.id === "internet" || devFilter === "all" || d.status === devFilter;
+    const nodes = site.devices.map((d, k) => {
+      const [x, y] = pos[d.id], r = d.id === "router" ? 28 : 22, size = r * 1.05, ring = RING[d.status], bx = x + r * .72, by = y + r * .72;
+      const main = d.id === "router" || d.id === "internet";
+      const label = d.id === "router" ? `Router · ${d.ms[1]} ms` : (d.short || d.name) + (d.status === "new" ? " · NEW" : "");
+      const color = d.status === "new" ? "#FF9F0A" : main ? "#F5F5F7" : "#A1A1AA";
+      const aria = `${d.name}, ${TYPE_NAME[d.type]}, ${{ ok: "healthy", new: "new, not trusted yet", down: "down", off: "offline" }[d.status]}. Open details`;
+      return `<g class="node${visible(d) ? "" : " dim"}${d.id === "router" ? " keep" : ""}" data-id="${d.id}" tabindex="0" role="button" aria-label="${aria}" style="animation-delay:${k * 60}ms">
+        <circle class="halo" cx="${x}" cy="${y}" r="${r + 6}"/>
+        <g class="disc"><circle cx="${x}" cy="${y}" r="${r}" fill="#1F1F23" stroke="${ring}" stroke-width="2"${d.status === "off" ? ' stroke-dasharray="4 3"' : ""}/>
+        <use href="#ic-${d.type}" x="${(x - size / 2).toFixed(1)}" y="${(y - size / 2).toFixed(1)}" width="${size.toFixed(1)}" height="${size.toFixed(1)}" fill="${d.status === "off" ? "#71717A" : "#F5F5F7"}"/>
+        <circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="6" fill="${ring}" stroke="#161618" stroke-width="3"/></g>
+        <text x="${x}" y="${y + r + 16}" fill="${color}" font-size="11" font-weight="${main || d.status === "new" ? 800 : 600}" text-anchor="middle" font-family="Manrope">${label}</text>
+        ${d.sub ? `<text x="${x}" y="${y + r + 29}" fill="#A1A1AA" font-size="10" text-anchor="middle" font-family="Manrope">${d.sub}</text>` : ""}</g>`;
+    }).join("");
+    mapSvg.innerHTML = `<defs>${Object.entries(ICONS).map(([k, d]) => `<symbol id="ic-${k}" viewBox="0 0 24 24"><path d="${d}"/></symbol>`).join("")}</defs><g>${links}</g>${inetLink}<g class="packets"></g>${nodes}`;
+    const list = realDevices(), fresh = list.filter(d => d.status === "new").length;
+    mapSvg.setAttribute("aria-label", `Network map: router with ${list.filter(d => d.status !== "off").length - 1} devices online${fresh ? `, ${fresh} new` : ""}; internet ${up ? "working" : "down since 9:41"}`);
+    mapSvg.querySelectorAll(".node").forEach(n => {
+      n.addEventListener("click", () => openDevice(n.dataset.id));
+      n.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDevice(n.dataset.id); } });
+    });
+    markSelection();
+  }
+  function markSelection() {
+    $("#map-card").classList.toggle("has-sel", !!selected);
+    mapSvg.querySelectorAll(".node").forEach(n => n.classList.toggle("sel", n.dataset.id === selected));
+    mapSvg.querySelectorAll(".link").forEach(l => l.classList.toggle("sel", l.dataset.id === selected));
+  }
+
+  // Device sheet: ping, trust
+  let pinging = false;
+  function openDevice(id) {
+    const d = site.devices.find(x => x.id === id); if (!d) return;
+    selected = id; markSelection();
+    const unsel = () => { selected = null; markSelection(); };
+    if (d.id === "internet") {
+      const up = d.status !== "down";
+      openSheet(sheetTop("globe", "Internet", `${CHIP[d.status]}<span>Internet</span>`) +
+        facts(up ? [["Status", "Working"], ["Checked", "8.8.8.8 · 9.9.9.9"], ["Latency", `${site.lights[2][1]}`]] : [["Status", "No reply since 9:41"], ["Cause", "Internet provider"], ["Checked", "8.8.8.8 · 9.9.9.9"], ["Outage so far", "7 min"]]) +
+        `<div class="actions"><button class="btn" id="d-diag">Run diagnose</button></div>`, unsel);
+      $("#d-diag").addEventListener("click", () => { closeSheet(); openDiagnose(); });
+      return;
+    }
+    const actions = [`<button class="btn${d.status === "new" ? " ghost" : ""}" id="d-ping">Ping test</button>`];
+    if (d.status === "new") actions.push(`<button class="btn" id="d-trust">Mark as trusted</button>`);
+    openSheet(sheetTop(d.type, d.name, `${CHIP[d.status]}<span>${TYPE_NAME[d.type]}</span>`) +
+      facts([["Manufacturer", d.vendor], ["IP address", d.ip], ["MAC address", d.mac], ["Seen", d.seen]]) +
+      `<div class="result" id="d-result" hidden></div><div class="actions">${actions.join("")}</div>`, unsel);
+    $("#d-ping").addEventListener("click", () => ping(d));
+    if ($("#d-trust")) $("#d-trust").addEventListener("click", () => trust(d));
+  }
+  function trust(d) {
+    d.status = "ok"; d.sub = "trusted just now";
+    const a = site.alerts.find(x => x.device === d.id && x.open); if (a) { a.open = false; a.status = "done"; a.title = "New device trusted"; a.sub = `Just now · ${d.name} marked as trusted by you`; }
+    site.problems = site.problems.filter(p => p.act !== `device:${d.id}`);
+    site.deductions = site.deductions.filter(([t]) => !t.includes("trusted")); site.score = Math.min(100, site.score + 5);
+    renderAll(); selected = d.id; markSelection();
+    $("#arc").style.strokeDashoffset = 251 * (1 - site.score / 100); $("#score").textContent = site.score;
+    $("#sheet-body .meta").innerHTML = `${CHIP.ok}<span>${TYPE_NAME[d.type]}</span>`;
+    $("#d-trust").remove(); $("#d-ping").classList.remove("ghost");
+    toast(`${d.name} marked as trusted`);
+  }
+  function packet(from, to, lost, ms) {
+    return new Promise(resolve => {
+      const g = mapSvg.querySelector(".packets");
+      if (reduced || $("#dev-map").hidden || !g || current !== "#s-devices") { setTimeout(resolve, reduced ? 0 : ms); return; }
+      const c = document.createElementNS(svgNS, "circle"); c.setAttribute("r", "4"); c.setAttribute("class", "packet" + (lost ? " lost" : "")); g.appendChild(c);
+      const t0 = performance.now();
+      const step = t => {
+        const p = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - p, 2);
+        c.setAttribute("cx", from[0] + (to[0] - from[0]) * e); c.setAttribute("cy", from[1] + (to[1] - from[1]) * e);
+        if (lost) c.style.opacity = String(1 - Math.max(0, p - .7) / .3);
+        if (p < 1) requestAnimationFrame(step); else { c.remove(); resolve(); }
+      };
+      requestAnimationFrame(step);
+    });
+  }
+  async function ping(d) {
+    if (pinging) return; pinging = true;
+    const pos = layout(), from = d.id === "router" ? pos[realDevices()[1].id] : pos.router, to = pos[d.id];
+    const res = $("#d-result"), btn = $("#d-ping");
+    btn.disabled = true; btn.textContent = "Pinging…"; res.hidden = false;
+    res.innerHTML = `<b>Pinging ${d.ip}…</b><span class="meta">5 ICMP echo requests from the agent</span><div class="replies">${"<span>·</span>".repeat(5)}</div>`;
+    const cells = [...res.querySelectorAll(".replies span")], got = [];
+    for (let i = 0; i < 5; i++) {
+      if (!$("#sheet").classList.contains("open")) break;
+      const lost = !d.ms;
+      await packet(from, to, lost, 260);
+      if (!lost) await packet(to, from, false, 260); else await wait(380);
+      if (lost) { cells[i].className = "bad"; cells[i].textContent = "lost"; } else { got.push(d.ms[i]); cells[i].className = "ok"; cells[i].textContent = `${d.ms[i]} ms`; }
+      await wait(110);
+    }
+    const head = res.querySelector("b"), meta = res.querySelector(".meta");
+    if (!got.length) { head.textContent = `${d.name} isn't answering`; meta.textContent = "0 of 5 replies · 100% loss. Is it switched on and connected?"; }
+    else {
+      const avg = got.reduce((a, b) => a + b, 0) / got.length, max = Math.max(...got);
+      head.textContent = max > 50 ? "Responds, but unevenly" : "Responds well";
+      meta.textContent = `${got.length} of 5 replies · average ${avg < 1 ? avg.toFixed(1) : Math.round(avg)} ms · max ${max} ms · ${100 - got.length * 20}% loss${max > 50 ? " · likely Wi-Fi power saving" : ""}`;
+    }
+    btn.disabled = false; btn.textContent = "Ping again"; pinging = false;
+  }
+
+  // ===================== Diagnose =====================
+  const STEPS = [
+    [0, "Network adapter", "Wi-Fi: 192.168.1.13 on 192.168.1.0/24, gateway 192.168.1.1", "This PC is connected"],
+    [1, "Router reachable (ARP)", "ARP: 192.168.1.1 is at 64:f8:8a:xx:xx:xx", "The router is on the network"],
+    [1, "Router answers ping", "ICMP echo to 192.168.1.1: 3 of 3 replies, avg 1 ms", "Your router responds normally"],
+    [2, "Internet answers ping", "ICMP echo to 8.8.8.8: 0 of 3; to 9.9.9.9: 0 of 3", "Your provider isn't responding"],
+    [3, "Name lookup (DNS)", "example.com resolved to 104.20.23.154", "Website names are found"],
+    [4, "Secure web connection", "TCP 8.8.8.8:443 in 27 ms; HTTPS returned 204", "Secure websites load"],
+  ];
+  $("#ladder").innerHTML = STEPS.map((s, i) => `<div class="rung" data-s="waiting"><span class="mark">${i + 1}</span><button class="body" aria-expanded="false"><b>${s[1]}</b><small>Waiting</small><span class="detail"><span></span></span></button></div>`).join("");
+  const rungs = [...$("#ladder").children];
+  rungs.forEach(r => r.querySelector(".body").addEventListener("click", e => { const open = r.classList.toggle("open"); e.currentTarget.setAttribute("aria-expanded", open); }));
+  function stepDetail(i, state) {
+    if (state === "skipped") return "Not run: an earlier step failed";
+    if (site === SITES.lola) return ["Wi-Fi: 192.168.0.10 on 192.168.0.0/24, gateway 192.168.0.1", "ARP: 192.168.0.1 is at 98:da:c4:xx:xx:xx", "ICMP echo to 192.168.0.1: 3 of 3 replies, avg 3 ms", "ICMP echo to 8.8.8.8: 3 of 3 replies, avg 31 ms", "example.com resolved to 104.20.23.154 in 18 ms", "TCP 8.8.8.8:443 in 33 ms; HTTPS returned 204"][i];
+    return STEPS[i][2];
+  }
+  let running = false;
+  async function runDiagnose() {
+    if (running) return; running = true;
+    $("#cause").classList.remove("show"); $("#diag-sub").textContent = `${site.name} · checking 6 layers, from this PC to the web`;
+    diagLights.forEach(l => setLight(l, "unlit", "—"));
+    rungs.forEach(r => { r.dataset.s = "waiting"; r.classList.remove("open"); r.querySelector("small").textContent = "Waiting"; });
+    for (let i = 0; i < STEPS.length; i++) {
+      const [li, , , summary] = STEPS[i], state = site.diag[i], light = diagLights[li], body = rungs[i];
+      body.querySelector(".detail > span").textContent = stepDetail(i, state);
+      if (state === "skipped") { body.dataset.s = "skipped"; body.querySelector("small").textContent = "Skipped"; setLight(light, "unlit", "Skipped"); continue; }
+      body.dataset.s = "checking"; body.querySelector("small").textContent = "Checking…"; setLight(light, "checking", "…");
+      await wait(state === "fail" ? 1300 : 600);
+      body.dataset.s = state; body.querySelector("small").textContent = state === "fail" ? summary : (i === 3 ? "The internet is reachable" : summary);
+      setLight(light, state, site.lights[li][1]);
+    }
+    const failed = site.diag.indexOf("fail");
+    $("#diag-sub").textContent = failed >= 0 ? `Finished just now · root cause: step ${failed + 1}` : "Finished just now · all 6 checks passed";
+    $("#cause").innerHTML = failed >= 0
+      ? `<div class="meta">${CHIP.down.replace("Down", `Step ${failed + 1} failed`)}<span>Just now</span></div><h2>Your internet provider isn't responding</h2><p>This PC, the Wi-Fi and your router are fine. Wait a few minutes, or call your provider. KinLAN will tell you when it's back.</p>`
+      : `<div class="meta">${CHIP.ok.replace("Healthy", "All passed")}<span>Just now</span></div><h2>Everything checks out</h2><p>Your network and internet are working, from this PC to secure websites.</p>`;
+    $("#cause").classList.add("show"); running = false;
+  }
+
+  // ===================== Alerts =====================
+  let alertFilter = "open";
+  function renderAlerts() {
+    const open = site.alerts.filter(a => a.open).length;
+    $("#alerts-sub").textContent = `${site.name} · ${open ? `${open} open` : "nothing open"}`;
+    $("#badge").textContent = open; $("#badge").classList.toggle("zero", !open);
+    $("#alert-filters").innerHTML = [["open", `Open (${open})`], ["done", "Resolved"]].map(([k, l]) => `<button data-f="${k}" aria-pressed="${alertFilter === k}">${l}</button>`).join("");
+    $$("#alert-filters button").forEach(b => b.addEventListener("click", () => { alertFilter = b.dataset.f; renderAlerts(); play($("#s-alerts")); }));
+    const items = site.alerts.filter(a => (alertFilter === "open") === a.open);
+    $("#alert-list").innerHTML = items.length ? items.map(a => `<div class="row" data-id="${a.id}"><div><b>${a.title}</b><small>${a.sub}</small></div><span class="end">${a.open ? `<button class="btn sm ghost" data-ack="${a.id}">${a.device ? "Review" : "Acknowledge"}</button>` : CHIP[a.status]}</span></div>`).join("")
+      : `<div class="card empty">${alertFilter === "open" ? "No open alerts. KinLAN will tell you when something needs attention." : "Nothing resolved yet."}</div>`;
+    $$("[data-ack]").forEach(b => b.addEventListener("click", async () => {
+      const a = site.alerts.find(x => x.id === b.dataset.ack);
+      if (a.device) { openDevice(a.device); return; }
+      const row = b.closest(".row");
+      row.style.transform = "translateX(40px)"; row.style.opacity = "0"; await wait(220);
+      a.open = false; a.status = "done"; a.sub = `${a.sub.split(" · ")[0]} · acknowledged by you`;
+      renderAlerts(); toast("Alert acknowledged");
+    }));
+  }
+
+  // ===================== Settings & pairing =====================
+  $$(".switch").forEach(s => s.addEventListener("click", () => { const on = s.getAttribute("aria-checked") !== "true"; s.setAttribute("aria-checked", on); toast(`${s.dataset.name} ${on ? "on" : "off"}`); }));
+  const tile = c => `<span style="opacity:1;transform:none;width:40px;height:52px;font-size:24px">${c}</span>`;
+  $("#invite").addEventListener("click", () => {
+    openSheet(sheetTop("invite", "Invite to your Circle", `<span>Dela Cruz Home</span>`) +
+      `<p class="text">Share this code. The new member chooses "Join with an invite code" in the app.</p>
+       <div class="code" style="margin:16px 0" aria-label="Invite code K7QM-2RXP">${[..."K7QM"].map(tile).join("")}<span class="gap" style="opacity:1"></span>${[..."2RXP"].map(tile).join("")}</div>` +
+      facts([["Role", "Viewer"], ["Expires", "in 7 days · single use"]]) + `<div class="actions"><button class="btn" id="inv-copy">Copy code</button></div>`);
+    $("#inv-copy").addEventListener("click", () => toast("Invite code copied"));
+  });
+  $("#copy").addEventListener("click", () => toast("Pairing code copied"));
+
+  // ===================== Navigation =====================
+  const tabs = { overview: "#s-overview", devices: "#s-devices", alerts: "#s-alerts", settings: "#s-settings" };
+  let current = "#s-overview";
+  function show(sel) {
+    closeSheet(); closeMenu();
+    if (sel === current) return;
+    $(current).classList.remove("on");
+    const next = $(sel); next.scrollTop = 0; next.classList.add("on"); play(next); current = sel;
+    $("#fab").classList.toggle("hide", sel !== "#s-overview");
+    if (sel === "#s-overview") intro();
+  }
+  const setNav = i => $$(".nav button").forEach((x, j) => j === i ? x.setAttribute("aria-current", "page") : x.removeAttribute("aria-current"));
+  $$(".nav button").forEach((b, i) => b.addEventListener("click", () => { setNav(i); show(tabs[b.dataset.go]); }));
+  function openDiagnose() { setNav(-1); show("#s-diagnose"); runDiagnose(); }
+  $("#fab").addEventListener("click", openDiagnose); $("#run").addEventListener("click", openDiagnose);
+  $("#again").addEventListener("click", runDiagnose);
+  $("#back").addEventListener("click", () => { setNav(0); show("#s-overview"); });
+  let timer;
+  function openPair() {
+    setNav(-1); show("#s-pair"); clearInterval(timer);
+    let s = 581; $("#wait-title").textContent = "Waiting for the agent…"; $("#wait-sub").textContent = "Keep this screen open"; $("#pulse").style.background = "";
+    timer = setInterval(() => { s--; $("#countdown").textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }, 1000);
+    setTimeout(() => { if (current !== "#s-pair") return; $("#wait-title").textContent = "Connected to DESKTOP-01"; $("#wait-sub").textContent = "Scanning the network: 14 devices found"; $("#pulse").style.background = "var(--green)"; toast("Agent connected"); }, reduced ? 1500 : 4500);
+  }
+  $("#pair").addEventListener("click", openPair); $("#to-pair").addEventListener("click", openPair);
+  $("#back2").addEventListener("click", () => { clearInterval(timer); setNav(3); show("#s-settings"); });
+
+  // ===================== Controls & start =====================
+  $("#replay").addEventListener("click", () => { setNav(0); if (current === "#s-overview") intro(); else show("#s-overview"); });
+  $("#motion").addEventListener("click", e => { reduced = !reduced; e.currentTarget.setAttribute("aria-pressed", reduced); document.body.classList.toggle("reduced", reduced); toast(reduced ? "Reduce motion on" : "Reduce motion off"); });
+  if (reduced) { $("#motion").setAttribute("aria-pressed", "true"); document.body.classList.add("reduced"); }
+
+  function renderAll() { renderOverview(); renderDevFilters(); renderDevices(); renderAlerts(); }
+  const overviewLights = buildStrip($("#strip-overview"), true);
+  const diagLights = buildStrip($("#strip-diagnose"), false);
+  renderAll(); intro();
+})();
+</script>
+</body>
+</html>

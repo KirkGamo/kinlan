@@ -14,6 +14,17 @@ Research input for DESIGN.md, gathered with the UI/UX Pro Max skill. Per the tec
 | list performance navigation tabs | react-native stack |
 | dashboard data dense tabular numbers | typography |
 
+## Visual references (Nov 7)
+
+The user shared dark mobile dashboards (running and home-energy apps) as inspiration and asked for a modern yellow, orange and black design with smooth animations. What they have in common, and what KinLAN takes:
+
+- Near-black grounds with dark grey, generously rounded cards and pill-shaped controls.
+- One signal yellow for the selected tab, primary buttons and highlighted numbers; yellow-filled line and bar charts.
+- Large, bold numbers, and a gauge or ring for the headline value (KinLAN: the health gauge).
+- Green and red only for up/down meaning, never yellow (KinLAN: status keeps green, orange and red).
+
+This overrides the earlier "dark-only theme: rejected" decision below.
+
 ## Adopted
 
 - **Status colors are the core of the palette:** operational green, degraded amber, incident red, plus a neutral for unknown/offline.
@@ -29,7 +40,7 @@ Research input for DESIGN.md, gathered with the UI/UX Pro Max skill. Per the tec
 
 | Suggestion | Why not |
 |---|---|
-| "Dark Mode (OLED)", light mode not recommended | The plan requires light and dark themes, following the phone's setting. |
+| "Dark Mode (OLED)", light mode not recommended | *Superseded Nov 7:* the user chose a dark-first look; a light theme is now optional. |
 | Playfair Display (serif) for body text | Editorial/luxury pairing; wrong for a task-focused Operate app. Use one sans-serif family (Roboto or Inter) with tabular figures. |
 | Fira Code/Fira Sans or Exo/Roboto Mono pairings | A monospace face isn't needed; tabular figures in the main sans-serif give aligned numbers with less visual noise. |
 | Landing-page structure (hero, CTA after metrics, "start trial") | KinLAN's screens are app UI, not marketing. |

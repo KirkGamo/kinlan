@@ -79,6 +79,7 @@ It exists because small networks rarely have IT staff, built-in tools (ping, arp
 - **Name:** KinLAN, from "kin on the LAN". Written with a capital *LAN* in text; `kinlan` in code, packages and URLs.
 - **Tagline:** *Your people, your network.*
 - **Personality:** calm, trustworthy, technical but friendly; warm, like people looking out for each other, but just as at home in an office as in a living room. A monitoring product should reassure, not alarm.
+- **Visual (user's choice, Nov 7):** a modern, dark-first look in yellow, orange and black with smooth animations and transitions. Yellow is the brand and selection color only; status keeps its own colors (green, orange, red) with an icon and a word.
 - **Defense line:** "KinLAN means kin on the LAN: anyone who shares a network and watches over it together."
 
 ## Evidence on Hand
@@ -101,5 +102,5 @@ It exists because small networks rarely have IT staff, built-in tools (ping, arp
 - **Contrast:** text at least 4.5:1, icons and large text at least 3:1, in light and dark themes.
 - **Touch targets:** at least 48 × 48 dp.
 - **Text size:** layouts must still work when the phone's text size is enlarged.
-- **Motion:** subtle, and reduced when the phone's Reduce Motion setting is on.
+- **Motion:** smooth and purposeful (lights igniting, cards rising, numbers counting up), never decorative loops on information the user must read; the phone's Reduce Motion setting turns every movement into a short fade and stops all loops.
 - **Screen readers:** icon-only buttons have accessibility labels; live status changes are announced.
