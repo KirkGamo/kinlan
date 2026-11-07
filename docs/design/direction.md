@@ -52,10 +52,17 @@ Only transform and opacity animate (Reanimated on the UI thread in the app).
 | Map selection | Yellow ring scales in; other nodes dim | 220 ms |
 | Ping on the map | A dot travels the link and back for each echo; lost echoes turn red and fade | 260 ms each way |
 | Toast | Rises 20 dp and fades in; leaves after 1.8 s | 220 ms |
+| Splash | The mark's five dots ignite, then the wordmark and tagline rise in | 110 ms per dot, 420 ms words; about 2 s |
+| Loading and pull to refresh | Five small dots light in sequence; pulling fills them one by one | 1.1 s loop; follows the finger |
+| Back online | The broken map link redraws as solid green | 1.1 s |
 
 Easings: decelerate `cubic-bezier(0.05, 0.7, 0.1, 1)` for arrivals, standard `cubic-bezier(0.2, 0, 0, 1)` for changes in place, accelerate `cubic-bezier(0.3, 0, 0.8, 0.15)` for exits.
 
 **Reduce Motion:** every movement becomes a 120 ms fade, loops stop, and results appear at once.
+
+## Brand system
+
+The brand layer on top of this direction is in `docs/design/brand.md` (mark, wordmark, silkscreen labels, perforation on the verdict card and splash only, people-first devices, voice, signature moments). Two rules from it bind every screen: only status lights glow, and avatars never use the status colors.
 
 ## Light mapping and states
 

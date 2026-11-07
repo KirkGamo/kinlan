@@ -41,10 +41,11 @@ Written with the Impeccable `shape` flow (Sprint 1, Nov 7, 2026). These say **wh
 
 - **Job:** "Who's on my network?" Spot unknown devices, put names on them, and check one device's connection.
 - **List (Devices tab):**
-  - Groups in order: **Needs review** (new untrusted devices after the baseline, and the one-time baseline review), **Online**, **Offline**.
+  - **People view (default, Nov 7):** **Needs review** first, then one group per Circle member (avatar, name, "2 of 2 online"), then **Shared and unassigned**. A People | Status | Map switch sits above the filters (`docs/design/brand.md`, section 4).
+  - **Status view:** **Needs review** (new untrusted devices after the baseline, and the one-time baseline review), **Online**, **Offline**.
   - Each row: display name (custom name, else hostname, else manufacturer), manufacturer, IP, status chip, trusted badge.
   - Filter chips (All / Needs review / Online / Offline). No search needed below about 40 devices.
-- **Map (a List | Map switch on the Devices tab; the list stays the default):**
+- **Map (the third option of the People | Status | Map switch):**
   - A **logical network map**: the router at the center, the internet above it, and every device as a node around the router (a star, which is what one local network is).
   - **Links carry live numbers:** internet latency and loss on the router-to-internet link, router latency on the agent PC's link.
   - **Each node:** a type icon (router, computer, laptop, phone, TV, printer, unknown; the device type is inferred from the manufacturer and hostname and can be changed in Device detail), the display name, and a status ring and badge (Online, Offline, New); the agent's PC is marked.
@@ -55,7 +56,7 @@ Written with the Impeccable `shape` flow (Sprint 1, Nov 7, 2026). These say **wh
   - **Range:** readable up to about 30 devices in one ring; beyond that, offline devices collapse into one "+N offline" node.
   - **Accessibility:** the map is an alternative view, never the only one. Screen readers get a text summary ("Router, 6 devices online, 1 new, internet 25 ms") and every action stays available from the list.
 - **Detail:**
-  - Identity: name and device type (both editable), manufacturer, MAC, IP, first and last seen. A "Private address" device explains in one line that the phone hides its real hardware address.
+  - Identity: name and device type (both editable), manufacturer, MAC, IP, first and last seen, and **whose it is** ("Whose is this?": one chip per member, plus Shared; never presence or location). A "Private address" device explains in one line that the phone hides its real hardware address.
   - Actions (owners and admins): **Mark as trusted**, **Rename**, **Ping test**.
   - Ping test result card: five reply cells fill in live, then the plain line ("Responds well", "Responds, but unevenly", "isn't answering") and the numbers (replies, average, max, loss).
   - Ping history and any **risky open ports** with plain advice ("Telnet sends passwords unencrypted. Turn it off on this device.").
@@ -117,6 +118,9 @@ Everything that shows a status can be tapped to explain it or act on it. The pro
 | Notification switch | Tap | Toggles, with a confirming toast |
 | Invite a member | Tap | Invite sheet with the code and Copy |
 | Copy code (pairing, invite) | Tap | "Copied" toast |
+| Your people (Overview) | Tap a member | Opens the Devices People view |
+| "Whose is this?" chips | Tap | Assigns the device to a member or Shared; the list, map and Your people update |
+| Any list screen | Drag down from the top | The five lights fill as you pull; release after the fifth to refresh |
 
 Sheets close with the close button, a tap on the scrim, Esc, or the Android back gesture, and return focus to what opened them. Pull to refresh stays on Overview, Devices and Alerts (`docs/design/research.md`).
 
