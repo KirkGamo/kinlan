@@ -80,6 +80,7 @@ It exists because small networks rarely have IT staff, built-in tools (ping, arp
 - **Tagline:** *Your people, your network.*
 - **Personality:** calm, trustworthy, technical but friendly; warm, like people looking out for each other, but just as at home in an office as in a living room. A monitoring product should reassure, not alarm.
 - **Visual (user's choice, Nov 7):** a modern, dark-first look in yellow, orange and black with smooth animations and transitions. Yellow is the brand and selection color only; status keeps its own colors (green, orange, red) with an icon and a word.
+- **Brand (Nov 7):** the identity comes from kin (people) and LAN (the router's lights): a five-light arc mark, a kin/LAN wordmark, silkscreen labels, a perforated texture on two surfaces, devices that belong to people, and a calm voice that names the person or place. Full system: `docs/design/brand.md`.
 - **Defense line:** "KinLAN means kin on the LAN: anyone who shares a network and watches over it together."
 
 ## Evidence on Hand

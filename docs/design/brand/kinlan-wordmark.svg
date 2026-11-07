@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 110" width="420" height="110" role="img" aria-label="KinLAN">
+  <!-- Lockup: mark, then "kin" in Manrope ExtraBold (tight) and "LAN" in the silkscreen style (uppercase, wide tracking).
+       Text needs Manrope installed; convert to outlines before using outside the app. -->
+  <rect width="420" height="110" rx="20" fill="#0B0B0C"/>
+  <g transform="translate(22 14) scale(.9)" fill="#FFD60A">
+    <circle cx="14" cy="51.4" r="9"/><circle cx="34.6" cy="35.6" r="9"/><circle cx="60" cy="30" r="9"/><circle cx="85.4" cy="35.6" r="9"/><circle cx="106" cy="51.4" r="9"/>
+  </g>
+  <text x="150" y="74" font-family="Manrope, sans-serif" font-weight="800" font-size="56" letter-spacing="-2" fill="#F5F5F7">kin</text>
+  <text x="244" y="74" font-family="Manrope, sans-serif" font-weight="800" font-size="30" letter-spacing="6" fill="#FFD60A">LAN</text>
+</svg>
