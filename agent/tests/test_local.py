@@ -102,6 +102,7 @@ def test_cli_run_local_calls_the_local_view(monkeypatch):
     assert calls == {"ticks": 2, "interval_s": 1.0}
 
 
-def test_cli_run_without_local_is_not_implemented_yet(capsys):
-    assert main.main(["run"]) == 2
-    assert "run --local" in capsys.readouterr().err
+def test_cli_run_before_pairing_says_to_pair(capsys, tmp_path, monkeypatch):
+    monkeypatch.setenv("KINLAN_HOME", str(tmp_path))
+    assert main.main(["run"]) == 1
+    assert "kinlan-agent pair" in capsys.readouterr().err

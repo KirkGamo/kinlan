@@ -274,7 +274,7 @@ def test_a_ping_test_result_is_kept_in_the_device_history(client, ana, agent, ho
         headers=ana.h,
         json={"type": "ping_test", "params": {"device_id": device_id}},
     ).json()
-    assert cmd["params"] == {"device_id": device_id, "count": 10}
+    assert cmd["params"] == {"device_id": device_id, "ip": PHONE[1], "mac": PHONE[0], "count": 10}
     client.get(f"{API}/agent/commands?wait=0", headers=agent["h"])
     stats = {
         "sent": 10,

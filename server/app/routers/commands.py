@@ -25,7 +25,7 @@ router = APIRouter(
 
 def _device_param(
     db: DB, site_id: uuid.UUID, params: dict[str, Any], *, required: bool
-) -> str | None:
+) -> Device | None:
     raw = params.get("device_id")
     if raw is None:
         if required:
@@ -38,7 +38,7 @@ def _device_param(
     device = db.get(Device, device_id)
     if device is None or device.site_id != site_id:
         raise ApiError(404, "device_not_found", "That device isn't on this site.")
-    return str(device_id)
+    return device
 
 
 @router.post("/sites/{site_id}/commands", status_code=201, response_model=CommandOut)
@@ -49,13 +49,19 @@ def send_command(site_id: uuid.UUID, body: CommandIn, user: CurrentUser, db: DB)
         count = body.params.get("count", 10)
         if not isinstance(count, int) or not 1 <= count <= 50:
             raise ApiError(400, "validation_error", "params.count: a whole number from 1 to 50")
+        device = _device_param(db, site.id, body.params, required=True)
+        if device.ip is None:
+            raise ApiError(409, "device_has_no_address", "That device has no known IP address yet.")
+        # The agent pings by address; the id ties the result back to the device's history.
         params = {
-            "device_id": _device_param(db, site.id, body.params, required=True),
+            "device_id": str(device.id),
+            "ip": str(device.ip),
+            "mac": device.mac,
             "count": count,
         }
     elif body.type == "port_check":
-        device_id = _device_param(db, site.id, body.params, required=False)
-        params = {"device_id": device_id} if device_id else {}
+        device = _device_param(db, site.id, body.params, required=False)
+        params = {"device_id": str(device.id), "ip": str(device.ip)} if device else {}
     else:
         params = {}
     cmd = Command(site_id=site.id, type=body.type, params=params, requested_by=user.id)

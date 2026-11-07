@@ -20,6 +20,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from kinlan_agent.config import home_dir
+
 MAX_AGE = timedelta(days=7)
 MAX_BYTES = 50 * 1024 * 1024
 DEFAULT_PATH = Path(os.environ.get("PROGRAMDATA", Path.home())) / "KinLAN" / "buffer.db"
@@ -37,6 +39,10 @@ CREATE TABLE IF NOT EXISTS outages (
     started_at  TEXT    NOT NULL,
     ended_at    TEXT,
     cause       TEXT    NOT NULL
+);
+CREATE TABLE IF NOT EXISTS meta (           -- small key/value state: in-flight batch, last upload
+    key         TEXT PRIMARY KEY,
+    value       TEXT NOT NULL
 );
 """
 
@@ -67,7 +73,9 @@ class OpenOutage:
 class Buffer:
     """Thread-safe wrapper around the agent's SQLite file."""
 
-    def __init__(self, path: Path | str = DEFAULT_PATH):
+    def __init__(self, path: Path | str | None = None):
+        # Follows KINLAN_HOME, like the config and token files.
+        path = path if path is not None else home_dir() / "buffer.db"
         self.path = Path(path)
         if str(path) != ":memory:":
             self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -168,6 +176,34 @@ class Buffer:
                 break
             removed += cur.rowcount
         return removed
+
+    def items_between(self, first_id: int, last_id: int) -> list[OutboxItem]:
+        """The items with ids in [first_id, last_id], oldest first (to resend a batch exactly)."""
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT id, kind, payload, created_at FROM outbox WHERE id BETWEEN ? AND ? "
+                "ORDER BY id",
+                (first_id, last_id),
+            ).fetchall()
+        return [OutboxItem(r[0], r[1], json.loads(r[2]), _parse(r[3])) for r in rows]
+
+    # --- small persistent state --------------------------------------------------------
+
+    def get_meta(self, key: str) -> str | None:
+        with self._lock:
+            row = self._db.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
+        return row[0] if row else None
+
+    def set_meta(self, key: str, value: str | None) -> None:
+        with self._lock:
+            if value is None:
+                self._db.execute("DELETE FROM meta WHERE key = ?", (key,))
+            else:
+                self._db.execute(
+                    "INSERT INTO meta (key, value) VALUES (?, ?) "
+                    "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                    (key, value),
+                )
 
     # --- outages --------------------------------------------------------------------
 
