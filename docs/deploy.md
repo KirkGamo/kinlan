@@ -4,8 +4,8 @@ The API runs as one free web service on **Render** (Singapore), backed by a free
 
 | Piece | Where | Notes |
 |---|---|---|
-| API | Render web service `kinlan-api`, free plan | `https://kinlan-api.onrender.com` if the name is free (Render adds a suffix otherwise) |
-| Database | Neon project `kinlan`, branch `main`, database `kinlan` | Pooled string for the app, direct string for migrations |
+| API | Render web service `kinlan-api`, free plan | **Live at <https://kinlan-api.onrender.com>** (since Nov 7, 2026) |
+| Database | Neon project `kinlan` (PostgreSQL 15, AWS Singapore), branch `main`, database `kinlan` | Pooled string for the app, direct string for migrations |
 | Migrations | `alembic upgrade head` in the start command | Free instances have no pre-deploy step |
 | Scheduled jobs | Inside the same process (APScheduler) | Keep **one** instance; set `RUN_JOBS=false` on any extra one |
 | Deploys | Automatic on `main`, only after CI passes | `autoDeployTrigger: checksPass` |
@@ -14,9 +14,10 @@ The API runs as one free web service on **Render** (Singapore), backed by a free
 
 1. Sign in at <https://console.neon.tech> and choose **New project**.
    - Name: `kinlan`
-   - Postgres version: 17
+   - Postgres version: **15**, the same as local development and CI (`postgres:15`), so tests match production
    - Region: **AWS Asia Pacific (Singapore)**, the closest to the Philippines
    - Database name: `kinlan`
+   - Leave Object storage, Functions, AI gateway and Realtime **off**: KinLAN uses Neon only as PostgreSQL
 2. Open **Connect** on the project dashboard and copy two connection strings for branch `main`:
    - **Pooled** (the host contains `-pooler`): this becomes `DATABASE_URL`.
    - **Direct** (turn connection pooling off): this becomes `DATABASE_URL_UNPOOLED`.
@@ -51,6 +52,10 @@ kinlan-agent run
 ```
 
 Make the pairing code in the app, or for now with the API: register, create a Circle and a site, then `POST /api/v1/sites/{site}/pairing-code`.
+
+## Verified (Nov 7, 2026)
+
+An end-to-end run against the live API from the developer's home network: a test account, Circle and site were created, the agent paired with a code, and `kinlan-agent run` uploaded for about a minute. The site went `pending` → `online` with network `192.168.1.0/24` and gateway `192.168.1.1`; 10 devices arrived; a diagnose sent from the API came back `done`; timestamps came back in UTC; and the alert engine raised a live `packet_loss` alert for the 11.8 % loss measured during the run. The test account was deleted afterwards.
 
 ## Free-tier behaviour to know
 
