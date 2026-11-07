@@ -1,6 +1,7 @@
 """Passwords (Argon2id), access tokens (JWT, HS256, 15 min) and opaque refresh tokens (30 days)."""
 
 import hashlib
+import hmac
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -74,3 +75,13 @@ def new_invite_code() -> str:
 def normalise_code(code: str) -> str:
     """Accept k7qm2rxp, K7QM-2RXP or ' k7qm 2rxp ' alike."""
     return "".join(ch for ch in code.upper() if ch.isalnum())
+
+
+def keyed_hash(value: str) -> str:
+    """HMAC-SHA-256 with the server secret, for short codes (6-digit pairing codes) whose plain
+    SHA-256 could be brute-forced from a database copy."""
+    return hmac.new(get_settings().jwt_secret.encode(), value.encode(), hashlib.sha256).hexdigest()
+
+
+def new_pairing_code() -> str:
+    return f"{secrets.randbelow(1_000_000):06d}"
