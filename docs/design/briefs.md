@@ -119,8 +119,11 @@ Everything that shows a status can be tapped to explain it or act on it. The pro
 | Invite a member | Tap | Invite sheet with the code and Copy |
 | Copy code (pairing, invite) | Tap | "Copied" toast |
 | Your people (Overview) | Tap a member | Opens the Devices People view |
+| Avatar (top right of the four tabs) | Tap | Account sheet: your name, email and role here; **Your Circles** with each one's status, tap to switch; Account settings; Sign out |
 | "Whose is this?" chips | Tap | Assigns the device to a member or Shared; the list, map and Your people update |
 | Any list screen | Drag down from the top | The five lights fill as you pull; release after the fifth to refresh |
+
+**Two switchers, two levels.** The site name switches sites *within* the current Circle; the avatar switches *between* Circles. Switching a Circle changes the members, sites, people and Settings shown, and returns to Overview. The avatar appears only on the four tabs, never on pushed screens (Diagnose, Pairing).
 
 Sheets close with the close button, a tap on the scrim, Esc, or the Android back gesture, and return focus to what opened them. Pull to refresh stays on Overview, Devices and Alerts (`docs/design/research.md`).
 

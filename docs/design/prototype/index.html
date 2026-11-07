@@ -260,6 +260,11 @@ svg.i { width: 22px; height: 22px; fill: currentColor; }
 .person:hover { background: var(--raised); } .person:active { transform: scale(.97); }
 .person span.who { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .person b { font: var(--t-title); } .person small { font: var(--t-body-s); color: var(--text-2); }
+.sheet .row { background: var(--raised); } .sheet button.row:hover { background: #26262B; }
+.sheet .row[aria-current="true"] { box-shadow: inset 0 0 0 2px var(--yellow); }
+.sheet .row .ci-check { width: 20px; height: 20px; fill: var(--yellow); }
+.sheet .acct-top .av { width: 52px; height: 52px; font-size: 1.125rem; }
+.sheet .acct-top + .label { margin-top: var(--sp-6); }
 .owner-label { color: var(--text-2); margin-top: var(--sp-1); }
 .owners { display: flex; gap: 6px; flex-wrap: wrap; margin: var(--sp-2) 0 var(--sp-5); }
 .owners button { display: inline-flex; align-items: center; gap: var(--sp-2); min-height: 40px; padding: var(--sp-1) 12px var(--sp-1) 6px; border-radius: var(--r-pill); background: var(--raised); font: 700 0.8125rem/1 var(--font); transition: box-shadow var(--t-small) var(--ease-std); }
@@ -313,7 +318,7 @@ svg.i { width: 22px; height: 22px; fill: currentColor; }
           <button class="sitebtn" id="site-btn" aria-haspopup="menu" aria-expanded="false"><h1 id="site-name">Home</h1><svg width="18" height="18" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z" fill="currentColor"/></svg></button>
           <div class="sub" id="site-sub"></div>
         </div>
-        <button class="iconbtn avatar" aria-label="Account">AM</button>
+        <button class="iconbtn avatar acct" aria-haspopup="dialog" aria-label="Account: Ana M.">AM</button>
         <div class="menu" id="site-menu" role="menu"></div>
       </div>
       <div class="strip" id="strip-overview" role="list" aria-label="Network path, tap a light for details"></div>
@@ -344,7 +349,7 @@ svg.i { width: 22px; height: 22px; fill: currentColor; }
     <!-- ===== DEVICES ===== -->
     <section class="screen" id="s-devices" aria-label="Devices">
       <div class="ptr" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="head"><div><h1>Devices</h1><div class="sub" id="dev-sub"></div></div><button class="iconbtn avatar" aria-label="Account">AM</button></div>
+      <div class="head"><div><h1>Devices</h1><div class="sub" id="dev-sub"></div></div><button class="iconbtn avatar acct" aria-haspopup="dialog" aria-label="Account: Ana M.">AM</button></div>
       <div class="seg" id="seg" data-i="0" role="tablist"><span class="thumb"></span><button role="tab" aria-selected="true">People</button><button role="tab" aria-selected="false">Status</button><button role="tab" aria-selected="false">Map</button></div>
       <div class="filters" id="dev-filters" role="group" aria-label="Filter devices"></div>
       <div id="dev-list" class="stagger"></div>
@@ -369,19 +374,17 @@ svg.i { width: 22px; height: 22px; fill: currentColor; }
     <!-- ===== ALERTS ===== -->
     <section class="screen" id="s-alerts" aria-label="Alerts">
       <div class="ptr" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="head"><div><h1>Alerts</h1><div class="sub" id="alerts-sub"></div></div><button class="iconbtn avatar" aria-label="Account">AM</button></div>
+      <div class="head"><div><h1>Alerts</h1><div class="sub" id="alerts-sub"></div></div><button class="iconbtn avatar acct" aria-haspopup="dialog" aria-label="Account: Ana M.">AM</button></div>
       <div class="filters" id="alert-filters" role="group" aria-label="Filter alerts"></div>
       <div id="alert-list" class="stagger"></div>
     </section>
 
     <!-- ===== SETTINGS ===== -->
     <section class="screen" id="s-settings" aria-label="Settings">
-      <div class="head"><div><h1>Settings</h1><div class="sub">Dela Cruz Home · Circle</div></div><button class="iconbtn avatar" aria-label="Account">AM</button></div>
+      <div class="head"><div><h1>Settings</h1><div class="sub" id="settings-sub"></div></div><button class="iconbtn avatar acct" aria-haspopup="dialog" aria-label="Account: Ana M.">AM</button></div>
       <div class="stagger">
         <div class="label">Circle members</div>
-        <div class="row"><div class="lead"><span class="av lg you">AM</span><div><b>Ana M.</b><small>Owner · you</small></div></div><span class="chip c-unk">Owner</span></div>
-        <div class="row"><div class="lead"><span class="av lg">JR</span><div><b>Jun R.</b><small>Admin</small></div></div><span class="chip c-unk">Admin</span></div>
-        <div class="row"><div class="lead"><span class="av lg m2">LT</span><div><b>Lito T.</b><small>Viewer</small></div></div><span class="chip c-unk">Viewer</span></div>
+        <div id="members"></div>
         <button class="btn" id="invite" style="margin-top:var(--sp-2)">Invite a member</button>
         <div class="label">Notifications</div>
         <div class="row"><div><b>Outages</b><small>Site unreachable and back online</small></div><button class="switch" role="switch" aria-checked="true" aria-label="Outage alerts" data-name="Outage alerts"></button></div>
@@ -468,7 +471,7 @@ svg.i { width: 22px; height: 22px; fill: currentColor; }
   const hours = [...Array(25).keys()];
   const SITES = {
     home: {
-      name: "Home", circle: "Dela Cruz Home", agent: "DESKTOP-01",
+      name: "Home", circle: "dela", agent: "DESKTOP-01",
       lights: [["pass", "OK"], ["pass", "2 ms"], ["fail", "Down"], ["unlit", "Skipped"], ["unlit", "Skipped"]],
       verdict: { chip: CHIP.down, meta: "Updated 10 s ago · seen by 2 of 3", title: "Internet down since 9:41", text: "Your router is fine. Your internet provider isn't answering." },
       problems: [{ title: "Internet provider outage", sub: "7 min so far · wait, or call your provider", chip: CHIP.down, act: "diagnose" }, { title: 'Someone new joined: <span class="nw">Galaxy-A15</span>', sub: "Samsung · 192.168.1.31 · whose is it?", chip: CHIP.new, act: "device:galaxy" }],
@@ -494,7 +497,7 @@ svg.i { width: 22px; height: 22px; fill: currentColor; }
       ],
     },
     lola: {
-      name: "Lola's house", circle: "Dela Cruz Home", agent: "LAPTOP-LOLA",
+      name: "Lola's house", circle: "dela", agent: "LAPTOP-LOLA",
       lights: [["pass", "OK"], ["pass", "3 ms"], ["pass", "31 ms"], ["pass", "18 ms"], ["pass", "OK"]],
       verdict: { chip: CHIP.ok, meta: "Updated 8 s ago", title: "All good", text: "Every light is green, from this PC to the web. Nothing needs you." },
       problems: [], score: 100, grade: "A", why: "No problems found in the last 24 hours.", deductions: [],
@@ -509,11 +512,38 @@ svg.i { width: 22px; height: 22px; fill: currentColor; }
       ],
       alerts: [{ id: "b1", title: "Back online after 2 min 05 s", sub: "Nov 4 · power interruption", status: "done", open: false }],
     },
+    lab: {
+      name: "Lab 3", circle: "lab", agent: "LAB3-PC01",
+      lights: [["pass", "OK"], ["pass", "1 ms"], ["pass", "24 ms"], ["pass", "12 ms"], ["pass", "OK"]],
+      verdict: { chip: CHIP.ok, meta: "Updated 5 s ago · seen by 1 of 3", title: "All good", text: "Every light is green. The lab printer came back after an hour offline." },
+      problems: [], score: 95, grade: "A", why: "One device was offline for an hour today.", deductions: [["The lab printer was offline for 1 hour", 5]],
+      internet: hours.map(h => Math.round(22 + 3 * Math.sin(h / 2.6))), router: hours.map(() => 1), outageFrom: null,
+      diag: ["pass", "pass", "pass", "pass", "pass", "pass"],
+      details: ["Ethernet: 10.20.3.11 on 10.20.3.0/24, gateway 10.20.3.1", "ARP: 10.20.3.1 is at 00:1b:54:xx:xx:xx", "ICMP echo to 10.20.3.1: 3 of 3 replies, avg 1 ms", "ICMP echo to 8.8.8.8: 3 of 3 replies, avg 24 ms", "example.com resolved to 104.20.23.154 in 12 ms", "TCP 8.8.8.8:443 in 26 ms; HTTPS returned 204"],
+      devices: [
+        { id: "internet", type: "globe", name: "Internet", status: "ok" },
+        { id: "router", type: "router", name: "Router", status: "ok", vendor: "Cisco", ip: "10.20.3.1", mac: "00:1b:54:xx:xx:xx", seen: "Online since Monday", sub: "gateway", ms: [1, 1, 1, 2, 1] },
+        { id: "lpc1", type: "computer", name: "LAB3-PC01", status: "ok", owner: null, vendor: "Dell", ip: "10.20.3.11", mac: "f8:bc:12:xx:xx:xx", seen: "This PC: runs the agent", sub: "runs the agent", ms: [0.3, 0.3, 0.4, 0.3, 0.3] },
+        { id: "lpc2", type: "computer", name: "LAB3-PC02", status: "ok", owner: "RB", vendor: "Dell", ip: "10.20.3.12", mac: "f8:bc:12:xx:xx:xx", seen: "Online since 7:30", sub: "", ms: [1, 1, 2, 1, 1] },
+        { id: "claptop", type: "laptop", name: "Carla's laptop", status: "ok", owner: "CS", vendor: "Acer", ip: "10.20.3.40", mac: "3c:a0:67:xx:xx:xx", seen: "Online since 8:10", sub: "", ms: [4, 6, 5, 4, 5] },
+        { id: "lprinter", type: "printer", name: "Lab printer", status: "ok", owner: null, vendor: "Epson", ip: "10.20.3.50", mac: "64:eb:8c:xx:xx:xx", seen: "Back online at 9:05", sub: "", ms: [3, 3, 4, 3, 3] },
+      ],
+      alerts: [{ id: "c1", title: "Lab printer is back online", sub: "9:05 · it was offline for 1 h", status: "done", open: false }],
+    },
   };
   let site = SITES.home;
 
+  // ===================== Circles: each has its own members and sites =====================
+  const CIRCLES = {
+    dela: { name: "Dela Cruz Home", sites: ["home", "lola"], members: {
+      AM: { name: "Ana", full: "Ana M.", role: "Owner", cls: "you" }, JR: { name: "Jun", full: "Jun R.", role: "Admin", cls: "" }, LT: { name: "Lito", full: "Lito T.", role: "Viewer", cls: "m2" } } },
+    lab: { name: "CICT Lab 3", sites: ["lab"], members: {
+      RB: { name: "Ramon", full: "Ramon B.", role: "Owner", cls: "" }, AM: { name: "Ana", full: "Ana M.", role: "Admin", cls: "you" }, CS: { name: "Carla", full: "Carla S.", role: "Viewer", cls: "m2" } } },
+  };
+  let circleKey = "dela";
+
   // ===================== Brand: people, mark, haptics =====================
-  const MEMBERS = { AM: { name: "Ana", cls: "you" }, JR: { name: "Jun", cls: "" }, LT: { name: "Lito", cls: "m2" } };
+  let MEMBERS = CIRCLES.dela.members;
   const av = (k, lg) => `<span class="av${lg ? " lg" : ""} ${MEMBERS[k].cls}">${k}</span>`;
   const ARC = [[14, 51.4], [34.6, 35.6], [60, 30], [85.4, 35.6], [106, 51.4]];
   const mark = () => `<svg class="mk" viewBox="0 16 120 50" aria-hidden="true">${ARC.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="9"/>`).join("")}</svg>`;
@@ -580,7 +610,7 @@ svg.i { width: 22px; height: 22px; fill: currentColor; }
 
   // ===================== Overview =====================
   function renderOverview() {
-    $("#site-name").textContent = site.name; $("#site-sub").innerHTML = `${site.circle} · agent on <span class="nw">${site.agent}</span>`;
+    $("#site-name").textContent = site.name; $("#site-sub").innerHTML = `${CIRCLES[site.circle].name} · agent on <span class="nw">${site.agent}</span>`;
     const v = site.verdict;
     $("#verdict").innerHTML = `<div class="meta">${v.chip}<span>${v.meta}</span></div><h2>${v.title}</h2><p>${v.text}</p>`;
     $("#problems-label span").textContent = site.problems.length || "";
@@ -663,7 +693,7 @@ svg.i { width: 22px; height: 22px; fill: currentColor; }
 
   // Site switcher
   function renderMenu() {
-    $("#site-menu").innerHTML = Object.entries(SITES).map(([k, s]) => `<button role="menuitemradio" aria-checked="${s === site}" data-k="${k}"><span>${s.name}<small>${s.problems.length ? `${s.problems.length} problems` : "All good"}</small></span>${s.problems.length ? CHIP.down : CHIP.ok}</button>`).join("");
+    $("#site-menu").innerHTML = Object.entries(SITES).filter(([k]) => CIRCLES[circleKey].sites.includes(k)).map(([k, s]) => `<button role="menuitemradio" aria-checked="${s === site}" data-k="${k}"><span>${s.name}<small>${s.problems.length ? `${s.problems.length} problems` : "All good"}</small></span>${s.problems.length ? CHIP.down : CHIP.ok}</button>`).join("");
     $$("#site-menu button").forEach(b => b.addEventListener("click", () => { switchSite(b.dataset.k); closeMenu(); }));
   }
   function openMenu() { renderMenu(); $("#site-menu").classList.add("open"); $("#site-btn").setAttribute("aria-expanded", "true"); setTimeout(() => $("#site-menu button").focus(), 50); }
@@ -858,6 +888,7 @@ svg.i { width: 22px; height: 22px; fill: currentColor; }
   rungs.forEach(r => r.querySelector(".body").addEventListener("click", e => { const open = r.classList.toggle("open"); e.currentTarget.setAttribute("aria-expanded", open); }));
   function stepDetail(i, state) {
     if (state === "skipped") return "Not run: an earlier step failed";
+    if (site.details) return site.details[i];
     if (site === SITES.lola) return ["Wi-Fi: 192.168.0.10 on 192.168.0.0/24, gateway 192.168.0.1", "ARP: 192.168.0.1 is at 98:da:c4:xx:xx:xx", "ICMP echo to 192.168.0.1: 3 of 3 replies, avg 3 ms", "ICMP echo to 8.8.8.8: 3 of 3 replies, avg 31 ms", "example.com resolved to 104.20.23.154 in 18 ms", "TCP 8.8.8.8:443 in 33 ms; HTTPS returned 204"][i];
     return STEPS[i][2];
   }
@@ -909,7 +940,7 @@ svg.i { width: 22px; height: 22px; fill: currentColor; }
   $$(".switch").forEach(s => s.addEventListener("click", () => { const on = s.getAttribute("aria-checked") !== "true"; s.setAttribute("aria-checked", on); toast(`${s.dataset.name} ${on ? "on" : "off"}`); }));
   const tile = c => `<span>${c}</span>`;
   $("#invite").addEventListener("click", () => {
-    openSheet(sheetTop("invite", "Invite to your Circle", `<span>Dela Cruz Home</span>`) +
+    openSheet(sheetTop("invite", "Invite to your Circle", `<span>${CIRCLES[circleKey].name}</span>`) +
       `<p class="text">Share this code. The new member chooses "Join with an invite code" in the app.</p>
        <div class="code static" aria-label="Invite code K7QM-2RXP">${[..."K7QM"].map(tile).join("")}<span class="gap"></span>${[..."2RXP"].map(tile).join("")}</div>` +
       facts([["Role", "Viewer"], ["Expires", "in 7 days · single use"]]) + `<div class="actions"><button class="btn" id="inv-copy">Copy code</button></div>`);
@@ -1004,12 +1035,45 @@ svg.i { width: 22px; height: 22px; fill: currentColor; }
     h.problems = h.problems.filter(p => p.act !== "diagnose");
     h.internet[23] = 27; h.internet[24] = 26;
     const a = h.alerts.find(x => x.id === "a1"); Object.assign(a, { open: false, status: "done", title: "Back online after 7 min", sub: "9:48 · your provider fixed it" });
-    if (site !== h) site = h;
+    if (site !== h) setCircle("dela", "home");
     renderAll(); haptic([30, 40, 30]); toast("Home is back online");
     if (current === "#s-overview") intro(); else if (current === "#s-devices") play($("#s-devices"));
   });
 
-  function renderAll() { renderOverview(); renderDevFilters(); renderDevices(); renderAlerts(); }
+  // ===================== Account sheet (the avatar) =====================
+  function setCircle(k, siteKey) {
+    circleKey = k; MEMBERS = CIRCLES[k].members; site = SITES[siteKey || CIRCLES[k].sites[0]]; devFilter = "all";
+    renderAll();
+  }
+  function circleStatus(c) {
+    const sites = c.sites.map(k => SITES[k]), down = sites.filter(x => x.lights.some(([st]) => st === "fail")).length, review = sites.filter(x => x.problems.length).length;
+    return down ? chip("c-down", "down", `${down} site${down > 1 ? "s" : ""} down`) : review ? chip("c-new", "new", "Needs review") : chip("c-ok", "ok", "All good");
+  }
+  function openAccount() {
+    const me = CIRCLES[circleKey].members.AM;
+    openSheet(`<div class="top acct-top">${av("AM", true)}<div><h3 id="sheet-title">${me.full}</h3><div class="meta"><span>ana.m@example.com</span></div><div class="meta" style="margin-top:2px">${me.role} in ${CIRCLES[circleKey].name}</div></div></div>
+      <div class="label">Your Circles <span>${Object.keys(CIRCLES).length}</span></div>
+      ${Object.entries(CIRCLES).map(([k, c]) => `<button class="row" data-c="${k}" aria-current="${k === circleKey}"><div><b>${c.name}</b><small>${c.members.AM.role} · ${c.sites.length} site${c.sites.length > 1 ? "s" : ""} · ${Object.keys(c.members).length} members</small></div><span class="end">${circleStatus(c)}${k === circleKey ? '<svg class="ci-check" viewBox="0 0 24 24" aria-label="Current Circle"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : ""}</span></button>`).join("")}
+      <div class="actions"><button class="btn ghost" id="acct-settings">Account settings</button><button class="btn ghost" id="acct-out">Sign out</button></div>`);
+    $$("#sheet-body .row[data-c]").forEach(b => b.addEventListener("click", () => {
+      const k = b.dataset.c;
+      if (k === circleKey) { closeSheet(); return; }
+      setCircle(k); closeSheet(); setNav(0);
+      if (current === "#s-overview") intro(); else show("#s-overview");
+      toast(`Switched to ${CIRCLES[k].name}`);
+    }));
+    $("#acct-settings").addEventListener("click", () => { closeSheet(); setNav(3); show("#s-settings"); });
+    $("#acct-out").addEventListener("click", () => { closeSheet(); toast("In the app, this returns to sign-in"); });
+  }
+  $$(".acct").forEach(b => b.addEventListener("click", openAccount));
+
+  function renderSettings() {
+    const c = CIRCLES[circleKey];
+    $("#settings-sub").textContent = `${c.name} · Circle`;
+    $("#members").innerHTML = Object.entries(c.members).map(([k, m]) => `<div class="row"><div class="lead">${av(k, true)}<div><b>${m.full}</b><small>${m.role}${m.cls === "you" ? " · you" : ""}</small></div></div><span class="chip c-unk">${m.role}</span></div>`).join("");
+  }
+
+  function renderAll() { renderOverview(); renderDevFilters(); renderDevices(); renderAlerts(); renderSettings(); }
   const overviewLights = buildStrip($("#strip-overview"), true);
   const diagLights = buildStrip($("#strip-diagnose"), false);
   renderAll(); splash().then(intro);
