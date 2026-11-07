@@ -21,7 +21,7 @@ from app.security import (
     verify_password,
 )
 
-router = APIRouter(tags=["auth"], responses={400: {"model": ErrorOut}, 401: {"model": ErrorOut}})
+router = APIRouter(responses={400: {"model": ErrorOut}, 401: {"model": ErrorOut}})
 
 
 def _issue_tokens(db: DB, user: User) -> tuple[TokenPair, RefreshToken]:
@@ -41,6 +41,7 @@ def _issue_tokens(db: DB, user: User) -> tuple[TokenPair, RefreshToken]:
 
 @router.post(
     "/auth/register",
+    tags=["auth"],
     status_code=201,
     response_model=TokenPair,
     responses={409: {"model": ErrorOut}},
@@ -62,7 +63,9 @@ def register(request: Request, body: RegisterIn, db: DB) -> TokenPair:
     return pair
 
 
-@router.post("/auth/login", response_model=TokenPair, responses={429: {"model": ErrorOut}})
+@router.post(
+    "/auth/login", tags=["auth"], response_model=TokenPair, responses={429: {"model": ErrorOut}}
+)
 @limiter.limit("10/minute")
 def login(request: Request, body: LoginIn, db: DB) -> TokenPair:
     """Sign in with email and password. A wrong email and a wrong password look the same."""
@@ -74,7 +77,7 @@ def login(request: Request, body: LoginIn, db: DB) -> TokenPair:
     return pair
 
 
-@router.post("/auth/refresh", response_model=TokenPair)
+@router.post("/auth/refresh", tags=["auth"], response_model=TokenPair)
 @limiter.limit("30/minute")
 def refresh(request: Request, body: RefreshIn, db: DB) -> TokenPair:
     """Swap a refresh token for a new pair. Each refresh token works once; reusing an old one
@@ -108,7 +111,7 @@ def refresh(request: Request, body: RefreshIn, db: DB) -> TokenPair:
     return pair
 
 
-@router.post("/auth/logout", status_code=204)
+@router.post("/auth/logout", tags=["auth"], status_code=204)
 def logout(body: RefreshIn, db: DB) -> Response:
     """Sign this session out. Always succeeds, so it reveals nothing about the token."""
     row = db.scalar(
