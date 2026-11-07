@@ -14,6 +14,7 @@ from fastapi import APIRouter, Query, Request
 from sqlalchemy import insert, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from app import alerts
 from app.agent_auth import CurrentAgent, GzipRoute, check_version
 from app.agent_schemas import (
     CommandBatch,
@@ -109,10 +110,10 @@ def pair(request: Request, body: PairIn, db: DB) -> PairOut:
 # ---------------------------------------------------------------- ingest
 
 
-def _store_devices(db: DB, site: Site, body: IngestIn, now: datetime) -> tuple[int, int]:
+def _store_devices(db: DB, site: Site, body: IngestIn, now: datetime) -> tuple[int, list[Device]]:
     """Upsert scanned devices. The site's first scan is its baseline (no alerts, no penalty)."""
     if not body.devices:
-        return 0, 0
+        return 0, []
     first_scan = db.scalar(select(Device.id).where(Device.site_id == site.id).limit(1)) is None
     existing = {
         d.mac: d
@@ -123,12 +124,11 @@ def _store_devices(db: DB, site: Site, body: IngestIn, now: datetime) -> tuple[i
         )
     }
     gateway = str(body.netinfo.gateway) if body.netinfo and body.netinfo.gateway else None
-    new = 0
+    new: list[Device] = []
     for item in body.devices:
         ip = str(item.ip) if item.ip else None
         device = existing.get(item.mac)
         if device is None:
-            new += 0 if first_scan else 1
             device = Device(
                 site_id=site.id,
                 mac=item.mac,
@@ -138,6 +138,8 @@ def _store_devices(db: DB, site: Site, body: IngestIn, now: datetime) -> tuple[i
             )
             db.add(device)
             existing[item.mac] = device
+            if not first_scan:
+                new.append(device)
         device.ip = ip or device.ip
         device.hostname = item.hostname or device.hostname
         device.vendor = item.vendor or device.vendor
@@ -151,56 +153,84 @@ def _store_devices(db: DB, site: Site, body: IngestIn, now: datetime) -> tuple[i
     return len(body.devices), new
 
 
-def _store_outages(db: DB, site: Site, body: IngestIn) -> int:
-    """Outages the agent recorded while it couldn't reach us; matched by start time."""
-    stored = 0
+def _store_outages(db: DB, site: Site, body: IngestIn) -> tuple[int, list[Outage]]:
+    """Outages the agent recorded while it couldn't reach us; matched by start time.
+    Also returns the ones that closed in this batch, for the back-online alert."""
+    stored, closed = 0, []
     for item in body.outages:
         row = db.scalar(
             select(Outage).where(Outage.site_id == site.id, Outage.started_at == item.started_at)
         )
         if row is None:
-            db.add(
-                Outage(
-                    site_id=site.id,
-                    started_at=item.started_at,
-                    ended_at=item.ended_at,
-                    cause=item.cause,
-                    detected_by=DetectedBy.agent,
-                )
+            row = Outage(
+                site_id=site.id,
+                started_at=item.started_at,
+                ended_at=item.ended_at,
+                cause=item.cause,
+                detected_by=DetectedBy.agent,
             )
+            db.add(row)
             stored += 1
+            if item.ended_at is not None:
+                closed.append(row)
         elif row.ended_at is None and item.ended_at is not None:
             row.ended_at, row.cause = item.ended_at, item.cause
             stored += 1
-    return stored
+            closed.append(row)
+    return stored, closed
 
 
-def _store_ports(db: DB, site: Site, body: IngestIn, now: datetime) -> int:
+def _store_ports(
+    db: DB, site: Site, body: IngestIn, now: datetime
+) -> tuple[int, list[tuple[Device, int, str]]]:
+    """Upsert port findings; returns those that are newly open (first seen, or back after being
+    resolved), for the risky-port alert."""
     if not body.port_findings:
-        return 0
-    ids = dict(
-        db.execute(
-            select(Device.mac, Device.id).where(
+        return 0, []
+    devices = {
+        d.mac: d
+        for d in db.scalars(
+            select(Device).where(
                 Device.site_id == site.id, Device.mac.in_({f.mac for f in body.port_findings})
+            )
+        )
+    }
+    known = [f for f in body.port_findings if f.mac in devices]
+    if not known:
+        return 0, []
+    already_open = set(
+        db.execute(
+            select(PortFinding.device_id, PortFinding.port).where(
+                PortFinding.device_id.in_({devices[f.mac].id for f in known}),
+                PortFinding.resolved_at.is_(None),
             )
         ).all()
     )
-    rows = [
-        {"device_id": ids[f.mac], "port": f.port, "service": f.service, "last_seen_at": now}
-        for f in body.port_findings
-        if f.mac in ids
+    stmt = pg_insert(PortFinding).values(
+        [
+            {
+                "id": uuid.uuid4(),
+                "device_id": devices[f.mac].id,
+                "port": f.port,
+                "service": f.service,
+                "first_seen_at": now,
+                "last_seen_at": now,
+            }
+            for f in known
+        ]
+    )
+    db.execute(
+        stmt.on_conflict_do_update(
+            constraint="uq_port_findings_device_id_port",
+            set_={"last_seen_at": now, "resolved_at": None, "service": stmt.excluded.service},
+        )
+    )
+    newly_open = [
+        (devices[f.mac], f.port, f.service)
+        for f in known
+        if (devices[f.mac].id, f.port) not in already_open
     ]
-    if rows:
-        stmt = pg_insert(PortFinding).values(
-            [{**r, "id": uuid.uuid4(), "first_seen_at": now} for r in rows]
-        )
-        db.execute(
-            stmt.on_conflict_do_update(
-                constraint="uq_port_findings_device_id_port",
-                set_={"last_seen_at": now, "resolved_at": None, "service": stmt.excluded.service},
-            )
-        )
-    return len(rows)
+    return len(known), newly_open
 
 
 @router.post("/ingest", response_model=IngestOut, responses={400: {"model": ErrorOut}})
@@ -218,9 +248,11 @@ def ingest(body: IngestIn, agent: CurrentAgent, db: DB) -> IngestOut:
         .on_conflict_do_nothing()
         .returning(IngestBatch.batch_id)
     )
+    was_unreachable = site.status == SiteStatus.unreachable
     site.last_seen_at = now
     site.status = SiteStatus.online
     if fresh is None:  # already stored; acknowledge so the agent deletes it from its outbox
+        alerts.came_back(db, site, was_unreachable, [], now)
         db.commit()
         return IngestOut(status="duplicate")
 
@@ -246,15 +278,21 @@ def ingest(body: IngestIn, agent: CurrentAgent, db: DB) -> IngestOut:
             ],
         )
     devices, new_devices = _store_devices(db, site, body, now)
-    outages = _store_outages(db, site, body)
-    ports = _store_ports(db, site, body, now)
+    outages, closed = _store_outages(db, site, body)
+    ports, newly_open = _store_ports(db, site, body, now)
+    db.flush()
+    alerts.new_devices(db, site, new_devices, now)
+    alerts.risky_ports(db, site, newly_open, now)
+    alerts.came_back(db, site, was_unreachable, closed, now)
+    if accepted:
+        alerts.thresholds(db, site, now)
     db.commit()
     return IngestOut(
         status="stored",
         samples=len(accepted),
         rejected_samples=len(body.samples) - len(accepted),
         devices=devices,
-        new_devices=new_devices,
+        new_devices=len(new_devices),
         outages=outages,
         port_findings=ports,
     )
