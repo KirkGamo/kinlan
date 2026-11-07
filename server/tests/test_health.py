@@ -17,3 +17,11 @@ def test_healthz_reports_ok_and_version():
 def test_openapi_docs_are_served():
     assert client.get("/docs").status_code == 200
     assert client.get("/openapi.json").json()["info"]["title"] == "KinLAN API"
+
+
+def test_every_operation_has_exactly_one_tag():
+    """Otherwise Swagger lists the same endpoint under two groups."""
+    spec = client.get("/openapi.json").json()
+    for path, ops in spec["paths"].items():
+        for method, op in ops.items():
+            assert len(op.get("tags", [])) == 1, (method, path, op.get("tags"))
