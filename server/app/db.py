@@ -3,7 +3,7 @@
 from collections.abc import Iterator
 from functools import lru_cache
 
-from sqlalchemy import MetaData, create_engine
+from sqlalchemy import MetaData, create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -28,7 +28,16 @@ class Base(DeclarativeBase):
 @lru_cache
 def get_engine() -> Engine:
     """One engine per process. pre_ping replaces connections Neon dropped while idle."""
-    return create_engine(get_settings().database_url, pool_pre_ping=True, pool_size=5)
+    engine = create_engine(get_settings().database_url, pool_pre_ping=True, pool_size=5)
+
+    @event.listens_for(engine, "connect")
+    def _utc(dbapi_connection, _record) -> None:
+        # The API speaks UTC (ISO 8601); don't inherit the server's local zone (e.g. Asia/Manila).
+        with dbapi_connection.cursor() as cur:
+            cur.execute("SET TIME ZONE 'UTC'")
+        dbapi_connection.commit()
+
+    return engine
 
 
 @lru_cache
