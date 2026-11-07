@@ -104,3 +104,6 @@ def jun(client):
 def eve(client):
     """Someone in a different Circle entirely."""
     return Person(client, "Eve")
+
+
+from tests.agent_fixtures import agent, home  # noqa: E402, F401  (shared fixtures)

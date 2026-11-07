@@ -191,6 +191,43 @@ class PairingCodeOut(BaseModel):
     expires_at: datetime
 
 
+class AlertOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    site_id: uuid.UUID
+    type: str
+    severity: Literal["info", "warning", "critical"]
+    title: str
+    body: str
+    subject_ref: str | None
+    created_at: datetime
+    acked_at: datetime | None
+    acked_by: uuid.UUID | None
+    resolved_at: datetime | None
+
+
+class AlertList(BaseModel):
+    items: list[AlertOut]
+    next_cursor: str | None = None
+
+
+class AlertSettingsOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    latency_ms: float
+    loss_pct: float
+    offline_seconds: int
+    notify_new_device: bool
+
+
+class AlertSettingsPatch(BaseModel):
+    latency_ms: float | None = Field(default=None, ge=20, le=2000)
+    loss_pct: float | None = Field(default=None, ge=0.5, le=50)
+    offline_seconds: int | None = Field(default=None, ge=60, le=3600)
+    notify_new_device: bool | None = None
+
+
 class ErrorDetail(BaseModel):
     code: str
     message: str
