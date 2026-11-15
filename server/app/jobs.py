@@ -5,9 +5,10 @@
 | check_heartbeats | 1 min  | mark silent sites unreachable and raise the alert            |
 | rollup_hourly    | 1 h    | combine raw samples into ping_hourly                         |
 | retention        | daily  | delete old samples, rollups, alerts, codes, tokens, batches  |
+| push_dispatch    | 15 s   | push new alerts to members' phones (app/push.py)             |
+| push_receipts    | 15 min | read Expo receipts and delete dead push tokens               |
 
-Each job is a plain function taking a session, so tests call them directly. ``push_receipts``
-joins when Expo push arrives (Sprint 3).
+Each job is a plain function taking a session, so tests call them directly.
 """
 
 from __future__ import annotations
@@ -121,6 +122,7 @@ def start_scheduler():
     """Start the jobs in a background thread; returns the scheduler (call .shutdown() to stop)."""
     from apscheduler.schedulers.background import BackgroundScheduler
 
+    from app import push
     from app.db import get_session_factory
 
     def run(job):
@@ -139,6 +141,8 @@ def start_scheduler():
     scheduler.add_job(run(check_heartbeats), "interval", minutes=1, id="check_heartbeats")
     scheduler.add_job(run(rollup_hourly), "cron", minute=5, id="rollup_hourly")
     scheduler.add_job(run(retention), "cron", hour=19, minute=30, id="retention")  # 03:30 PHT
+    scheduler.add_job(run(push.dispatch), "interval", seconds=15, id="push_dispatch")
+    scheduler.add_job(run(push.check_receipts), "interval", minutes=15, id="push_receipts")
     scheduler.start()
     log.info("scheduler started: %s", ", ".join(j.id for j in scheduler.get_jobs()))
     return scheduler
