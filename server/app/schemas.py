@@ -169,6 +169,19 @@ class DeductionOut(BaseModel):
     detail: str
 
 
+class DiagnoseStepState(BaseModel):
+    n: int = Field(description="1-6: adapter, ARP, router ping, internet ping, DNS, HTTPS")
+    status: Literal["pass", "fail", "skipped"]
+    ms: float | None
+
+
+class LastDiagnose(BaseModel):
+    command_id: uuid.UUID
+    finished_at: datetime
+    root_cause_step: int | None
+    steps: list[DiagnoseStepState]
+
+
 class SiteSummary(BaseModel):
     site_id: uuid.UUID
     status: SiteStatus
@@ -184,6 +197,9 @@ class SiteSummary(BaseModel):
     needs_review: int = Field(description="Untrusted devices first seen after the baseline")
     open_alerts: int
     open_outage_since: datetime | None
+    last_diagnose: LastDiagnose | None = Field(
+        None, description="The newest finished diagnose: the Overview's DNS and Web lights"
+    )
 
 
 class PairingCodeOut(BaseModel):

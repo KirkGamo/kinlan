@@ -59,14 +59,41 @@ export function useSite(siteId: string, poll = false) {
   });
 }
 
-export type SiteSummary = { devices_total: number; devices_online: number; status: SiteStatus };
+export type LatestSample = { ts: string; rtt_ms: number | null; ok: boolean };
+export type Deduction = { factor: string; points: number; reason: string; detail: string };
+export type DiagnoseStepState = { n: number; status: 'pass' | 'fail' | 'skipped'; ms: number | null };
+export type LastDiagnose = {
+  command_id: string;
+  finished_at: string;
+  root_cause_step: number | null;
+  steps: DiagnoseStepState[];
+};
+/** Everything the Overview needs for one site (GET /sites/{id}/summary). */
+export type SiteSummary = {
+  site_id: string;
+  status: SiteStatus;
+  last_seen_at: string | null;
+  score: number;
+  grade: string;
+  grade_summary: string;
+  deductions: Deduction[];
+  internet: LatestSample | null;
+  gateway: LatestSample | null;
+  devices_total: number;
+  devices_online: number;
+  needs_review: number;
+  open_alerts: number;
+  open_outage_since: string | null;
+  last_diagnose: LastDiagnose | null;
+};
 
-export function useSiteSummary(siteId: string, enabled: boolean) {
+/** The site's summary, refetched every `everyMs` (the agent reports about every 10 s). */
+export function useSiteSummary(siteId: string | undefined, enabled = true, everyMs = 5_000) {
   return useQuery({
-    queryKey: keys.summary(siteId),
+    queryKey: keys.summary(siteId ?? 'none'),
     queryFn: () => api<SiteSummary>(`/sites/${siteId}/summary`),
-    enabled,
-    refetchInterval: enabled ? 5_000 : false,
+    enabled: enabled && !!siteId,
+    refetchInterval: enabled ? everyMs : false,
   });
 }
 

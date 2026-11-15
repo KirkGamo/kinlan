@@ -1,97 +1,275 @@
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
-import { useCircles, useSites, type Site } from '@/api/circles';
-import { ComingNext } from '@/components/placeholder';
-import { Button, Card, Loader, Screen, SectionLabel, StatusChip, Text, type ChipTone } from '@/components/ui';
+import { useCircles, useSiteSummary, useSites, type Circle, type Site, type SiteSummary } from '@/api/circles';
+import { useDevices, useLatency, useMembers } from '@/api/overview';
+import { selectSite, useSelectedSite } from '@/api/selection';
+import { Button, Card, Loader, Screen, SectionLabel, StatusChip, Text } from '@/components/ui';
+import { HealthCard } from '@/features/overview/health-card';
+import { LatencyChart } from '@/features/overview/latency-chart';
+import { LightStrip } from '@/features/overview/light-strip';
+import { ago, isStale, lights, problems, verdict, type Light } from '@/features/overview/model';
+import { People } from '@/features/overview/people';
+import { SiteHeader } from '@/features/overview/site-header';
 import { colors, radius, space } from '@/theme';
 
-const STATUS: Record<Site['status'], { tone: ChipTone; label: string }> = {
-  online: { tone: 'ok', label: 'Online' },
-  degraded: { tone: 'new', label: 'Degraded' },
-  unreachable: { tone: 'down', label: 'Unreachable' },
-  pending: { tone: 'neutral', label: 'Not paired' },
-};
+const UNLIT: Light[] = Array.from({ length: 5 }, () => ({ state: 'unlit', value: '—' }));
 
-/** Until the full Overview (#58): your Circle and its sites, with a way to pair or add one. */
+/**
+ * Overview (briefs.md section 1): answers "is anything wrong now?" first. The five lights and the
+ * verdict lead; open problems, your people, the health grade, the 24-hour chart and devices
+ * follow. A site with no agent yet becomes the pairing call to action.
+ */
 export default function OverviewScreen() {
   const circles = useCircles();
-  const circle = circles.data?.[0]; // the account sheet's Circle switcher arrives with #62
+  const circle = circles.data?.[0]; // switching Circles arrives with the account sheet (#62)
   const sites = useSites(circle?.id);
-  const canManage = circle?.role === 'owner' || circle?.role === 'admin';
+  const site = useSelectedSite(sites.data);
+
+  if (circles.isPending || sites.isPending) return <Skeleton />;
+  if (circles.isError || sites.isError) {
+    const error = circles.error ?? sites.error;
+    return (
+      <Screen>
+        <ErrorCard message={error?.message ?? 'Something went wrong.'} onRetry={() => void sites.refetch()} />
+      </Screen>
+    );
+  }
+  if (!circle) return <Skeleton />;
+  const canManage = circle.role === 'owner' || circle.role === 'admin';
+  if (!site) return <NoSites circle={circle} canManage={canManage} />;
+  if (site.status === 'pending') return <Unpaired site={site} sites={sites.data} canManage={canManage} />;
+  return <Live key={site.id} circle={circle} site={site} sites={sites.data} />;
+}
+
+function Live({ circle, site, sites }: { circle: Circle; site: Site; sites: Site[] }) {
+  const summary = useSiteSummary(site.id, true, 10_000);
+  const latency = useLatency(site.id);
+  const devices = useDevices(site.id);
+  const members = useMembers(circle.id);
+  const now = useNow(5_000);
+  const [ignite, setIgnite] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function refresh() {
+    setRefreshing(true);
+    await Promise.all([summary.refetch(), latency.refetch(), devices.refetch(), members.refetch()]);
+    setRefreshing(false);
+    setIgnite((n) => n + 1); // the lights re-ignite after a pull, like switching sites
+  }
+
+  const s = summary.data;
+  const staleNow = s ? isStale(s, now) : false;
+  // While the agent is offline the online counts are old, so only the total is shown.
+  const sub = !s
+    ? circle.name
+    : staleNow
+      ? `${circle.name} · ${s.devices_total} devices`
+      : `${circle.name} · ${s.devices_online} of ${s.devices_total} devices online`;
+  const header = <SiteHeader site={site} sites={sites} sub={sub} onSwitch={selectSite} />;
+
+  if (!s) {
+    return (
+      <Screen>
+        {header}
+        <LightStrip lights={UNLIT} igniteKey="loading" />
+        {summary.isError ? (
+          <ErrorCard message={summary.error.message} onRetry={() => void summary.refetch()} />
+        ) : (
+          <Card style={styles.loading}>
+            <Loader label="Loading the site" />
+          </Card>
+        )}
+      </Screen>
+    );
+  }
+
+  const lit = lights(s, now);
+  const v = verdict(s, now, lit);
+  const open = problems(s, now, v);
+  const stale = staleNow;
 
   return (
-    <Screen>
-      <View>
-        <Text role="titleLarge" accessibilityRole="header">
-          {circle?.name ?? 'Overview'}
+    <Screen
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.yellow} colors={[colors.onYellow]} progressBackgroundColor={colors.yellow} />
+      }>
+      {header}
+      <LightStrip lights={lit} igniteKey={`${site.id}-${ignite}`} />
+
+      <Card style={styles.verdict}>
+        <View style={styles.meta}>
+          <StatusChip tone={v.tone} label={v.chip} />
+          <Text role="bodySmall" color={stale ? 'orange' : 'text2'} tabular>
+            {s.last_seen_at ? `Updated ${ago(s.last_seen_at, now)}` : 'No data yet'}
+          </Text>
+        </View>
+        <Text role="headline" accessibilityRole="header">
+          {v.title}
         </Text>
-        {circle ? (
-          <Text role="bodySmall" color="text2">
-            {`${circle.member_count} ${circle.member_count === 1 ? 'member' : 'members'} · you’re ${circle.role === 'admin' ? 'an' : 'the'} ${circle.role}`}
+        <Text role="body" color="text2">
+          {v.text}
+        </Text>
+        {summary.isRefetchError ? (
+          <Text role="bodySmall" color="orange">
+            {`Couldn’t refresh: ${summary.error?.message ?? 'no connection'}. Showing the last data.`}
           </Text>
         ) : null}
-      </View>
+      </Card>
 
-      <SectionLabel>Sites</SectionLabel>
-      {sites.isPending ? (
-        <Loader label="Loading sites" />
-      ) : sites.isError ? (
-        <Text role="bodySmall" color="red">
-          {sites.error.message}
-        </Text>
-      ) : sites.data.length === 0 ? (
-        <Card>
-          <Text role="title">No sites yet</Text>
-          <Text role="bodySmall" color="text2">
-            A site is one network. Add one, then pair a PC on it.
-          </Text>
-        </Card>
-      ) : (
-        sites.data.map((site) => (
-          <SiteRow key={site.id} site={site} canManage={canManage} />
-        ))
-      )}
-      {canManage && circle ? (
-        <Button
-          label="Add a site"
-          variant="ghost"
-          onPress={() => router.push({ pathname: '/onboarding/new-site', params: { circle: circle.id } })}
-        />
+      {open.length ? (
+        <>
+          <SectionLabel end={String(open.length)}>Open problems</SectionLabel>
+          {open.map((p) => (
+            <Pressable
+              key={p.key}
+              onPress={() => router.navigate(p.to)}
+              accessibilityRole="button"
+              accessibilityLabel={`${p.title}. ${p.next}`}
+              style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+              <View style={styles.rowText}>
+                <Text role="title">{p.title}</Text>
+                <Text role="bodySmall" color="text2">
+                  {p.next}
+                </Text>
+              </View>
+              <StatusChip tone={p.tone} label={p.chip} />
+            </Pressable>
+          ))}
+        </>
       ) : null}
-      <ComingNext issue={58} what="Status lights, verdict, your people, health grade and the 24-hour chart" />
+
+      <SectionLabel end={stale ? 'devices' : 'devices online'}>Your people</SectionLabel>
+      {devices.data && members.data ? (
+        <People members={members.data} devices={devices.data} stale={stale} />
+      ) : devices.isError || members.isError ? (
+        <ErrorCard message={(devices.error ?? members.error)?.message ?? ''} onRetry={() => void Promise.all([devices.refetch(), members.refetch()])} />
+      ) : (
+        <Card style={styles.loading}>
+          <Loader label="Loading people" />
+        </Card>
+      )}
+
+      <SectionLabel>Health</SectionLabel>
+      <HealthCard score={s.score} grade={s.grade} summary={s.grade_summary} deductions={s.deductions} sweepKey={`${site.id}-${ignite}`} />
+
+      <SectionLabel end="drag to read">Connection · 24 h</SectionLabel>
+      <LatencyChart data={latency.data} loading={latency.isPending} error={latency.isError ? latency.error.message : undefined} />
+
+      <SectionLabel>Devices</SectionLabel>
+      <DevicesRow summary={s} stale={stale} />
     </Screen>
   );
 }
 
-function SiteRow({ site, canManage }: { site: Site; canManage: boolean }) {
-  const status = STATUS[site.status];
-  const pair = site.status === 'pending' && canManage;
+function DevicesRow({ summary, stale }: { summary: SiteSummary; stale: boolean }) {
+  const n = summary.needs_review;
   return (
     <Pressable
-      disabled={!pair}
-      onPress={() => router.push({ pathname: '/onboarding/pair', params: { site: site.id } })}
-      accessibilityRole={pair ? 'button' : undefined}
-      accessibilityLabel={`${site.name}, ${status.label}${pair ? '. Pair the agent' : ''}`}
+      onPress={() => router.navigate('/devices')}
+      accessibilityRole="button"
+      accessibilityHint="Opens Devices"
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       <View style={styles.rowText}>
-        <Text role="title">{site.name}</Text>
+        <Text role="title" tabular>
+          {stale ? `${summary.devices_total} devices` : `${summary.devices_online} of ${summary.devices_total} online`}
+        </Text>
         <Text role="bodySmall" color="text2">
-          {site.cidr ? `${site.cidr} · router ${site.gateway_ip ?? 'unknown'}` : 'Waiting for its agent'}
+          {stale
+            ? 'Who’s online shows again when the agent reports.'
+            : n
+              ? 'Review the new ones: say whose they are.'
+              : 'Everything here has been seen before.'}
         </Text>
       </View>
-      {pair ? (
-        <Text role="labelSmall" color="yellow">
-          Pair the agent
-        </Text>
-      ) : (
-        <StatusChip tone={status.tone} label={status.label} />
-      )}
+      {n ? <StatusChip tone="new" label={`${n} new to review`} /> : null}
     </Pressable>
   );
 }
 
+/** Re-renders every `everyMs`, so "Updated 10 s ago" and staleness keep up between fetches. */
+function useNow(everyMs: number): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), everyMs);
+    return () => clearInterval(timer);
+  }, [everyMs]);
+  return now;
+}
+
+function Unpaired({ site, sites, canManage }: { site: Site; sites: Site[]; canManage: boolean }) {
+  return (
+    <Screen>
+      <SiteHeader site={site} sites={sites} sub="Not paired yet" onSwitch={selectSite} />
+      <LightStrip lights={UNLIT} igniteKey="pending" />
+      <Card style={styles.verdict}>
+        <StatusChip tone="neutral" label="Not paired" />
+        <Text role="headline" accessibilityRole="header">
+          Pair the agent to start
+        </Text>
+        <Text role="body" color="text2">
+          {canManage
+            ? 'The lights come on once a PC on this network runs the KinLAN agent. It takes about two minutes.'
+            : 'An owner or admin of this Circle needs to pair a PC on this network. The lights come on once they do.'}
+        </Text>
+        {canManage ? (
+          <Button label="Pair the agent" onPress={() => router.push({ pathname: '/onboarding/pair', params: { site: site.id } })} />
+        ) : null}
+      </Card>
+    </Screen>
+  );
+}
+
+function NoSites({ circle, canManage }: { circle: Circle; canManage: boolean }) {
+  return (
+    <Screen>
+      <Text role="titleLarge" accessibilityRole="header">
+        {circle.name}
+      </Text>
+      <Card style={styles.verdict}>
+        <Text role="headline">No sites yet</Text>
+        <Text role="body" color="text2">
+          {canManage
+            ? 'A site is one network, like your home Wi-Fi or a lab. Add one, then pair a PC on it.'
+            : 'An owner or admin of this Circle needs to add a site first.'}
+        </Text>
+        {canManage ? (
+          <Button label="Add a site" onPress={() => router.push({ pathname: '/onboarding/new-site', params: { circle: circle.id } })} />
+        ) : null}
+      </Card>
+    </Screen>
+  );
+}
+
+function Skeleton() {
+  return (
+    <Screen>
+      <View style={styles.skelTitle} />
+      <LightStrip lights={UNLIT} igniteKey="skeleton" />
+      <Card style={styles.loading}>
+        <Loader label="Loading" />
+      </Card>
+    </Screen>
+  );
+}
+
+function ErrorCard({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <Card>
+      <StatusChip tone="down" label="Couldn’t load" />
+      <Text role="body" color="text2">
+        {message}
+      </Text>
+      <Button label="Try again" variant="ghost" onPress={onRetry} />
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
+  verdict: { paddingTop: space.s6, gap: space.s2 },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: space.s3, flexWrap: 'wrap' },
+  loading: { alignItems: 'center', justifyContent: 'center', minHeight: 120 },
   row: {
     minHeight: 68,
     flexDirection: 'row',
@@ -105,4 +283,5 @@ const styles = StyleSheet.create({
   },
   pressed: { backgroundColor: colors.raised },
   rowText: { flex: 1, gap: 2 },
+  skelTitle: { width: 160, height: 28, borderRadius: 8, backgroundColor: colors.card, marginVertical: space.s2 },
 });

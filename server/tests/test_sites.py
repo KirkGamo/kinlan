@@ -9,6 +9,7 @@ from app.db import get_session_factory
 from app.models import (
     Alert,
     AlertSettings,
+    Command,
     Device,
     Outage,
     PairingCode,
@@ -180,6 +181,50 @@ def test_summary_measures_the_last_24_hours(client, ana):
     assert s["gateway"]["rtt_ms"] == 2.0
     assert (s["devices_total"], s["devices_online"], s["needs_review"]) == (3, 2, 1)
     assert s["open_alerts"] == 1 and s["open_outage_since"] is not None
+
+
+def test_summary_carries_the_newest_finished_diagnose(client, ana):
+    site = make_site(client, ana, circle_with(client, ana)).json()["id"]
+    s = client.get(f"{API}/sites/{site}/summary", headers=ana.h).json()
+    assert s["last_diagnose"] is None
+    now = datetime.now(UTC)
+
+    def steps(failing):
+        return [
+            {
+                "n": n,
+                "status": "fail" if n == failing else "pass" if n < failing else "skipped",
+                "ms": 3.0 if n < failing else None,
+                "name": "x",
+                "summary": "",
+                "detail": "",
+            }
+            for n in range(1, 7)
+        ]
+
+    with get_session_factory()() as db:
+        old = Command(
+            site_id=site,
+            type="diagnose",
+            status="done",
+            result={"steps": steps(5), "root_cause_step": 5},
+            finished_at=now - timedelta(hours=2),
+        )
+        new = Command(
+            site_id=site,
+            type="diagnose",
+            status="done",
+            result={"steps": steps(7), "root_cause_step": None},
+            finished_at=now - timedelta(minutes=3),
+        )
+        running = Command(site_id=site, type="diagnose", status="running")
+        scan = Command(site_id=site, type="scan", status="done", result={}, finished_at=now)
+        db.add_all([old, new, running, scan])
+        db.commit()
+        newest = str(new.id)
+    d = client.get(f"{API}/sites/{site}/summary", headers=ana.h).json()["last_diagnose"]
+    assert d["command_id"] == newest and d["root_cause_step"] is None
+    assert [x["status"] for x in d["steps"]] == ["pass"] * 6
 
 
 # ---------------------------------------------------------------- pairing codes
