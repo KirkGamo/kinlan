@@ -11,10 +11,13 @@ export function Screen({
   children,
   scroll = true,
   refreshControl,
+  fab,
 }: {
   children: ReactNode;
   scroll?: boolean;
   refreshControl?: ReactElement<RefreshControlProps>;
+  /** A floating action button, bottom-right above the tab bar (Overview's Diagnose). */
+  fab?: ReactNode;
 }) {
   return (
     <SafeAreaView edges={['top']} style={styles.screen}>
@@ -28,6 +31,7 @@ export function Screen({
       ) : (
         <View style={styles.content}>{children}</View>
       )}
+      {fab ? <View style={styles.fab}>{fab}</View> : null}
     </SafeAreaView>
   );
 }
@@ -54,6 +58,7 @@ export function SectionLabel({ children, end }: { children: string; end?: string
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
+  fab: { position: 'absolute', right: space.gutter, bottom: space.gutter },
   content: {
     paddingHorizontal: space.gutter,
     paddingTop: space.s4,

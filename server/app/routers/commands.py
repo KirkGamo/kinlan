@@ -6,10 +6,10 @@ Admins and owners send commands; any member can read their status and result.
 import uuid
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from sqlalchemy import select
 
-from app.agent_schemas import CommandIn, CommandOut
+from app.agent_schemas import CommandIn, CommandList, CommandOut
 from app.authz import require_site
 from app.commands import expire_stale, fail_if_overdue, to_out
 from app.deps import DB, CurrentUser
@@ -85,3 +85,24 @@ def get_command(command_id: uuid.UUID, user: CurrentUser, db: DB) -> CommandOut:
     fail_if_overdue(cmd)
     db.commit()
     return to_out(cmd)
+
+
+@router.get("/sites/{site_id}/diagnoses", response_model=CommandList)
+def recent_diagnoses(
+    site_id: uuid.UUID, user: CurrentUser, db: DB, limit: int = Query(5, ge=1, le=20)
+) -> CommandList:
+    """The site's latest diagnose runs, newest first, finished or not (the Diagnose screen)."""
+    site = require_site(db, user, site_id, Role.viewer)
+    expire_stale(db, site.id)
+    rows = list(
+        db.scalars(
+            select(Command)
+            .where(Command.site_id == site.id, Command.type == "diagnose")
+            .order_by(Command.created_at.desc(), Command.id.desc())
+            .limit(limit)
+        )
+    )
+    for cmd in rows:
+        fail_if_overdue(cmd)
+    db.commit()
+    return CommandList(items=[to_out(c) for c in rows])

@@ -11,7 +11,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { Card, Sheet, StatusChip, Text, type ChipTone } from '@/components/ui';
+import { Button, Card, Sheet, StatusChip, Text, type ChipTone } from '@/components/ui';
 import { colors, motion, radius, space } from '@/theme';
 
 import { LAYERS, type Light, type LightState } from './model';
@@ -40,7 +40,16 @@ const CHIP: Record<LightState, { tone: ChipTone; label: string }> = {
  * left to right whenever `igniteKey` changes (opening the screen, switching sites); the failing
  * light breathes. Tap a light for what that layer checks and what its state means.
  */
-export function LightStrip({ lights, igniteKey }: { lights: Light[]; igniteKey: string }) {
+export function LightStrip({
+  lights,
+  igniteKey,
+  onDiagnose,
+}: {
+  lights: Light[];
+  igniteKey: string;
+  /** Owners and admins get "Run diagnose" in the layer sheet. */
+  onDiagnose?: () => void;
+}) {
   const [open, setOpen] = useState<number | null>(null);
   const layer = open == null ? null : LAYERS[open];
   const light = open == null ? null : lights[open];
@@ -67,6 +76,15 @@ export function LightStrip({ lights, igniteKey }: { lights: Light[]; igniteKey: 
               <Fact label="Now" value={light.value} />
               <Fact label="What it means" value={meaning(light.state, open ?? 0)} />
             </View>
+            {onDiagnose ? (
+              <Button
+                label="Run diagnose"
+                onPress={() => {
+                  setOpen(null);
+                  onDiagnose();
+                }}
+              />
+            ) : null}
           </>
         ) : null}
       </Sheet>
