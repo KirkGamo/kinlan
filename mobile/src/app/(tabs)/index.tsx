@@ -3,9 +3,9 @@ import { useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { useCircles, useSiteSummary, useSites, type Circle, type Site, type SiteSummary } from '@/api/circles';
+import { useSiteSummary, useSites, type Circle, type Site, type SiteSummary } from '@/api/circles';
 import { useDevices, useLatency, useMembers } from '@/api/overview';
-import { selectSite, useSelectedSite } from '@/api/selection';
+import { selectSite, useCurrentCircle, useSelectedSite } from '@/api/selection';
 import { Button, Card, Loader, Screen, SectionLabel, StatusChip, Text } from '@/components/ui';
 import { HealthCard } from '@/features/overview/health-card';
 import { LatencyChart } from '@/features/overview/latency-chart';
@@ -24,8 +24,7 @@ const UNLIT: Light[] = Array.from({ length: 5 }, () => ({ state: 'unlit', value:
  * follow. A site with no agent yet becomes the pairing call to action.
  */
 export default function OverviewScreen() {
-  const circles = useCircles();
-  const circle = circles.data?.[0]; // switching Circles arrives with the account sheet (#62)
+  const { circles, circle } = useCurrentCircle();
   const sites = useSites(circle?.id);
   const site = useSelectedSite(sites.data);
 

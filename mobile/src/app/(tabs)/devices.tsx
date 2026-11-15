@@ -2,16 +2,17 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
-import { useCircles, useSiteSummary, useSites, type Circle, type Site } from '@/api/circles';
+import { useSiteSummary, useSites, type Circle, type Site } from '@/api/circles';
 import { useDevices, useMembers, type Device, type Member } from '@/api/overview';
-import { selectSite, useSelectedSite } from '@/api/selection';
+import { selectSite, useCurrentCircle, useSelectedSite } from '@/api/selection';
 import { Button, Card, Chips, Loader, Screen, SectionLabel, Segmented, StatusChip, Text } from '@/components/ui';
 import { DeviceMap } from '@/features/devices/device-map';
 import { DeviceSheet } from '@/features/devices/device-sheet';
 import { DeviceIcon } from '@/features/devices/icons';
 import { chip, facts, FILTERS, matches, type Filter } from '@/features/devices/model';
 import { isStale } from '@/features/overview/model';
-import { initials } from '@/features/overview/people';
+import { Avatar } from '@/features/account/avatar';
+import { useMe } from '@/api/session';
 import { SiteHeader } from '@/features/overview/site-header';
 import { useNow } from '@/hooks/use-now';
 import { colors, radius, space } from '@/theme';
@@ -28,8 +29,7 @@ const VIEWS: { key: View_; label: string }[] = [
  * same devices, filter chips, and the device sheet. Every action on the map is also in the lists.
  */
 export default function DevicesScreen() {
-  const circles = useCircles();
-  const circle = circles.data?.[0];
+  const { circles, circle } = useCurrentCircle();
   const sites = useSites(circle?.id);
   const site = useSelectedSite(sites.data);
 
@@ -90,6 +90,7 @@ function Live({ circle, site, sites, canManage }: { circle: Circle; site: Site; 
   const members = useMembers(circle.id);
   const summary = useSiteSummary(site.id, true, 15_000);
   const now = useNow(10_000);
+  const meId = useMe().data?.id;
   const [view, setView] = useState<View_>('people');
   const [filter, setFilter] = useState<Filter>('all');
   const [selected, setSelected] = useState<string | null>(null);
@@ -155,7 +156,7 @@ function Live({ circle, site, sites, canManage }: { circle: Circle; site: Site; 
       shown.map((g) => (
         <View key={g.key} style={styles.group}>
           {g.person ? (
-            <PersonHeader name={g.title} items={g.items} stale={stale} />
+            <PersonHeader name={g.title} items={g.items} stale={stale} me={g.key === meId} />
           ) : (
             <SectionLabel end={String(g.items.length)}>{g.title}</SectionLabel>
           )}
@@ -224,15 +225,11 @@ function byStatus(list: Device[]): Group[] {
   ];
 }
 
-function PersonHeader({ name, items, stale }: { name: string; items: Device[]; stale: boolean }) {
+function PersonHeader({ name, items, stale, me }: { name: string; items: Device[]; stale: boolean; me: boolean }) {
   const on = items.filter((d) => d.online).length;
   return (
     <View style={styles.person}>
-      <View style={styles.avatar}>
-        <Text role="labelSmall" color="onYellow">
-          {initials(name)}
-        </Text>
-      </View>
+      <Avatar name={name} me={me} size={32} />
       <Text role="title">{name}</Text>
       <Text role="bodySmall" color="text2" tabular>
         {stale || !items.length ? `${items.length} ${items.length === 1 ? 'device' : 'devices'}` : `${on} of ${items.length} online`}
@@ -284,7 +281,6 @@ const styles = StyleSheet.create({
   stale: { flexDirection: 'row', alignItems: 'center', gap: space.s3, paddingVertical: space.s3 },
   group: { gap: space.item },
   person: { flexDirection: 'row', alignItems: 'center', gap: space.s3, marginTop: space.s5, paddingHorizontal: space.s1 },
-  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.yellow, alignItems: 'center', justifyContent: 'center' },
   row: {
     minHeight: 68,
     flexDirection: 'row',

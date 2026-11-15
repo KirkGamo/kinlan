@@ -4,8 +4,8 @@ import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, LinearTransition, SlideOutRight, useReducedMotion } from 'react-native-reanimated';
 
 import { useAcknowledge, useAlerts, type Alert } from '@/api/alerts';
-import { useCircles, useSites, type Circle, type Site } from '@/api/circles';
-import { selectSite, useSelectedSite } from '@/api/selection';
+import { useSites, type Circle, type Site } from '@/api/circles';
+import { selectSite, useCurrentCircle, useSelectedSite } from '@/api/selection';
 import { Button, Card, Loader, Screen, SectionLabel, StatusChip, Text, type ChipTone } from '@/components/ui';
 import { ago, clock } from '@/features/overview/model';
 import { SiteHeader } from '@/features/overview/site-header';
@@ -32,8 +32,7 @@ function deviceOf(a: Alert): string | null {
  * repeats within 30 minutes, so the list shows exactly what it sends.
  */
 export default function AlertsScreen() {
-  const circles = useCircles();
-  const circle = circles.data?.[0];
+  const { circles, circle } = useCurrentCircle();
   const sites = useSites(circle?.id);
   const site = useSelectedSite(sites.data);
 
