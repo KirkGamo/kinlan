@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { useCircles, useSiteSummary, useSites, type Circle, type Site, type SiteSummary } from '@/api/circles';
@@ -12,6 +12,7 @@ import { LightStrip } from '@/features/overview/light-strip';
 import { ago, isStale, lights, problems, verdict, type Light } from '@/features/overview/model';
 import { People } from '@/features/overview/people';
 import { SiteHeader } from '@/features/overview/site-header';
+import { useNow } from '@/hooks/use-now';
 import { colors, radius, space } from '@/theme';
 
 const UNLIT: Light[] = Array.from({ length: 5 }, () => ({ state: 'unlit', value: '—' }));
@@ -188,15 +189,6 @@ function DevicesRow({ summary, stale }: { summary: SiteSummary; stale: boolean }
   );
 }
 
-/** Re-renders every `everyMs`, so "Updated 10 s ago" and staleness keep up between fetches. */
-function useNow(everyMs: number): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), everyMs);
-    return () => clearInterval(timer);
-  }, [everyMs]);
-  return now;
-}
 
 function Unpaired({ site, sites, canManage }: { site: Site; sites: Site[]; canManage: boolean }) {
   return (
