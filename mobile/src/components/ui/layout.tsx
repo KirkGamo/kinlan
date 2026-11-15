@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
+import type { ReactElement, ReactNode } from 'react';
+import { ScrollView, StyleSheet, View, type RefreshControlProps, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radius, space } from '@/theme';
@@ -7,11 +7,22 @@ import { colors, radius, space } from '@/theme';
 import { Text } from './text';
 
 /** A tab screen: black ground, safe areas, the 16-dp gutter, and room under the tab bar. */
-export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
+export function Screen({
+  children,
+  scroll = true,
+  refreshControl,
+}: {
+  children: ReactNode;
+  scroll?: boolean;
+  refreshControl?: ReactElement<RefreshControlProps>;
+}) {
   return (
     <SafeAreaView edges={['top']} style={styles.screen}>
       {scroll ? (
-        <ScrollView contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
+        <ScrollView
+          contentContainerStyle={styles.content}
+          contentInsetAdjustmentBehavior="automatic"
+          refreshControl={refreshControl}>
           {children}
         </ScrollView>
       ) : (

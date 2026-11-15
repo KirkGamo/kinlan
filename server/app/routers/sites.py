@@ -17,6 +17,8 @@ from app.health import HealthInputs, compute
 from app.models import (
     Alert,
     AlertSettings,
+    Command,
+    CommandStatus,
     Device,
     Outage,
     PairingCode,
@@ -28,7 +30,9 @@ from app.models import (
 )
 from app.schemas import (
     DeductionOut,
+    DiagnoseStepState,
     ErrorOut,
+    LastDiagnose,
     LatestSample,
     PairingCodeOut,
     SiteIn,
@@ -144,6 +148,36 @@ def health_inputs(db: DB, site_id: uuid.UUID, now: datetime) -> tuple[HealthInpu
     return inputs, needs_review
 
 
+def _last_diagnose(db: DB, site_id: uuid.UUID) -> LastDiagnose | None:
+    cmd = db.scalars(
+        select(Command)
+        .where(
+            Command.site_id == site_id,
+            Command.type == "diagnose",
+            Command.status == CommandStatus.done,
+            Command.finished_at.is_not(None),
+        )
+        .order_by(Command.finished_at.desc())
+        .limit(1)
+    ).first()
+    if cmd is None or not isinstance(cmd.result, dict):
+        return None
+    steps = []
+    for raw in cmd.result.get("steps", []):
+        try:
+            steps.append(
+                DiagnoseStepState(n=raw["n"], status=raw.get("status", "skipped"), ms=raw.get("ms"))
+            )
+        except (KeyError, TypeError, ValueError):
+            continue  # one malformed step from an old agent shouldn't hide the rest
+    return LastDiagnose(
+        command_id=cmd.id,
+        finished_at=cmd.finished_at,
+        root_cause_step=cmd.result.get("root_cause_step"),
+        steps=steps,
+    )
+
+
 @router.get("/sites/{site_id}/summary", response_model=SiteSummary)
 def site_summary(site_id: uuid.UUID, user: CurrentUser, db: DB) -> SiteSummary:
     """Everything the Overview needs for one site: status, grade with its reasons, the latest
@@ -180,6 +214,7 @@ def site_summary(site_id: uuid.UUID, user: CurrentUser, db: DB) -> SiteSummary:
         needs_review=needs_review,
         open_alerts=open_alerts,
         open_outage_since=open_outage,
+        last_diagnose=_last_diagnose(db, site.id),
     )
 
 
