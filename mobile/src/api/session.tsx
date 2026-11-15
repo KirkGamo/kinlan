@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { createContext, use, useEffect, useState, type ReactNode } from 'react';
 
 import { api, loadSession, onSessionChange, setSession, toSession } from './client';
+import { unregisterPush } from './push';
 import { queryClient } from './query-client';
 
 type Status = 'loading' | 'signedIn' | 'signedOut';
@@ -42,6 +43,7 @@ async function signUp(displayName: string, email: string, password: string) {
 async function signOut() {
   const current = await loadSession();
   if (current) {
+    await unregisterPush(); // while still signed in, so the API knows whose token it is
     // Best effort: even offline, the device forgets the session.
     await api('/auth/logout', {
       method: 'POST',

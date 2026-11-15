@@ -8,8 +8,10 @@ import { Platform, View } from 'react-native';
 
 import { queryClient } from '@/api/query-client';
 import { useCircles } from '@/api/circles';
+import { pushSupported } from '@/api/push';
 import { SessionProvider, useSession } from '@/api/session';
 import { Button, FormScreen, Mark, Text } from '@/components/ui';
+import { PushBridge } from '@/features/push/push-bridge';
 import { colors, FONT_FAMILY, space } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -92,6 +94,8 @@ function RootNavigator() {
   const hasCircle = (circles.data?.length ?? 0) > 0;
 
   return (
+    <>
+      {signedIn && hasCircle && pushSupported ? <PushBridge /> : null}
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
       <Stack.Protected guard={signedIn && hasCircle} redirectTo={signedIn ? '/onboarding' : '/welcome'}>
         <Stack.Screen name="(tabs)" />
@@ -115,6 +119,7 @@ function RootNavigator() {
         <Stack.Screen name="(auth)" />
       </Stack.Protected>
     </Stack>
+    </>
   );
 }
 
