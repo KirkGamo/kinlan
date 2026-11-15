@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 
 import { queryClient } from '@/api/query-client';
+import { SessionProvider, useSession } from '@/api/session';
 import { colors, FONT_FAMILY } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -52,20 +53,39 @@ const WEB_FONTS: FontFamilyDefinition[] =
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(WEB_FONTS);
-  const ready = fontsLoaded || fontError !== null; // a font failure falls back to the system face
-
-  useEffect(() => {
-    if (ready) SplashScreen.hideAsync();
-  }, [ready]);
-
-  if (!ready) return null;
+  const fontsReady = fontsLoaded || fontError !== null; // a font failure falls back to the system face
+  if (!fontsReady) return null;
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider value={navigationTheme}>
-        <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
-      </ThemeProvider>
+      <SessionProvider>
+        <ThemeProvider value={navigationTheme}>
+          <StatusBar style="light" />
+          <RootNavigator />
+        </ThemeProvider>
+      </SessionProvider>
     </QueryClientProvider>
+  );
+}
+
+/** Signed out: only the welcome and sign-in screens exist. Signed in: only the app. */
+function RootNavigator() {
+  const { status } = useSession();
+
+  useEffect(() => {
+    if (status !== 'loading') SplashScreen.hideAsync(); // keep the splash until we know
+  }, [status]);
+
+  if (status === 'loading') return null;
+
+  return (
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+      <Stack.Protected guard={status === 'signedIn'} redirectTo="/welcome">
+        <Stack.Screen name="(tabs)" />
+      </Stack.Protected>
+      <Stack.Protected guard={status === 'signedOut'} redirectTo="/">
+        <Stack.Screen name="(auth)" />
+      </Stack.Protected>
+    </Stack>
   );
 }
