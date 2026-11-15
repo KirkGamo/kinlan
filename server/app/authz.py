@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.errors import ApiError
-from app.models import Membership, Role, Site, User
+from app.models import Device, Membership, Role, Site, User
 
 RANK = {Role.viewer: 0, Role.admin: 1, Role.owner: 2}
 ROLE_WORD = {Role.viewer: "a viewer", Role.admin: "an admin", Role.owner: "an owner"}
@@ -43,3 +43,15 @@ def require_site(db: Session, user: User, site_id: uuid.UUID, min_role: Role) ->
         )
     require_role(db, user, site.circle_id, min_role)
     return site
+
+
+def require_device(db: Session, user: User, device_id: uuid.UUID, min_role: Role) -> Device:
+    """Return the device if the caller's role in its site's Circle is high enough."""
+    device = db.get(Device, device_id)
+    site = db.get(Site, device.site_id) if device else None
+    if site is None or db.get(Membership, (site.circle_id, user.id)) is None:
+        raise ApiError(
+            404, "device_not_found", "That device doesn't exist or you're not in its Circle."
+        )
+    require_role(db, user, site.circle_id, min_role)
+    return device
