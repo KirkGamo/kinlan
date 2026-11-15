@@ -1,6 +1,7 @@
 import { TabList, TabSlot, TabTrigger, Tabs, type TabTriggerSlotProps } from 'expo-router/ui';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { useOpenAlertCount } from '@/api/alerts';
 import { Text } from '@/components/ui';
 import { colors, radius, space, touch } from '@/theme';
 
@@ -9,6 +10,7 @@ import { colors, radius, space, touch } from '@/theme';
  * from expo-router/ui with the same four destinations and the same yellow selected pill.
  */
 export default function WebTabsLayout() {
+  const open = useOpenAlertCount();
   return (
     <Tabs>
       <TabSlot style={styles.slot} />
@@ -21,7 +23,7 @@ export default function WebTabsLayout() {
             <TabButton label="Devices" />
           </TabTrigger>
           <TabTrigger name="alerts" href="/alerts" asChild>
-            <TabButton label="Alerts" />
+            <TabButton label="Alerts" badge={open} />
           </TabTrigger>
           <TabTrigger name="settings" href="/settings" asChild>
             <TabButton label="Settings" />
@@ -33,19 +35,27 @@ export default function WebTabsLayout() {
 }
 
 // The trigger's ref is typed for a View, not a Pressable; tab switching doesn't need it.
-type TabButtonProps = Omit<TabTriggerSlotProps, 'ref'> & { label: string };
+type TabButtonProps = Omit<TabTriggerSlotProps, 'ref'> & { label: string; badge?: number };
 
-function TabButton({ label, isFocused, ...props }: TabButtonProps) {
+function TabButton({ label, badge = 0, isFocused, ...props }: TabButtonProps) {
   return (
     <Pressable
       {...props}
       role="tab"
       aria-selected={isFocused}
+      aria-label={badge ? `${label}, ${badge} open` : label}
       style={({ pressed }) => [styles.tab, pressed && styles.pressed]}>
       <View style={[styles.pill, isFocused && styles.pillOn]}>
         <Text role="labelSmall" color={isFocused ? 'onYellow' : 'text2'}>
           {label}
         </Text>
+        {badge ? (
+          <View style={styles.badge}>
+            <Text role="labelSmall" color="onRed" tabular>
+              {badge > 99 ? '99+' : String(badge)}
+            </Text>
+          </View>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -65,4 +75,16 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.7 },
   pill: { paddingHorizontal: space.s4, paddingVertical: space.s2, borderRadius: radius.pill },
   pillOn: { backgroundColor: colors.yellow },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -10,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    backgroundColor: colors.red,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

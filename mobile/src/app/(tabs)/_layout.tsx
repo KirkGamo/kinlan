@@ -1,5 +1,6 @@
 import { NativeTabs } from 'expo-router/native-tabs';
 
+import { useOpenAlertCount } from '@/api/alerts';
 import { colors } from '@/theme';
 
 /**
@@ -7,6 +8,7 @@ import { colors } from '@/theme';
  * yellow pill from the design (direction.md). Icons are Material Symbols via expo-symbols.
  */
 export default function TabsLayout() {
+  const open = useOpenAlertCount();
   return (
     <NativeTabs
       backgroundColor={colors.card}
@@ -14,6 +16,8 @@ export default function TabsLayout() {
       rippleColor={colors.raised}
       iconColor={{ default: colors.text2, selected: colors.onYellow }}
       labelStyle={{ default: { color: colors.text2 }, selected: { color: colors.text } }}
+      badgeBackgroundColor={colors.red}
+      badgeTextColor={colors.onRed}
       labelVisibilityMode="labeled">
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Overview</NativeTabs.Trigger.Label>
@@ -26,6 +30,7 @@ export default function TabsLayout() {
       <NativeTabs.Trigger name="alerts">
         <NativeTabs.Trigger.Label>Alerts</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon md="notifications" />
+        <NativeTabs.Trigger.Badge hidden={open === 0}>{open > 99 ? '99+' : String(open)}</NativeTabs.Trigger.Badge>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="settings">
         <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>

@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
@@ -93,6 +93,13 @@ function Live({ circle, site, sites, canManage }: { circle: Circle; site: Site; 
   const [view, setView] = useState<View_>('people');
   const [filter, setFilter] = useState<Filter>('all');
   const [selected, setSelected] = useState<string | null>(null);
+  // An alert's Review opens Devices with ?device=…: open that device's sheet when it arrives.
+  const { device: asked } = useLocalSearchParams<{ device?: string }>();
+  const [handled, setHandled] = useState<string | undefined>(undefined);
+  if (asked && asked !== handled) {
+    setHandled(asked);
+    setSelected(asked);
+  }
   const [refreshing, setRefreshing] = useState(false);
 
   const stale = summary.data ? isStale(summary.data, now) : false;
