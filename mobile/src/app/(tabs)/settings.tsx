@@ -164,11 +164,11 @@ function MemberSheet({ circle, member, onClose }: { circle: Circle; member: Memb
           {confirm ? (
             <Card style={styles.warn}>
               <Text role="body">{`Remove ${member.display_name} from ${circle.name}? They lose access to every site here.`}</Text>
-              <Button label="Remove" loading={remove.isPending} onPress={() => remove.mutate(member.user_id, { onSuccess: close })} />
+              <Button label="Remove" variant="danger" loading={remove.isPending} onPress={() => remove.mutate(member.user_id, { onSuccess: close })} />
               <Button label="Keep them" variant="ghost" onPress={() => setConfirm(false)} />
             </Card>
           ) : (
-            <Button label="Remove from this Circle" variant="ghost" onPress={() => setConfirm(true)} />
+            <Button label="Remove from this Circle" variant="danger" onPress={() => setConfirm(true)} />
           )}
           {change.isError || remove.isError ? (
             <Text role="bodySmall" color="red" accessibilityRole="alert">
@@ -379,7 +379,9 @@ function Thresholds({ siteId, value, manage }: { siteId: string; value: AlertSet
           disabled={!manage || update.isPending}
           onValueChange={(on) => update.mutate({ notify_new_device: on })}
           trackColor={{ false: colors.unlit, true: colors.yellow }}
-          thumbColor={colors.text}
+          thumbColor={value.notify_new_device ? colors.onYellow : colors.text2}
+          // react-native-web reads its own props for the thumb; without them it paints a default teal.
+          {...({ activeThumbColor: colors.onYellow, activeTrackColor: colors.yellow } as object)}
           accessibilityLabel="Alert about new devices"
         />
       </View>
@@ -451,6 +453,7 @@ function AccountSection({ circle }: { circle: Circle | undefined }) {
             <Text role="body">{`Leave ${circle.name}? You lose access to its sites until someone invites you again.`}</Text>
             <Button
               label="Leave"
+              variant="danger"
               loading={leave.isPending}
               onPress={() =>
                 leave.mutate(me.data.id, {
@@ -465,7 +468,7 @@ function AccountSection({ circle }: { circle: Circle | undefined }) {
             <Button label="Stay" variant="ghost" onPress={() => setConfirm(null)} />
           </Card>
         ) : (
-          <Button label={`Leave ${circle.name}`} variant="ghost" onPress={() => setConfirm('leave')} />
+          <Button label={`Leave ${circle.name}`} variant="danger" onPress={() => setConfirm('leave')} />
         )
       ) : null}
       {confirm === 'delete' ? (
@@ -475,13 +478,14 @@ function AccountSection({ circle }: { circle: Circle | undefined }) {
           </Text>
           <Button
             label="Delete my account"
+            variant="danger"
             loading={del.isPending}
             onPress={() => del.mutate(undefined, { onSuccess: () => void signOut() })}
           />
           <Button label="Keep my account" variant="ghost" onPress={() => setConfirm(null)} />
         </Card>
       ) : (
-        <Button label="Delete account" variant="ghost" onPress={() => setConfirm('delete')} />
+        <Button label="Delete account" variant="danger" onPress={() => setConfirm('delete')} />
       )}
       {leave.isError || del.isError ? (
         <Text role="bodySmall" color="red" accessibilityRole="alert">
