@@ -95,6 +95,18 @@ function RootNavigator() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
       <Stack.Protected guard={signedIn && hasCircle} redirectTo={signedIn ? '/onboarding' : '/welcome'}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="diagnose"
+          options={{
+            headerShown: true,
+            title: 'Diagnose',
+            headerStyle: { backgroundColor: colors.bg },
+            headerTintColor: colors.text,
+            headerTitleStyle: { fontFamily: FONT_FAMILY, fontWeight: '800' },
+            headerShadowVisible: false,
+            animation: 'slide_from_right',
+          }}
+        />
       </Stack.Protected>
       <Stack.Protected guard={signedIn} redirectTo="/welcome">
         <Stack.Screen name="onboarding" />

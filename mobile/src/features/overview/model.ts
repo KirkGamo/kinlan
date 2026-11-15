@@ -99,9 +99,8 @@ export function lights(summary: SiteSummary, now: number): Light[] {
     if (provider.state === 'fail' || provider.state === 'unlit' || !fresh) return notChecked;
     const step = d.steps.find((s) => s.n === n);
     if (!step || step.status === 'skipped') return notChecked;
-    return step.status === 'pass'
-      ? { state: 'pass', value: step.ms != null ? ms(step.ms) : 'OK' }
-      : { state: 'fail', value: 'Failing' };
+    // step.ms is how long the check took, not latency, so a pass just reads OK.
+    return step.status === 'pass' ? { state: 'pass', value: 'OK' } : { state: 'fail', value: 'Failing' };
   };
 
   return [pc, router, provider, fromDiagnose(5), fromDiagnose(6)];

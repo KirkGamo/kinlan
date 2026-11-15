@@ -271,6 +271,21 @@ def test_viewers_cannot_send_commands_but_can_read_them(client, ana, jun, home):
     assert client.get(f"{API}/commands/{cmd.json()['id']}", headers=jun.h).status_code == 200
 
 
+def test_recent_diagnoses_are_listed_newest_first_for_members_only(client, ana, eve, home):
+    url = f"{API}/sites/{home['id']}/commands"
+    first = client.post(url, json={"type": "diagnose"}, headers=ana.h).json()["id"]
+    client.post(url, json={"type": "scan"}, headers=ana.h)
+    second = client.post(url, json={"type": "diagnose"}, headers=ana.h).json()["id"]
+    with get_session_factory()() as db:  # make the order unambiguous
+        db.get(Command, first).created_at = datetime.now(UTC) - timedelta(seconds=30)
+        db.commit()
+    listed = client.get(f"{API}/sites/{home['id']}/diagnoses", headers=ana.h).json()["items"]
+    assert [c["id"] for c in listed] == [second, first]
+    one = client.get(f"{API}/sites/{home['id']}/diagnoses?limit=1", headers=ana.h).json()
+    assert [c["id"] for c in one["items"]] == [second]
+    assert client.get(f"{API}/sites/{home['id']}/diagnoses", headers=eve.h).status_code == 404
+
+
 def test_unclaimed_commands_expire_after_two_minutes(client, ana, home):
     cmd = client.post(f"{API}/sites/{home['id']}/commands", json={"type": "scan"}, headers=ana.h)
     with get_session_factory()() as db:

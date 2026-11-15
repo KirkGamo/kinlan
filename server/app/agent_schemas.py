@@ -112,6 +112,10 @@ class CommandOut(BaseModel):
     finished_at: datetime | None
 
 
+class CommandList(BaseModel):
+    items: list[CommandOut]
+
+
 class CommandBatch(BaseModel):
     commands: list[CommandOut]
 

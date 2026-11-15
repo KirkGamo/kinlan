@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 
 import { useCircles, useSiteSummary, useSites, type Circle, type Site, type SiteSummary } from '@/api/circles';
 import { useDevices, useLatency, useMembers } from '@/api/overview';
@@ -90,14 +91,17 @@ function Live({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
   const v = verdict(s, now, lit);
   const open = problems(s, now, v);
   const stale = staleNow;
+  const canManage = circle.role === 'owner' || circle.role === 'admin';
+  const diagnose = () => router.push({ pathname: '/diagnose', params: { site: site.id, run: stale ? '0' : '1' } });
 
   return (
     <Screen
+      fab={canManage ? <DiagnoseFab onPress={diagnose} /> : null}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.yellow} colors={[colors.onYellow]} progressBackgroundColor={colors.yellow} />
       }>
       {header}
-      <LightStrip lights={lit} igniteKey={`${site.id}-${ignite}`} />
+      <LightStrip lights={lit} igniteKey={`${site.id}-${ignite}`} onDiagnose={canManage && !stale ? diagnose : undefined} />
 
       <Card style={styles.verdict}>
         <View style={styles.meta}>
@@ -125,14 +129,14 @@ function Live({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
           {open.map((p) => (
             <Pressable
               key={p.key}
-              onPress={() => router.navigate(p.to)}
+              onPress={() => (p.key === 'outage' && canManage ? diagnose() : router.navigate(p.to))}
               accessibilityRole="button"
-              accessibilityLabel={`${p.title}. ${p.next}`}
+              accessibilityLabel={`${p.title}. ${p.key === 'outage' && canManage ? 'Run a diagnose to find where it breaks.' : p.next}`}
               style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
               <View style={styles.rowText}>
                 <Text role="title">{p.title}</Text>
                 <Text role="bodySmall" color="text2">
-                  {p.next}
+                  {p.key === 'outage' && canManage ? 'Run a diagnose to find where it breaks.' : p.next}
                 </Text>
               </View>
               <StatusChip tone={p.tone} label={p.chip} />
@@ -161,6 +165,28 @@ function Live({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
       <SectionLabel>Devices</SectionLabel>
       <DevicesRow summary={s} stale={stale} />
     </Screen>
+  );
+}
+
+/** The Diagnose pill (owners and admins): opens Diagnose and starts a run. */
+function DiagnoseFab({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Diagnose"
+      accessibilityHint="Runs the six checks to find where the network breaks"
+      style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}>
+      <Svg width={20} height={20} viewBox="0 0 24 24">
+        <Path
+          d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+          fill={colors.onYellow}
+        />
+      </Svg>
+      <Text role="label" color="onYellow">
+        Diagnose
+      </Text>
+    </Pressable>
   );
 }
 
@@ -274,6 +300,21 @@ const styles = StyleSheet.create({
     paddingVertical: space.s3,
   },
   pressed: { backgroundColor: colors.raised },
+  fab: {
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s2,
+    paddingHorizontal: space.s5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.yellow,
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  fabPressed: { transform: [{ scale: 0.96 }] },
   rowText: { flex: 1, gap: 2 },
   skelTitle: { width: 160, height: 28, borderRadius: 8, backgroundColor: colors.card, marginVertical: space.s2 },
 });
