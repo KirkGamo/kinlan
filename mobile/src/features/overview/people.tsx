@@ -2,17 +2,10 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { Device, Member } from '@/api/overview';
+import { useMe } from '@/api/session';
 import { Card, Text } from '@/components/ui';
+import { Avatar } from '@/features/account/avatar';
 import { colors, radius, space } from '@/theme';
-
-export function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  const letters =
-    parts.length > 1
-      ? parts[0][0] + parts[parts.length - 1][0]
-      : (parts[0] ?? '?').slice(0, 2);
-  return letters.toUpperCase();
-}
 
 /**
  * Your people (brand.md, people-first devices): each member with how many of their devices are
@@ -27,6 +20,8 @@ export function People({
   devices: Device[];
   stale?: boolean;
 }) {
+  const me = useMe();
+  const meId = me.data?.id;
   // While the agent is offline, online flags are old: show only how many devices each has.
   const count = (list: Device[]) =>
     stale
@@ -36,7 +31,7 @@ export function People({
   if (owned.length === 0) {
     return (
       <Card>
-        <Text role='body' color='text2'>
+        <Text role="body" color="text2">
           No devices belong to anyone here yet. Open a device in Devices and say
           whose it is.
         </Text>
@@ -49,10 +44,10 @@ export function People({
       {members.map((m) => {
         const mine = owned.filter((d) => d.owner?.user_id === m.user_id);
         const sub = mine.length ? count(mine) : 'No devices yet';
-        return <Person key={m.user_id} name={m.display_name} sub={sub} />;
+        return <Person key={m.user_id} name={m.display_name} sub={sub} me={m.user_id === meId} />;
       })}
       {shared.length ? (
-        <Person name='Shared' sub={count(shared)} shared />
+        <Person name="Shared" sub={count(shared)} shared />
       ) : null}
     </View>
   );
@@ -62,29 +57,35 @@ function Person({
   name,
   sub,
   shared,
+  me,
 }: {
   name: string;
   sub: string;
   shared?: boolean;
+  me?: boolean;
 }) {
   return (
     <Pressable
       onPress={() => router.navigate('/devices')}
-      accessibilityRole='button'
+      accessibilityRole="button"
       accessibilityLabel={`${name}: ${sub}`}
-      accessibilityHint='Opens Devices'
+      accessibilityHint="Opens Devices"
       style={({ pressed }) => [styles.person, pressed && styles.pressed]}
     >
-      <View style={[styles.avatar, shared && styles.sharedAvatar]}>
-        <Text role='labelSmall' color={shared ? 'text2' : 'onYellow'}>
-          {shared ? 'ALL' : initials(name)}
-        </Text>
-      </View>
+      {shared ? (
+        <View style={[styles.avatar, styles.sharedAvatar]}>
+          <Text role="labelSmall" color="text2">
+            ALL
+          </Text>
+        </View>
+      ) : (
+        <Avatar name={name} me={me} />
+      )}
       <View style={styles.text}>
-        <Text role='title' numberOfLines={1}>
+        <Text role="title" numberOfLines={1}>
           {name}
         </Text>
-        <Text role='bodySmall' color='text2' tabular>
+        <Text role="bodySmall" color="text2" tabular>
           {sub}
         </Text>
       </View>

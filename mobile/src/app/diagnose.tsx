@@ -5,7 +5,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
-import { useCircles, useSiteSummary } from '@/api/circles';
+import { useSiteSummary } from '@/api/circles';
+import { canManage as manages, useCurrentCircle } from '@/api/selection';
 import type { Command } from '@/api/devices';
 import { isActive, useDiagnoses, useStartDiagnose, type DiagnoseResult } from '@/api/diagnose';
 import { Button, Card, FormScreen, Loader, SectionLabel, StatusChip, Text, type ChipTone } from '@/components/ui';
@@ -43,8 +44,8 @@ const UNLIT: Light[] = Array.from({ length: 5 }, () => ({ state: 'unlit', value:
  */
 export default function DiagnoseScreen() {
   const { site: siteId, run } = useLocalSearchParams<{ site: string; run?: string }>();
-  const circles = useCircles();
-  const canManage = circles.data?.[0]?.role === 'owner' || circles.data?.[0]?.role === 'admin';
+  const { circle } = useCurrentCircle();
+  const canManage = manages(circle);
   const summary = useSiteSummary(siteId, true, 15_000);
   const now = useNow(10_000);
   const stale = summary.data ? isStale(summary.data, now) : false;

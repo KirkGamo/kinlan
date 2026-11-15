@@ -2,8 +2,8 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { api } from './client';
-import { useCircles, useSiteSummary, useSites } from './circles';
-import { useSelectedSite } from './selection';
+import { useSiteSummary, useSites } from './circles';
+import { useCurrentCircle, useSelectedSite } from './selection';
 
 export type AlertType = 'new_device' | 'risky_port' | 'unreachable' | 'back_online' | 'high_latency' | 'packet_loss' | string;
 export type Alert = {
@@ -51,8 +51,8 @@ export function useAcknowledge(siteId: string) {
 
 /** Open alerts on the site the tabs show, for the Alerts tab badge. */
 export function useOpenAlertCount(): number {
-  const circles = useCircles();
-  const sites = useSites(circles.data?.[0]?.id);
+  const { circle } = useCurrentCircle();
+  const sites = useSites(circle?.id);
   const site = useSelectedSite(sites.data);
   const summary = useSiteSummary(site?.id, !!site && site.status !== 'pending', 30_000);
   return summary.data?.open_alerts ?? 0;
