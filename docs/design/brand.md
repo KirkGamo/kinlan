@@ -1,6 +1,6 @@
 # KinLAN brand system (Nov 7, 2026)
 
-KinLAN should not look like a generic dark dashboard. Its identity comes from the two halves of its name: **kin**, the people a network serves, and **LAN**, the router and its status lights. Everything below follows from those two ideas. This page feeds the brand section of DESIGN.md (end of Sprint 3). The interactive reference is `docs/design/prototype/index.html`; the source files are in `docs/design/brand/`.
+KinLAN should not look like a generic dark dashboard. Its identity comes from the two halves of its name: **kin**, the people a network serves, and **LAN**, the router and its status lights. Everything below follows from those two ideas. Its visual rules are recorded in [`DESIGN.md`](../../DESIGN.md) (Nov 15, 2026); the perforated texture is still to build. The interactive reference is `docs/design/prototype/index.html`; the source files are in `docs/design/brand/`.
 
 ## 1. The mark: five lights in an arc
 

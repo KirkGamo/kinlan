@@ -9,7 +9,8 @@ import { Text } from './text';
 type ButtonProps = {
   label: string;
   onPress: () => void;
-  variant?: 'primary' | 'ghost';
+  /** primary: the yellow action; ghost: neutral; danger: destructive (red label, never filled). */
+  variant?: 'primary' | 'ghost' | 'danger';
   loading?: boolean;
   disabled?: boolean;
   accessibilityHint?: string;
@@ -29,13 +30,14 @@ export function Button({ label, onPress, variant = 'primary', loading, disabled,
       style={({ pressed }) => [
         styles.button,
         variant === 'primary' ? styles.primary : styles.ghost,
+        variant === 'danger' && styles.danger,
         pressed && styles.pressed,
         disabled && !loading && styles.disabled,
       ]}>
       {loading ? (
         <Loader label={`${label}…`} />
       ) : (
-        <Text role="label" color={variant === 'primary' ? 'onYellow' : 'text'}>
+        <Text role="label" color={variant === 'primary' ? 'onYellow' : variant === 'danger' ? 'red' : 'text'}>
           {label}
         </Text>
       )}
@@ -119,6 +121,7 @@ const styles = StyleSheet.create({
   },
   primary: { backgroundColor: colors.yellow },
   ghost: { backgroundColor: colors.raised },
+  danger: { borderWidth: 1, borderColor: 'rgba(255, 69, 58, 0.45)' },
   pressed: { transform: [{ scale: 0.97 }] },
   disabled: { opacity: 0.5 },
   field: { gap: space.s2 },

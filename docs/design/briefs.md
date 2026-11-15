@@ -127,9 +127,10 @@ Everything that shows a status can be tapped to explain it or act on it. The pro
 
 Sheets close with the close button, a tap on the scrim, Esc, or the Android back gesture, and return focus to what opened them. Pull to refresh stays on Overview, Devices and Alerts (`docs/design/research.md`).
 
-## Open decisions for DESIGN.md (not decided here)
+## Decisions recorded in DESIGN.md (Nov 15)
 
 - ~~Visual direction~~ **Decided Nov 7: Status Lights** (`docs/design/direction.md`). Palette, type and the signature light strip are fixed there; exact dark-theme values are set during the build.
-- How the Diagnose ladder looks (the brief fixes only its structure and states).
+- ~~How the Diagnose ladder looks~~ **Built (#60):** a root-cause card over six 68-dp rungs with numbered badges that turn into a check or a cross; the failing rung is outlined in red; tap a rung for its detail.
 - ~~How the network map looks~~ **Drawn in the prototype (Nov 7):** type icons in rings, status badges, a red marching dashed link for an outage, a yellow selection ring.
-- Chart styling, within the accessibility rules above.
+- ~~Chart styling~~ **Built (#58):** internet as a 3-dp yellow line with a yellow fade, router as a 2-dp dashed grey line, outages as red bands, a crosshair readout on drag or hover.
+- Above 10 devices the map names only the selected device and marks new ones with the word New (finish review, Nov 15).

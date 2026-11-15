@@ -76,6 +76,9 @@ export function DeviceMap({
     const rad = (deg * Math.PI) / 180;
     return { x: cx + R * Math.sin(rad), y: cy - R * Math.cos(rad) };
   };
+  // A phone-width ring fits about 10 names. Past that, only new devices and the selected one are
+  // named on the map (the lists name everything), so labels never pile onto other nodes.
+  const nameAll = ringDevices.length <= 10;
   const nodes: Node[] = [];
   let slot = 0;
   const next = () => {
@@ -86,7 +89,8 @@ export function DeviceMap({
     nodes.push({
       key: d.id,
       ...next(),
-      label: d.display_name,
+      // Crowded map: the selected device keeps its name; a new one is marked with the word New.
+      label: nameAll || d.id === selectedId ? d.display_name : d.needs_review ? 'New' : '',
       type: d.device_type,
       ring: ringColor(d),
       badge: d.needs_review ? 'New' : undefined,
@@ -151,14 +155,13 @@ export function DeviceMap({
                 key: 'router',
                 x: cx,
                 y: cy,
-                label: router?.display_name ?? 'Router',
+                label: '', // its size and icon name it; the map's screen-reader summary says Router
                 type: 'router',
                 ring: routerDown ? colors.red : stale ? colors.unlitRing : colors.green,
                 device: router,
                 dim: !!sel && router?.id !== sel,
               }}
               big
-              side
               selected={!!router && router.id === sel}
               onPress={router ? () => onSelect(router.id) : undefined}
             />
@@ -173,6 +176,7 @@ export function DeviceMap({
                 n={{ ...n, dim: n.dim || (!!sel && n.device?.id !== sel) }}
                 selected={!!n.device && n.device.id === sel}
                 onPress={n.device ? () => onSelect(n.device!.id) : undefined}
+                small={!nameAll}
               />
             ))}
           </Svg>
@@ -181,6 +185,7 @@ export function DeviceMap({
         )}
       </View>
       <Text role="bodySmall" color="text2">
+        {nameAll ? '' : 'Tap a device to see its name. '}
         Shows which devices share this network, not how they’re wired: KinLAN can’t tell Wi-Fi from cable or see extenders.
       </Text>
     </Card>
@@ -201,9 +206,24 @@ function Link({ x1, y1, x2, y2, broken, label }: { x1: number; y1: number; x2: n
 }
 
 /** `side` puts the label beside the node, off the vertical links of the internet and router. */
-function MapNode({ n, big, side, selected, onPress }: { n: Node; big?: boolean; side?: boolean; selected?: boolean; onPress?: () => void }) {
-  const r = big ? NODE + 6 : NODE;
-  const icon = big ? 26 : 20;
+function MapNode({
+  n,
+  big,
+  side,
+  small,
+  selected,
+  onPress,
+}: {
+  n: Node;
+  big?: boolean;
+  side?: boolean;
+  /** Crowded ring: smaller nodes so a node and its label fit between neighbours. */
+  small?: boolean;
+  selected?: boolean;
+  onPress?: () => void;
+}) {
+  const r = big ? NODE + 6 : small ? NODE - 4 : NODE;
+  const icon = big ? 26 : small ? 16 : 20;
   const label = n.label.length > 14 ? `${n.label.slice(0, 13)}…` : n.label;
   return (
     <G opacity={n.dim ? 0.35 : 1} onPress={onPress}>
@@ -217,16 +237,18 @@ function MapNode({ n, big, side, selected, onPress }: { n: Node; big?: boolean; 
           <Circle cx={n.x + r * 0.75} cy={n.y - r * 0.75} r={6} fill={colors.orange} stroke={colors.card} strokeWidth={2} />
         </>
       ) : null}
-      <SvgText
-        x={side ? n.x - r - 8 : n.x}
-        y={side ? n.y + 4 : n.y + r + 14}
-        fill={n.badge ? colors.orange : colors.text2}
-        fontSize={11}
-        fontWeight="600"
-        fontFamily={FONT_FAMILY}
-        textAnchor={side ? 'end' : 'middle'}>
-        {n.badge ? `${label} · New` : label}
-      </SvgText>
+      {n.label ? (
+        <SvgText
+          x={side ? n.x - r - 8 : n.x}
+          y={side ? n.y + 4 : n.y + r + 12}
+          fill={n.badge ? colors.orange : colors.text2}
+          fontSize={11}
+          fontWeight="600"
+          fontFamily={FONT_FAMILY}
+          textAnchor={side ? 'end' : 'middle'}>
+          {n.badge && label !== 'New' ? `${label} · New` : label}
+        </SvgText>
+      ) : null}
     </G>
   );
 }

@@ -6,7 +6,7 @@
 
 This is the repository copy. The working copy that Impeccable reloads is `.impeccable/surfaces/mobile-app-tabs-index-tsx.md` (local only, because `.impeccable/` is git-ignored). Update both together.
 
-**DESIGN.md** is written from the built app at the end of Sprint 3 (#26); until then this contract is the visual reference.
+**[`DESIGN.md`](../../DESIGN.md)** (repo root) was written from the built app on Nov 15, 2026 (#26), after the finish review against this contract. It is now the single source of truth for the visual system; this contract stays as the record of why the world was chosen.
 
 ---
 
