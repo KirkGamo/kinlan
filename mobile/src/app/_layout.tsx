@@ -4,11 +4,13 @@ import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 
 import { queryClient } from '@/api/query-client';
+import { useCircles } from '@/api/circles';
 import { SessionProvider, useSession } from '@/api/session';
-import { colors, FONT_FAMILY } from '@/theme';
+import { Button, FormScreen, Mark, Text } from '@/components/ui';
+import { colors, FONT_FAMILY, space } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -68,24 +70,53 @@ export default function RootLayout() {
   );
 }
 
-/** Signed out: only the welcome and sign-in screens exist. Signed in: only the app. */
+/**
+ * Signed out: only the welcome and sign-in screens exist. Signed in without a Circle: only
+ * onboarding (create or join one). Signed in with a Circle: the app, with onboarding still
+ * reachable for adding sites and pairing.
+ */
 function RootNavigator() {
   const { status } = useSession();
+  const signedIn = status === 'signedIn';
+  const circles = useCircles(signedIn);
+  const deciding = status === 'loading' || (signedIn && circles.isPending);
 
   useEffect(() => {
-    if (status !== 'loading') SplashScreen.hideAsync(); // keep the splash until we know
-  }, [status]);
+    if (!deciding) SplashScreen.hideAsync(); // keep the splash until we know where to go
+  }, [deciding]);
 
-  if (status === 'loading') return null;
+  if (deciding) return null;
+  if (signedIn && circles.isError) {
+    return <StartupError message={circles.error.message} onRetry={() => circles.refetch()} />;
+  }
+  const hasCircle = (circles.data?.length ?? 0) > 0;
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-      <Stack.Protected guard={status === 'signedIn'} redirectTo="/welcome">
+      <Stack.Protected guard={signedIn && hasCircle} redirectTo={signedIn ? '/onboarding' : '/welcome'}>
         <Stack.Screen name="(tabs)" />
+      </Stack.Protected>
+      <Stack.Protected guard={signedIn} redirectTo="/welcome">
+        <Stack.Screen name="onboarding" />
       </Stack.Protected>
       <Stack.Protected guard={status === 'signedOut'} redirectTo="/">
         <Stack.Screen name="(auth)" />
       </Stack.Protected>
     </Stack>
+  );
+}
+
+/** The app couldn't load your Circles (offline, or the API is waking up). */
+function StartupError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <FormScreen>
+      <View style={{ flex: 1, justifyContent: 'center', gap: space.s4 }}>
+        <Mark width={96} />
+        <Text role="title" align="center">
+          {message}
+        </Text>
+        <Button label="Try again" onPress={onRetry} />
+      </View>
+    </FormScreen>
   );
 }
