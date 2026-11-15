@@ -826,13 +826,13 @@ Write each chapter of the report **at the end of the sprint it covers**, not in 
 - [x] **Done when:** `kinlan-agent run --local` shows devices, latency, loss and a diagnose result on your home network.
 
 ### Sprint 2 — Server, database and connection (Sun Nov 15 – Sat Nov 21)
-- [ ] **Sun–Mon, before the progress report:** SQLAlchemy models + first Alembic migration; auth (register/login/refresh), so the `/docs` page has real endpoints to screenshot.
-- [ ] Circles, memberships, invites; sites and pairing.
-- [ ] Agent pairing + ingest + heartbeat + command long-poll; uploader with backoff and resend-safe batches.
-- [ ] Alert engine v1 (new device, unreachable, back online); scheduled jobs (heartbeat, rollup, retention).
-- [ ] Deploy to Render + Neon; run the agent against production.
+- [x] **Sun–Mon, before the progress report:** SQLAlchemy models + first Alembic migration; auth (register/login/refresh), so the `/docs` page has real endpoints to screenshot.
+- [x] Circles, memberships, invites; sites and pairing.
+- [x] Agent pairing + ingest + heartbeat + command long-poll; uploader with backoff and resend-safe batches.
+- [x] Alert engine v1 (new device, unreachable, back online); scheduled jobs (heartbeat, rollup, retention). *Also high latency, packet loss and risky ports.*
+- [x] Deploy to Render + Neon; run the agent against production. *Live at https://kinlan-api.onrender.com since Nov 7 (`docs/deploy.md`).*
 - [ ] Set up Firebase/FCM credentials in EAS now, so push isn't blocked in Sprint 3.
-- [ ] **Tue Nov 17 — Progress Report (2–3 pages).** Contents:
+- [ ] **Tue Nov 17 — Progress Report (2–3 pages).** *Written Nov 7 (3 pages, `course/`); to submit.* Contents:
   - system design (architecture, ERD, flowchart)
   - screenshots of the agent CLI, the Swagger `/docs` page, Wireshark captures and Figma mockups
   - sample code (`diagnose.py`, ingest endpoint)
