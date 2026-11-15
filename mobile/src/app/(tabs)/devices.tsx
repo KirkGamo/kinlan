@@ -1,13 +1,295 @@
-import { ComingNext } from '@/components/placeholder';
-import { Screen, Text } from '@/components/ui';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
+import { useCircles, useSiteSummary, useSites, type Circle, type Site } from '@/api/circles';
+import { useDevices, useMembers, type Device, type Member } from '@/api/overview';
+import { selectSite, useSelectedSite } from '@/api/selection';
+import { Button, Card, Chips, Loader, Screen, SectionLabel, Segmented, StatusChip, Text } from '@/components/ui';
+import { DeviceMap } from '@/features/devices/device-map';
+import { DeviceSheet } from '@/features/devices/device-sheet';
+import { DeviceIcon } from '@/features/devices/icons';
+import { chip, facts, FILTERS, matches, type Filter } from '@/features/devices/model';
+import { isStale } from '@/features/overview/model';
+import { initials } from '@/features/overview/people';
+import { SiteHeader } from '@/features/overview/site-header';
+import { useNow } from '@/hooks/use-now';
+import { colors, radius, space } from '@/theme';
+
+type View_ = 'people' | 'status' | 'map';
+const VIEWS: { key: View_; label: string }[] = [
+  { key: 'people', label: 'People' },
+  { key: 'status', label: 'Status' },
+  { key: 'map', label: 'Map' },
+];
+
+/**
+ * Devices (briefs.md section 2): "Who's on my network?" People, Status and Map views over the
+ * same devices, filter chips, and the device sheet. Every action on the map is also in the lists.
+ */
 export default function DevicesScreen() {
+  const circles = useCircles();
+  const circle = circles.data?.[0];
+  const sites = useSites(circle?.id);
+  const site = useSelectedSite(sites.data);
+
+  if (circles.isPending || sites.isPending) {
+    return (
+      <Screen>
+        <Card style={styles.center}>
+          <Loader label="Loading" />
+        </Card>
+      </Screen>
+    );
+  }
+  if (circles.isError || sites.isError || !circle) {
+    return (
+      <Screen>
+        <ErrorCard message={(circles.error ?? sites.error)?.message ?? 'Something went wrong.'} onRetry={() => void sites.refetch()} />
+      </Screen>
+    );
+  }
+  const canManage = circle.role === 'owner' || circle.role === 'admin';
+  if (!site) {
+    return (
+      <Screen>
+        <Text role="titleLarge" accessibilityRole="header">
+          Devices
+        </Text>
+        <Card>
+          <Text role="body" color="text2">
+            No sites yet. Add a site on Overview, then pair a PC on it to see its devices.
+          </Text>
+        </Card>
+      </Screen>
+    );
+  }
+  if (site.status === 'pending') {
+    return (
+      <Screen>
+        <SiteHeader site={site} sites={sites.data} sub="Not paired yet" onSwitch={selectSite} />
+        <Card>
+          <Text role="title">No devices yet</Text>
+          <Text role="body" color="text2">
+            {canManage
+              ? 'Devices appear after the agent’s first scan. Pair a PC on this network first.'
+              : 'Devices appear once an owner or admin pairs a PC on this network.'}
+          </Text>
+          {canManage ? (
+            <Button label="Pair the agent" onPress={() => router.push({ pathname: '/onboarding/pair', params: { site: site.id } })} />
+          ) : null}
+        </Card>
+      </Screen>
+    );
+  }
+  return <Live key={site.id} circle={circle} site={site} sites={sites.data} canManage={canManage} />;
+}
+
+function Live({ circle, site, sites, canManage }: { circle: Circle; site: Site; sites: Site[]; canManage: boolean }) {
+  const devices = useDevices(site.id);
+  const members = useMembers(circle.id);
+  const summary = useSiteSummary(site.id, true, 15_000);
+  const now = useNow(10_000);
+  const [view, setView] = useState<View_>('people');
+  const [filter, setFilter] = useState<Filter>('all');
+  const [selected, setSelected] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const stale = summary.data ? isStale(summary.data, now) : false;
+  const list = devices.data ?? [];
+  const online = list.filter((d) => d.online).length;
+  const fresh = list.filter((d) => d.needs_review).length;
+  const sub = devices.data
+    ? `${list.length} ${list.length === 1 ? 'device' : 'devices'}${stale ? '' : ` · ${online} online`}${fresh ? ` · ${fresh} new` : ''}`
+    : circle.name;
+
+  async function refresh() {
+    setRefreshing(true);
+    await Promise.all([devices.refetch(), members.refetch(), summary.refetch()]);
+    setRefreshing(false);
+  }
+
+  let body;
+  if (devices.isPending || members.isPending) {
+    body = (
+      <Card style={styles.center}>
+        <Loader label="Loading devices" />
+      </Card>
+    );
+  } else if (devices.isError || members.isError) {
+    body = <ErrorCard message={(devices.error ?? members.error)?.message ?? ''} onRetry={() => void refresh()} />;
+  } else if (list.length === 0) {
+    body = (
+      <Card>
+        <Text role="title">No devices found yet</Text>
+        <Text role="body" color="text2">
+          The agent scans the network every few minutes. Devices show up here after its first scan.
+        </Text>
+      </Card>
+    );
+  } else if (view === 'map') {
+    body = (
+      <DeviceMap
+        devices={list}
+        filter={filter}
+        summary={summary.data}
+        gatewayIp={site.gateway_ip}
+        selectedId={selected}
+        onSelect={setSelected}
+        stale={stale}
+      />
+    );
+  } else {
+    const groups = view === 'people' ? byPerson(list, members.data ?? []) : byStatus(list);
+    const shown = groups
+      .map((g) => ({ ...g, items: g.items.filter((d) => matches(d, filter)) }))
+      .filter((g) => g.items.length > 0 || (g.person && filter === 'all'));
+    body = shown.length ? (
+      shown.map((g) => (
+        <View key={g.key} style={styles.group}>
+          {g.person ? (
+            <PersonHeader name={g.title} items={g.items} stale={stale} />
+          ) : (
+            <SectionLabel end={String(g.items.length)}>{g.title}</SectionLabel>
+          )}
+          {g.items.length ? (
+            g.items.map((d) => <DeviceRow key={d.id} d={d} stale={stale} onPress={() => setSelected(d.id)} />)
+          ) : (
+            <Text role="bodySmall" color="text2">
+              No devices yet. Open one and choose them under “Whose is this?”.
+            </Text>
+          )}
+        </View>
+      ))
+    ) : (
+      <Card>
+        <Text role="body" color="text2">
+          No devices match this filter.
+        </Text>
+      </Card>
+    );
+  }
+
   return (
-    <Screen>
-      <Text role="headline" accessibilityRole="header">
-        Devices
-      </Text>
-      <ComingNext issue={59} what="People, Status and Map views with the device sheet" />
+    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.yellow} colors={[colors.onYellow]} progressBackgroundColor={colors.yellow} />}>
+      <SiteHeader site={site} sites={sites} sub={sub} onSwitch={selectSite} />
+      {stale ? (
+        <Card style={styles.stale}>
+          <StatusChip tone="neutral" label="Offline" />
+          <Text role="bodySmall" color="text2">
+            The agent isn’t reporting, so who’s online may be out of date.
+          </Text>
+        </Card>
+      ) : null}
+      <Segmented label="Group devices by" options={VIEWS} value={view} onChange={setView} />
+      <Chips label="Filter devices" options={FILTERS} value={filter} onChange={setFilter} />
+      {body}
+      <DeviceSheet
+        deviceId={selected}
+        siteId={site.id}
+        members={members.data ?? []}
+        canManage={canManage}
+        stale={stale}
+        onClose={() => setSelected(null)}
+      />
     </Screen>
   );
 }
+
+type Group = { key: string; title: string; items: Device[]; person?: boolean };
+
+/** Needs review first, then one group per member, then shared and unassigned. */
+function byPerson(list: Device[], members: Member[]): Group[] {
+  const review = list.filter((d) => d.needs_review);
+  const rest = list.filter((d) => !d.needs_review);
+  return [
+    { key: 'review', title: 'Needs review', items: review },
+    ...members.map((m) => ({ key: m.user_id, title: m.display_name, items: rest.filter((d) => d.owner?.user_id === m.user_id), person: true })),
+    { key: 'shared', title: 'Shared and unassigned', items: rest.filter((d) => !d.owner) },
+  ];
+}
+
+function byStatus(list: Device[]): Group[] {
+  return [
+    { key: 'review', title: 'Needs review', items: list.filter((d) => d.needs_review) },
+    { key: 'online', title: 'Online', items: list.filter((d) => !d.needs_review && d.online) },
+    { key: 'offline', title: 'Offline', items: list.filter((d) => !d.needs_review && !d.online) },
+  ];
+}
+
+function PersonHeader({ name, items, stale }: { name: string; items: Device[]; stale: boolean }) {
+  const on = items.filter((d) => d.online).length;
+  return (
+    <View style={styles.person}>
+      <View style={styles.avatar}>
+        <Text role="labelSmall" color="onYellow">
+          {initials(name)}
+        </Text>
+      </View>
+      <Text role="title">{name}</Text>
+      <Text role="bodySmall" color="text2" tabular>
+        {stale || !items.length ? `${items.length} ${items.length === 1 ? 'device' : 'devices'}` : `${on} of ${items.length} online`}
+      </Text>
+    </View>
+  );
+}
+
+function DeviceRow({ d, stale, onPress }: { d: Device; stale: boolean; onPress: () => void }) {
+  const st = chip(d, stale);
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${d.display_name}, ${st.label}${d.trusted ? ', trusted' : ''}. ${facts(d)}`}
+      accessibilityHint="Opens the device"
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+      <View style={styles.icon}>
+        <DeviceIcon type={d.device_type} size={20} color={d.online && !stale ? colors.text : colors.text2} />
+      </View>
+      <View style={styles.rowText}>
+        <Text role="title" numberOfLines={1}>
+          {d.display_name}
+        </Text>
+        <Text role="bodySmall" color="text2" numberOfLines={1} tabular>
+          {d.trusted ? `${facts(d)} · Trusted` : facts(d)}
+        </Text>
+      </View>
+      <StatusChip tone={st.tone} label={st.label} />
+    </Pressable>
+  );
+}
+
+function ErrorCard({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <Card>
+      <StatusChip tone="down" label="Couldn’t load" />
+      <Text role="body" color="text2">
+        {message}
+      </Text>
+      <Button label="Try again" variant="ghost" onPress={onRetry} />
+    </Card>
+  );
+}
+
+
+const styles = StyleSheet.create({
+  center: { minHeight: 120, alignItems: 'center', justifyContent: 'center' },
+  stale: { flexDirection: 'row', alignItems: 'center', gap: space.s3, paddingVertical: space.s3 },
+  group: { gap: space.item },
+  person: { flexDirection: 'row', alignItems: 'center', gap: space.s3, marginTop: space.s5, paddingHorizontal: space.s1 },
+  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.yellow, alignItems: 'center', justifyContent: 'center' },
+  row: {
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s3,
+    backgroundColor: colors.card,
+    borderRadius: radius.row,
+    borderCurve: 'continuous',
+    paddingHorizontal: space.s4,
+    paddingVertical: space.s3,
+  },
+  pressed: { backgroundColor: colors.raised },
+  icon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.raised, alignItems: 'center', justifyContent: 'center' },
+  rowText: { flex: 1, gap: 2 },
+});

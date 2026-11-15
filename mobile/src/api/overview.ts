@@ -33,14 +33,25 @@ export type Latency = {
   outages: OutageSpan[];
 };
 
+export type DeviceType = 'router' | 'computer' | 'laptop' | 'phone' | 'tv' | 'printer' | 'unknown';
 export type Device = {
   id: string;
+  site_id: string;
   display_name: string;
-  device_type: string;
+  custom_name: string | null;
+  hostname: string | null;
+  vendor: string | null;
+  mac: string;
+  ip: string | null;
+  device_type: DeviceType;
   owner: { user_id: string; display_name: string } | null;
   trusted: boolean;
+  baseline: boolean;
   needs_review: boolean;
   online: boolean;
+  first_seen_at: string;
+  last_seen_at: string;
+  open_risky_ports: number;
 };
 export type Member = { user_id: string; display_name: string; email: string; role: Role };
 type List<T> = { items: T[]; next_cursor: string | null };

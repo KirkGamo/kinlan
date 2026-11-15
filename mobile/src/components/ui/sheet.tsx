@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -24,6 +24,7 @@ export function Sheet({
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   return (
     <Modal visible={open} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       {open ? (
@@ -48,7 +49,9 @@ export function Sheet({
                 </Svg>
               </Pressable>
             </View>
-            {children}
+            <ScrollView style={{ maxHeight: height * 0.72 }} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+              {children}
+            </ScrollView>
           </Animated.View>
         </View>
       ) : null}
@@ -71,6 +74,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   head: { flexDirection: 'row', alignItems: 'center', gap: space.s3 },
+  body: { gap: space.s3 },
   title: { flex: 1 },
   close: {
     width: 44,
