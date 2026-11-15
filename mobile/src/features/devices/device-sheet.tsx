@@ -101,6 +101,11 @@ function Body({
           {TYPE_LABEL[d.device_type]}
         </Text>
       </View>
+      {d.is_agent ? (
+        <Text role="bodySmall" color="text2">
+          This PC runs the KinLAN agent: every check and ping test starts here.
+        </Text>
+      ) : null}
       {isPrivateAddress(d.mac) ? (
         <Text role="bodySmall" color="text2">
           Private address: this phone or laptop hides its real hardware address, so its maker can’t be named.

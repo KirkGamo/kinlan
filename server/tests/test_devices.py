@@ -52,6 +52,14 @@ def test_list_puts_new_devices_first_with_names_and_types(client, ana, agent, ho
     assert router["device_type"] == "router" and router["baseline"] and not router["needs_review"]
 
 
+def test_the_agents_own_pc_is_marked(client, ana, agent, home):
+    ids = seeded(client, agent)
+    items = devices(client, ana, home["id"])
+    assert [d["display_name"] for d in items if d["is_agent"]] == ["DESKTOP-01"]
+    detail = client.get(f"{API}/devices/{ids[PC[0]]}", headers=ana.h).json()
+    assert detail["is_agent"] is True
+
+
 def test_filters(client, ana, agent, home):
     ids = seeded(client, agent)
     assert [d["mac"] for d in devices(client, ana, home["id"], "?status=review")] == [PHONE[0]]
