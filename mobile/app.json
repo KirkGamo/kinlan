@@ -1,0 +1,71 @@
+{
+  "expo": {
+    "name": "KinLAN",
+    "slug": "kinlan",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "kinlan",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B0B0C",
+    "android": {
+      "package": "io.github.kirkgamo.kinlan",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B0B0C",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png",
+      "name": "KinLAN",
+      "shortName": "KinLAN",
+      "backgroundColor": "#0B0B0C",
+      "themeColor": "#0B0B0C"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0B0B0C",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 132
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "android": {
+            "fonts": [
+              {
+                "fontFamily": "Manrope",
+                "fontDefinitions": [
+                  { "path": "./node_modules/@expo-google-fonts/manrope/500Medium/Manrope_500Medium.ttf", "weight": 500 },
+                  { "path": "./node_modules/@expo-google-fonts/manrope/600SemiBold/Manrope_600SemiBold.ttf", "weight": 600 },
+                  { "path": "./node_modules/@expo-google-fonts/manrope/700Bold/Manrope_700Bold.ttf", "weight": 700 },
+                  { "path": "./node_modules/@expo-google-fonts/manrope/800ExtraBold/Manrope_800ExtraBold.ttf", "weight": 800 }
+                ]
+              }
+            ]
+          },
+          "ios": {
+            "fonts": [
+              "./node_modules/@expo-google-fonts/manrope/500Medium/Manrope_500Medium.ttf",
+              "./node_modules/@expo-google-fonts/manrope/600SemiBold/Manrope_600SemiBold.ttf",
+              "./node_modules/@expo-google-fonts/manrope/700Bold/Manrope_700Bold.ttf",
+              "./node_modules/@expo-google-fonts/manrope/800ExtraBold/Manrope_800ExtraBold.ttf"
+            ]
+          }
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
