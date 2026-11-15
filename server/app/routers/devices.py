@@ -25,7 +25,17 @@ from app.device_schemas import (
     PortFindingOut,
 )
 from app.errors import ApiError
-from app.models import Alert, Device, Membership, PingTest, PortFinding, Role, Site, User
+from app.models import (
+    Agent,
+    Alert,
+    Device,
+    Membership,
+    PingTest,
+    PortFinding,
+    Role,
+    Site,
+    User,
+)
 from app.schemas import ErrorOut
 
 router = APIRouter(
@@ -49,7 +59,20 @@ def _risky_counts(db: DB, device_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
     return dict(rows)
 
 
-def _out(d: Device, owner: User | None, risky: int) -> dict:
+def _short(name: str | None) -> str | None:
+    """`LAPTOP-01.lan` and `laptop-01` are the same machine: compare the bare, lowercased name."""
+    return name.split(".")[0].strip().lower() or None if name else None
+
+
+def _agent_names(db: DB, site_id: uuid.UUID) -> set[str]:
+    """Hostnames of the site's active agents, as each reported when it paired."""
+    names = db.scalars(
+        select(Agent.hostname).where(Agent.site_id == site_id, Agent.revoked_at.is_(None))
+    )
+    return {n for n in (_short(h) for h in names) if n}
+
+
+def _out(d: Device, owner: User | None, risky: int, agents: set[str] = frozenset()) -> dict:
     return {
         "id": d.id,
         "site_id": d.site_id,
@@ -68,6 +91,7 @@ def _out(d: Device, owner: User | None, risky: int) -> dict:
         "first_seen_at": d.first_seen_at,
         "last_seen_at": d.last_seen_at,
         "open_risky_ports": risky,
+        "is_agent": _short(d.hostname) in agents,
     }
 
 
@@ -101,7 +125,8 @@ def list_devices(
     query = query.order_by(case((review, 0), else_=1), Device.online.desc(), name)
     rows = db.execute(query).all()
     risky = _risky_counts(db, [d.id for d, _ in rows])
-    return DeviceList(items=[DeviceOut(**_out(d, u, risky.get(d.id, 0))) for d, u in rows])
+    agents = _agent_names(db, site.id)
+    return DeviceList(items=[DeviceOut(**_out(d, u, risky.get(d.id, 0), agents)) for d, u in rows])
 
 
 def _detail(db: DB, d: Device) -> DeviceDetail:
@@ -117,7 +142,7 @@ def _detail(db: DB, d: Device) -> DeviceDetail:
         select(PingTest).where(PingTest.device_id == d.id).order_by(PingTest.ts.desc()).limit(1)
     ).first()
     return DeviceDetail(
-        **_out(d, owner, len(ports)),
+        **_out(d, owner, len(ports), _agent_names(db, d.site_id)),
         risky_ports=[
             PortFindingOut(
                 port=p.port,

@@ -25,7 +25,7 @@ export function chip(d: Device, stale = false): { tone: ChipTone; label: string 
 
 /** "Apple · 192.168.1.23", leaving out what isn't known. */
 export function facts(d: Device): string {
-  return [d.vendor, d.ip].filter(Boolean).join(' · ') || d.mac;
+  return [d.is_agent ? 'This PC, runs the agent' : null, d.vendor, d.ip].filter(Boolean).join(' · ') || d.mac;
 }
 
 /** Randomized (locally administered) hardware addresses: the second hex digit is 2, 6, A or E. */

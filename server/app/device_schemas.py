@@ -32,6 +32,9 @@ class DeviceOut(BaseModel):
     first_seen_at: datetime
     last_seen_at: datetime
     open_risky_ports: int
+    is_agent: bool = Field(
+        False, description="The PC running this site's agent (matched by its hostname)"
+    )
 
 
 class DeviceList(BaseModel):

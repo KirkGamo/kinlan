@@ -52,7 +52,8 @@ export function DeviceMap({
   const onLayout = (e: LayoutChangeEvent) => setWidth(Math.round(e.nativeEvent.layout.width));
 
   const router = devices.find((d) => gatewayIp && d.ip === gatewayIp);
-  const others = devices.filter((d) => d !== router);
+  const agentPc = devices.find((d) => d.is_agent && d !== router);
+  const others = devices.filter((d) => d !== router && d !== agentPc);
   const collapse = others.length > MAX_RING;
   const ringDevices = collapse ? others.filter((d) => d.online || d.needs_review) : others;
   const hidden = others.length - ringDevices.length;
@@ -96,7 +97,17 @@ export function DeviceMap({
   if (hidden) {
     nodes.push({ key: 'offline', ...next(), label: `+${hidden} offline`, type: 'unknown', ring: colors.unlitRing, dim: filter === 'online' || filter === 'review' });
   }
-  const pc = { key: 'pc', ...at(pcSlot), label: 'This PC', type: 'computer' as const, ring: stale ? colors.unlitRing : colors.green, dim: false };
+  // The agent's PC is a scanned device when its hostname matches; otherwise draw it anyway,
+  // since the router link's latency is measured from it.
+  const pc: Node = {
+    key: agentPc?.id ?? 'pc',
+    ...at(pcSlot),
+    label: 'This PC',
+    type: agentPc?.device_type ?? 'computer',
+    ring: stale ? colors.unlitRing : colors.green,
+    device: agentPc,
+    dim: false,
+  };
 
   const routerDown = !stale && summary?.gateway != null && !summary.gateway.ok;
   const providerDown = !stale && !routerDown && (!!summary?.open_outage_since || (summary?.internet != null && !summary.internet.ok));
@@ -151,7 +162,11 @@ export function DeviceMap({
               selected={!!router && router.id === sel}
               onPress={router ? () => onSelect(router.id) : undefined}
             />
-            <MapNode n={{ ...pc, dim: !!sel }} />
+            <MapNode
+              n={{ ...pc, dim: !!sel && agentPc?.id !== sel }}
+              selected={!!agentPc && agentPc.id === sel}
+              onPress={agentPc ? () => onSelect(agentPc.id) : undefined}
+            />
             {nodes.map((n) => (
               <MapNode
                 key={n.key}

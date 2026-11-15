@@ -52,6 +52,7 @@ export type Device = {
   first_seen_at: string;
   last_seen_at: string;
   open_risky_ports: number;
+  is_agent: boolean; // the PC running this site's agent
 };
 export type Member = { user_id: string; display_name: string; email: string; role: Role };
 type List<T> = { items: T[]; next_cursor: string | null };
