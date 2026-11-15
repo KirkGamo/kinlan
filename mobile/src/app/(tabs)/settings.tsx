@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Switch, View } from 'react-native';
 import { useSites, type Circle, type Role, type Site } from '@/api/circles';
 import { useMembers, type Member } from '@/api/overview';
 import { canManage, selectCircle, selectSite, useCurrentCircle, useSelectedSite } from '@/api/selection';
+import { pushSupported, useNotificationSwitches, useUpdateNotificationSwitches, type NotificationSwitches } from '@/api/push';
 import { useMe, useSession } from '@/api/session';
 import {
   useAlertSettings,
@@ -69,6 +70,7 @@ export default function SettingsScreen() {
           <MembersSection key={`m-${circle.id}`} circle={circle} />
           <SitesSection key={`s-${circle.id}`} circle={circle} />
           <AlertsSection key={`a-${circle.id}`} circle={circle} />
+          <PushSection key={`p-${circle.id}`} circle={circle} />
         </>
       ) : null}
       <AccountSection key={`acc-${circle?.id}`} circle={circle} />
@@ -330,12 +332,6 @@ function AlertsSection({ circle }: { circle: Circle }) {
       ) : (
         <Thresholds key={site.id} siteId={site.id} value={settings.data} manage={canManage(circle)} />
       )}
-      <Card>
-        <Text role="title">Push notifications</Text>
-        <Text role="bodySmall" color="text2">
-          Not set up on this build yet. Until then, open problems show on Overview and in Alerts.
-        </Text>
-      </Card>
     </>
   );
 }
@@ -403,6 +399,71 @@ function Setting({ label, hint, children }: { label: string; hint: string; child
       </Text>
       {children}
     </View>
+  );
+}
+
+// ---------------------------------------------------------------- push switches (yours)
+
+const PUSH_ROWS: { key: keyof NotificationSwitches; title: string; hint: string }[] = [
+  { key: 'outages', title: 'Outages', hint: 'A site goes down, or comes back online.' },
+  { key: 'new_devices', title: 'New devices', hint: 'Someone new joins a network.' },
+  { key: 'security', title: 'Risky open ports', hint: 'A device has a service open that it shouldn’t.' },
+  { key: 'performance', title: 'Slow internet and lost data', hint: 'Off by default: these stay in the Alerts tab.' },
+];
+
+/** Each member's own push switches for this Circle; any role can change their own. */
+function PushSection({ circle }: { circle: Circle }) {
+  const switches = useNotificationSwitches(circle.id);
+  const update = useUpdateNotificationSwitches(circle.id);
+  return (
+    <>
+      <SectionLabel end="just you">Push notifications</SectionLabel>
+      {!pushSupported ? (
+        <Card>
+          <Text role="body" color="text2">
+            Push needs the Android app. On the web, open problems show on Overview and in Alerts.
+          </Text>
+        </Card>
+      ) : switches.isPending ? (
+        <Card style={styles.center}>
+          <Loader label="Loading your notification settings" />
+        </Card>
+      ) : switches.isError ? (
+        <Text role="bodySmall" color="red">
+          {switches.error.message}
+        </Text>
+      ) : (
+        <Card style={styles.thresholds}>
+          {PUSH_ROWS.map((row) => {
+            const on = switches.data[row.key];
+            return (
+              <View key={row.key} style={styles.switchRow}>
+                <View style={styles.rowText}>
+                  <Text role="title">{row.title}</Text>
+                  <Text role="bodySmall" color="text2">
+                    {row.hint}
+                  </Text>
+                </View>
+                <Switch
+                  value={on}
+                  disabled={update.isPending}
+                  onValueChange={(v) => update.mutate({ [row.key]: v })}
+                  trackColor={{ false: colors.unlit, true: colors.yellow }}
+                  thumbColor={on ? colors.onYellow : colors.text2}
+                  accessibilityLabel={`Push for ${row.title.toLowerCase()}`}
+                  {...({ activeThumbColor: colors.onYellow, activeTrackColor: colors.yellow } as object)}
+                />
+              </View>
+            );
+          })}
+          {update.isError ? (
+            <Text role="bodySmall" color="red" accessibilityRole="alert">
+              {update.error.message}
+            </Text>
+          ) : null}
+        </Card>
+      )}
+    </>
   );
 }
 

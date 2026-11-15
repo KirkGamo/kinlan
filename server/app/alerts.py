@@ -13,7 +13,8 @@ Rules run during ingest and in the 1-minute heartbeat job:
 
 Duplicate suppression: an alert of the same type for the same site and subject doesn't fire
 again within 30 minutes while it's still open. Copy follows docs/design/brand.md (voice).
-Push delivery to phones arrives with Expo push in Sprint 3; :func:`notify` is its hook.
+Phones hear about new alerts from the push job (app/push.py), which sends every alert not
+pushed yet within 15 seconds; :func:`notify` only logs.
 """
 
 from __future__ import annotations
@@ -47,7 +48,7 @@ CAUSE_WORDS = {"isp": "internet provider outage", "lan": "problem inside the net
 
 
 def notify(alert: Alert) -> None:
-    """Hook for push delivery (Expo, Sprint 3). For now the alert is stored and logged."""
+    """Log the new alert. Push delivery is the 15-second job in app/push.py, after commit."""
     log.info("alert %s for site %s: %s", alert.type, alert.site_id, alert.title)
 
 

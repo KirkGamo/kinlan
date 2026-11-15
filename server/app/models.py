@@ -21,7 +21,10 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
     func,
+    text,
+    true,
 )
 from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -160,6 +163,12 @@ class Membership(Base):
     )
     role: Mapped[Role] = mapped_column(ROLE)
     joined_at: Mapped[datetime] = _ts(default=True)
+    # Push switches for this member in this Circle (briefs.md section 5: outages, new devices and
+    # risky ports buzz by default; slow internet and lost data stay in the app).
+    push_outages: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    push_devices: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    push_security: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    push_performance: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
     __table_args__ = (Index("ix_memberships_user_id", "user_id"),)
 
@@ -364,6 +373,11 @@ class Alert(Base):
     acked_by: Mapped[uuid.UUID | None] = _fk("users.id", nullable=True, ondelete="SET NULL")
     acked_at: Mapped[datetime | None] = _ts(nullable=True)
     resolved_at: Mapped[datetime | None] = _ts(nullable=True)
+    pushed_at: Mapped[datetime | None] = _ts(nullable=True)  # set once the push job handled it
+
+    __table_args__ = (
+        Index("ix_alerts_unpushed", "created_at", postgresql_where=text("pushed_at IS NULL")),
+    )
 
 
 class PushToken(Base):
@@ -374,6 +388,16 @@ class PushToken(Base):
     platform: Mapped[str] = mapped_column(String(10))  # android, web
     created_at: Mapped[datetime] = _ts(default=True)
     last_used_at: Mapped[datetime | None] = _ts(nullable=True)
+
+
+class PushTicket(Base):
+    """An Expo push ticket awaiting its receipt; the receipts job checks it and deletes it."""
+
+    __tablename__ = "push_tickets"
+
+    ticket_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    token: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = _ts(default=True)
 
 
 class IngestBatch(Base):

@@ -52,3 +52,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Firebase credentials (never committed)
+mobile/google-services.json
+*firebase-adminsdk*.json
