@@ -184,9 +184,12 @@ function Live({ circle, site, sites, canManage }: { circle: Circle; site: Site; 
       {stale ? (
         <Card style={styles.stale}>
           <StatusChip tone="neutral" label="Offline" />
-          <Text role="bodySmall" color="text2">
-            The agent isn’t reporting, so who’s online may be out of date.
-          </Text>
+          {/* flex: 1 lets the sentence wrap beside the chip instead of running off the card (Android). */}
+          <View style={styles.staleText}>
+            <Text role="bodySmall" color="text2">
+              The agent isn’t reporting, so who’s online may be out of date.
+            </Text>
+          </View>
         </Card>
       ) : null}
       <Segmented label="Group devices by" options={VIEWS} value={view} onChange={setView} />
@@ -279,6 +282,7 @@ function ErrorCard({ message, onRetry }: { message: string; onRetry: () => void 
 const styles = StyleSheet.create({
   center: { minHeight: 120, alignItems: 'center', justifyContent: 'center' },
   stale: { flexDirection: 'row', alignItems: 'center', gap: space.s3, paddingVertical: space.s3 },
+  staleText: { flex: 1 },
   group: { gap: space.item },
   person: { flexDirection: 'row', alignItems: 'center', gap: space.s3, marginTop: space.s5, paddingHorizontal: space.s1 },
   row: {

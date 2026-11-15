@@ -1,6 +1,6 @@
 # KinLAN mobile app
 
-The Android app (and its web build) for KinLAN: Expo SDK 58, Expo Router, TypeScript. Plan: `docs/KinLAN_Technical_Plan.md`, Section 6. Design: `docs/design/direction.md` (tokens and rules) and the interactive prototype in `docs/design/prototype/`.
+The Android app (and its web build) for KinLAN: Expo SDK 58, Expo Router, TypeScript. Plan: `docs/KinLAN_Technical_Plan.md`, Section 6. Design: [`DESIGN.md`](../DESIGN.md) (tokens and rules) and the interactive prototype in `docs/design/prototype/`.
 
 ## Run it
 
@@ -9,13 +9,38 @@ npm install
 npx expo start
 ```
 
-Press `w` for the web build or `a` for an Android emulator. Expo Go can't load the embedded Manrope font or the native tabs exactly as built; for a phone, use a development build (`npx eas-cli@latest build --profile development`, issue #63). Telemetry: set `EXPO_NO_TELEMETRY=1`.
+Press `w` for the web build. Expo Go can't load the embedded Manrope font or the native tabs exactly as built; on a phone, use the development build below. Telemetry: set `EXPO_NO_TELEMETRY=1`.
 
 The app talks to the live API by default. To use a local server instead:
 
 ```bash
 EXPO_PUBLIC_API_URL=http://192.168.1.13:8000 npx expo start
 ```
+
+## Development build on an Android phone (Windows)
+
+The app includes `expo-dev-client`: build the native app once, install it over USB, then load the JavaScript from Metro.
+
+1. On the phone: Developer options > **USB debugging** on, USB mode **File transfer** (USB tethering hides debugging), then accept "Allow USB debugging".
+2. Windows paths: the native build writes object files with very long paths, so it fails from a deep folder (such as `...\Network and Communications\kinlan\mobile`) even with Windows long paths enabled. Build from a short copy, with a CMake whose Ninja (1.12+) supports long paths:
+
+   ```bash
+   robocopy mobile C:\kb\mobile /E /XD node_modules android .expo dist
+   cd C:\kb\mobile && npm ci && npx expo prebuild -p android --no-install
+   sdkmanager "cmake;3.31.6"
+   ```
+
+   Then point `C:\kb\mobile\android\local.properties` at it: `sdk.dir=...\\Android\\Sdk` and `cmake.dir=...\\Android\\Sdk\\cmake\\3.31.6` (backslashes doubled).
+3. Build for the phone's architecture, install, and forward Metro's port:
+
+   ```bash
+   cd C:\kb\mobile\android && ./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a
+   adb install -r app/build/outputs/apk/debug/app-debug.apk
+   adb reverse tcp:8081 tcp:8081
+   ```
+4. Start Metro from the repo (`npx expo start --dev-client`) and open KinLAN on the phone.
+
+Rebuild the native app only when native dependencies or `app.json` change; JavaScript changes load through Metro. `android/` is generated and git-ignored.
 
 ## Checks (also run by CI)
 
