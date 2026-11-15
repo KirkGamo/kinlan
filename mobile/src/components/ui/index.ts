@@ -4,3 +4,4 @@ export { Text, type TextProps } from './text';
 export { Loader, Mark, Wordmark } from './brand';
 export { Button, TextField } from './controls';
 export { FormScreen } from './form-screen';
+export { StatusChip, type ChipTone } from './status-chip';
