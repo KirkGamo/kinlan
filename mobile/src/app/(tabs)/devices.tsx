@@ -95,12 +95,20 @@ function Live({ circle, site, sites, canManage }: { circle: Circle; site: Site; 
   const [view, setView] = useState<View_>('people');
   const [filter, setFilter] = useState<Filter>('all');
   const [selected, setSelected] = useState<string | null>(null);
-  // An alert's Review opens Devices with ?device=…: open that device's sheet when it arrives.
-  const { device: asked } = useLocalSearchParams<{ device?: string }>();
+  // Links into Devices: ?device=… opens that device's sheet (an alert's Review, a push), and
+  // ?filter=…&at=… sets the filter (Overview's "new devices to review"). `at` makes a repeat
+  // tap of the same link apply again.
+  const { device: asked, filter: askedFilter, at } = useLocalSearchParams<{ device?: string; filter?: Filter; at?: string }>();
   const [handled, setHandled] = useState<string | undefined>(undefined);
   if (asked && asked !== handled) {
     setHandled(asked);
     setSelected(asked);
+  }
+  const filterRequest = askedFilter && FILTERS.some((f) => f.key === askedFilter) ? `${askedFilter}-${at ?? ''}` : undefined;
+  const [handledFilter, setHandledFilter] = useState<string | undefined>(undefined);
+  if (filterRequest && filterRequest !== handledFilter) {
+    setHandledFilter(filterRequest);
+    setFilter(askedFilter as Filter);
   }
   const [refreshing, setRefreshing] = useState(false);
 
@@ -182,7 +190,14 @@ function Live({ circle, site, sites, canManage }: { circle: Circle; site: Site; 
   }
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.yellow} colors={[colors.onYellow]} progressBackgroundColor={colors.yellow} />}>
+    <Screen
+      onReselectAtTop={() => {
+        // Tapping Devices again at the top clears the filter.
+        if (filter === 'all') return;
+        haptics.tick();
+        setFilter('all');
+      }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.yellow} colors={[colors.onYellow]} progressBackgroundColor={colors.yellow} />}>
       <SiteHeader title="Devices" site={site} sites={sites} sub={sub} onSwitch={selectSite} />
       {stale ? (
         <Card style={styles.stale}>

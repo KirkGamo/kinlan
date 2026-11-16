@@ -2,7 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from './client';
-import type { Device, DeviceType } from './overview';
+import type { Device, DeviceType, Member } from './overview';
 
 export type PingTest = {
   id: string;
@@ -43,17 +43,57 @@ export function useDevice(deviceId: string | null) {
   });
 }
 
-/** Edit a device; the list and the Overview counts refresh with it. */
-export function useUpdateDevice(deviceId: string, siteId: string) {
+/**
+ * Edit a device. The change shows at once in the sheet and the list (optimistic) and rolls back
+ * if the server refuses; then the list and the Overview counts refresh from the server.
+ * `members` names the new owner in the meantime.
+ */
+export function useUpdateDevice(deviceId: string, siteId: string, members: Member[] = []) {
   const client = useQueryClient();
+  const detailKey = ['devices', deviceId];
+  const listKey = ['sites', siteId, 'devices'];
   return useMutation({
     mutationFn: (patch: DevicePatch) =>
       api<DeviceDetail>(`/devices/${deviceId}`, { method: 'PATCH', body: patch }),
+    onMutate: async (patch) => {
+      await Promise.all([client.cancelQueries({ queryKey: detailKey }), client.cancelQueries({ queryKey: listKey })]);
+      const detail = client.getQueryData<DeviceDetail>(detailKey);
+      const list = client.getQueryData<Device[]>(listKey);
+      const apply = <T extends Device>(d: T): T => applyPatch(d, patch, members);
+      if (detail) client.setQueryData<DeviceDetail>(detailKey, apply(detail));
+      if (list) client.setQueryData<Device[]>(listKey, list.map((d) => (d.id === deviceId ? apply(d) : d)));
+      return { detail, list };
+    },
+    onError: (_error, _patch, before) => {
+      if (before?.detail) client.setQueryData(detailKey, before.detail);
+      if (before?.list) client.setQueryData(listKey, before.list);
+    },
     onSuccess: (detail) => {
-      client.setQueryData(['devices', deviceId], detail);
+      client.setQueryData(detailKey, detail);
+    },
+    onSettled: () => {
       void client.invalidateQueries({ queryKey: ['sites', siteId] });
     },
   });
+}
+
+/** What the server will return, as far as the app can tell before it answers. */
+function applyPatch<T extends Device>(d: T, patch: DevicePatch, members: Member[]): T {
+  const next: T = { ...d };
+  if ('custom_name' in patch) {
+    next.custom_name = patch.custom_name ?? null;
+    if (patch.custom_name) next.display_name = patch.custom_name; // a cleared name waits for the server
+  }
+  if (patch.device_type) next.device_type = patch.device_type;
+  if ('owner_user_id' in patch) {
+    const m = members.find((x) => x.user_id === patch.owner_user_id);
+    next.owner = m ? { user_id: m.user_id, display_name: m.display_name } : null;
+  }
+  if (patch.trusted != null) {
+    next.trusted = patch.trusted;
+    if (patch.trusted) next.needs_review = false;
+  }
+  return next;
 }
 
 export const PING_COUNT = 5;

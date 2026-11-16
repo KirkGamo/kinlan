@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useRef, useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
@@ -10,7 +10,7 @@ import { Button, Card, Loader, Perforation, Screen, SectionLabel, StatusChip, Te
 import { HealthCard } from '@/features/overview/health-card';
 import { LatencyChart } from '@/features/overview/latency-chart';
 import { LightStrip } from '@/features/overview/light-strip';
-import { ago, isStale, lights, problems, verdict, type Light } from '@/features/overview/model';
+import { ago, isStale, lights, problems, verdict, type Light, type Problem } from '@/features/overview/model';
 import { People } from '@/features/overview/people';
 import { SiteHeader } from '@/features/overview/site-header';
 import { useNow } from '@/hooks/use-now';
@@ -53,6 +53,9 @@ function Live({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
   const now = useNow(5_000);
   const [ignite, setIgnite] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const taps = useRef(0);
+  // An outage push opens Overview with ?light=failing&at=…: open the failing light's sheet.
+  const { light: askedLight, at } = useLocalSearchParams<{ light?: string; at?: string }>();
 
   async function refresh() {
     haptics.tick(); // released past the pull threshold
@@ -89,11 +92,24 @@ function Live({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
   }
 
   const lit = lights(s, now);
+  // The first failing light; with the agent offline every light is unlit, so This PC explains it.
+  // If everything is green again by the time the push is tapped, nothing opens.
+  const failing = lit.findIndex((l) => l.state === 'fail');
+  const lightIndex = failing >= 0 ? failing : isStale(s, now) ? 0 : -1;
+  const lightRequest = askedLight === 'failing' && lightIndex >= 0 ? { id: at ?? 'failing', index: lightIndex } : undefined;
   const v = verdict(s, now, lit);
   const open = problems(s, now, v);
   const stale = staleNow;
   const canManage = circle.role === 'owner' || circle.role === 'admin';
   const diagnose = () => router.push({ pathname: '/diagnose', params: { site: site.id, run: stale ? '0' : '1' } });
+  // Each problem opens exactly where it's dealt with: an outage runs Diagnose (owners and admins),
+  // new devices open Devices filtered to Needs review, anything else opens Alerts.
+  const openProblem = (p: Problem) => {
+    // `taps` makes each tap a new link, so Devices applies the filter again.
+    if (p.key === 'outage' && canManage) diagnose();
+    else if (p.key === 'review') router.navigate({ pathname: '/devices', params: { filter: 'review', at: String(++taps.current) } });
+    else router.navigate(p.to);
+  };
 
   return (
     <Screen
@@ -102,7 +118,7 @@ function Live({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
         <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.yellow} colors={[colors.onYellow]} progressBackgroundColor={colors.yellow} />
       }>
       {header}
-      <LightStrip lights={lit} igniteKey={`${site.id}-${ignite}`} onDiagnose={canManage && !stale ? diagnose : undefined} />
+      <LightStrip lights={lit} igniteKey={`${site.id}-${ignite}`} request={lightRequest} onDiagnose={canManage && !stale ? diagnose : undefined} />
 
       <Card style={styles.verdict}>
         <Perforation />
@@ -131,7 +147,7 @@ function Live({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
           {open.map((p) => (
             <Pressable
               key={p.key}
-              onPress={() => (p.key === 'outage' && canManage ? diagnose() : router.navigate(p.to))}
+              onPress={() => openProblem(p)}
               accessibilityRole="button"
               accessibilityLabel={`${p.title}. ${p.key === 'outage' && canManage ? 'Run a diagnose to find where it breaks.' : p.next}`}
               style={({ pressed }) => [styles.row, pressed && styles.pressed]}>

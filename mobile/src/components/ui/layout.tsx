@@ -1,28 +1,56 @@
-import type { ReactElement, ReactNode } from 'react';
-import { ScrollView, StyleSheet, View, type RefreshControlProps, type ViewStyle } from 'react-native';
+import { useNavigation } from 'expo-router';
+import { useEffect, useRef, type ReactElement, type ReactNode } from 'react';
+import { ScrollView, StyleSheet, View, type RefreshControlProps, type ScrollViewInstance, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radius, space } from '@/theme';
 
 import { Text } from './text';
 
-/** A tab screen: black ground, safe areas, the 16-dp gutter, and room under the tab bar. */
+/**
+ * A tab screen: black ground, safe areas, the 16-dp gutter, and room under the tab bar.
+ * Tapping its tab again scrolls back to the top; tapping it once more at the top calls
+ * `onReselectAtTop` (Devices clears its filter).
+ */
 export function Screen({
   children,
   scroll = true,
   refreshControl,
   fab,
+  onReselectAtTop,
 }: {
   children: ReactNode;
   scroll?: boolean;
   refreshControl?: ReactElement<RefreshControlProps>;
   /** A floating action button, bottom-right above the tab bar (Overview's Diagnose). */
   fab?: ReactNode;
+  onReselectAtTop?: () => void;
 }) {
+  const ref = useRef<ScrollViewInstance>(null);
+  const y = useRef(0);
+  const atTop = useRef(onReselectAtTop);
+  useEffect(() => {
+    atTop.current = onReselectAtTop;
+  }, [onReselectAtTop]);
+  const navigation = useNavigation();
+  useEffect(() => {
+    // Native tabs emit tabPress for a repeat tap too; only the focused tab's repeat counts.
+    return navigation.addListener('tabPress' as never, () => {
+      if (!navigation.isFocused()) return;
+      if (y.current > 4) ref.current?.scrollTo({ y: 0, animated: true });
+      else atTop.current?.();
+    });
+  }, [navigation]);
+
   return (
     <SafeAreaView edges={['top']} style={styles.screen}>
       {scroll ? (
         <ScrollView
+          ref={ref}
+          onScroll={(e) => {
+            y.current = e.nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={64}
           contentContainerStyle={styles.content}
           contentInsetAdjustmentBehavior="automatic"
           refreshControl={refreshControl}>

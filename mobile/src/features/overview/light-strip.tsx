@@ -54,14 +54,22 @@ const CHIP: Record<LightState, { tone: ChipTone; label: string }> = {
 export function LightStrip({
   lights,
   igniteKey,
+  request,
   onDiagnose,
 }: {
   lights: Light[];
   igniteKey: string;
+  /** Open a light's sheet from a link (an outage push); a new `id` opens it again. */
+  request?: { id: string; index: number };
   /** Owners and admins get "Run diagnose" in the layer sheet. */
   onDiagnose?: () => void;
 }) {
   const [open, setOpen] = useState<number | null>(null);
+  const [handled, setHandled] = useState<string | undefined>(undefined);
+  if (request && request.id !== handled) {
+    setHandled(request.id);
+    setOpen(request.index);
+  }
   const layer = open == null ? null : LAYERS[open];
   const light = open == null ? null : lights[open];
   return (
