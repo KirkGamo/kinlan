@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from './client';
 import type { Role } from './circles';
+import { keys } from './keys';
 
 export type Invite = { code: string; role: Role; expires_at: string };
 export type AlertSettings = {
@@ -15,8 +16,8 @@ export type AlertSettings = {
 function useCircleRefresh(circleId: string) {
   const client = useQueryClient();
   return () => {
-    void client.invalidateQueries({ queryKey: ['circles', circleId, 'members'] });
-    void client.invalidateQueries({ queryKey: ['circles'] });
+    void client.invalidateQueries({ queryKey: keys.members(circleId) });
+    void client.invalidateQueries({ queryKey: keys.circles });
   };
 }
 
@@ -46,7 +47,7 @@ export function useCreateInvite(circleId: string) {
 
 export function useAlertSettings(siteId: string | undefined) {
   return useQuery({
-    queryKey: ['sites', siteId, 'alert-settings'],
+    queryKey: keys.alertSettings(siteId),
     queryFn: () => api<AlertSettings>(`/sites/${siteId}/alert-settings`),
     enabled: !!siteId,
   });
@@ -57,7 +58,7 @@ export function useUpdateAlertSettings(siteId: string) {
   return useMutation({
     mutationFn: (patch: Partial<AlertSettings>) =>
       api<AlertSettings>(`/sites/${siteId}/alert-settings`, { method: 'PATCH', body: patch }),
-    onSuccess: (data) => client.setQueryData(['sites', siteId, 'alert-settings'], data),
+    onSuccess: (data) => client.setQueryData(keys.alertSettings(siteId), data),
   });
 }
 

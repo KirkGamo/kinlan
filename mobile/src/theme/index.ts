@@ -3,5 +3,5 @@
  * or sizes (CLAUDE.md). Source of truth until DESIGN.md exists: docs/design/direction.md.
  */
 export { colors, glows, scrim, strokes, tints, type ColorToken } from './colors';
-export { motion, radius, space, touch } from './layout';
+export { motion, radius, size, space, touch } from './layout';
 export { FONT_FAMILY, type, type TypeRole } from './typography';

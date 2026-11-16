@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   digit: {
     width: 44,
     height: 60,
-    borderRadius: 14,
+    borderRadius: radius.inner,
     borderCurve: 'continuous',
     backgroundColor: colors.raised,
     alignItems: 'center',

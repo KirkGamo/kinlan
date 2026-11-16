@@ -9,6 +9,7 @@ import { createContext, use, useEffect, useState, type ReactNode } from 'react';
 import { api, loadSession, onSessionChange, setSession, toSession } from './client';
 import { unregisterPush } from './push';
 import { queryClient } from './query-client';
+import { keys } from './keys';
 
 type Status = 'loading' | 'signedIn' | 'signedOut';
 type TokenPair = { access_token: string; refresh_token: string };
@@ -84,9 +85,9 @@ export function useSession(): SessionApi {
   return value;
 }
 
-export type Me = { id: string; email: string; display_name: string; created_at: string };
+type Me = { id: string; email: string; display_name: string; created_at: string };
 
 /** The signed-in account (GET /me). */
 export function useMe() {
-  return useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/me') });
+  return useQuery({ queryKey: keys.me, queryFn: () => api<Me>('/me') });
 }

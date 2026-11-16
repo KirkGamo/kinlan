@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from './client';
+import { keys } from './keys';
 
 export type Role = 'owner' | 'admin' | 'viewer';
 export type Circle = {
@@ -24,15 +25,8 @@ export type Site = {
   gateway_ip: string | null;
   created_at: string;
 };
-export type PairingCode = { code: string; expires_at: string };
+type PairingCode = { code: string; expires_at: string };
 type List<T> = { items: T[]; next_cursor: string | null };
-
-export const keys = {
-  circles: ['circles'] as const,
-  sites: (circleId: string) => ['circles', circleId, 'sites'] as const,
-  site: (siteId: string) => ['sites', siteId] as const,
-  summary: (siteId: string) => ['sites', siteId, 'summary'] as const,
-};
 
 export function useCircles(enabled = true) {
   return useQuery({
@@ -59,10 +53,10 @@ export function useSite(siteId: string, poll = false) {
   });
 }
 
-export type LatestSample = { ts: string; rtt_ms: number | null; ok: boolean };
+type LatestSample = { ts: string; rtt_ms: number | null; ok: boolean };
 export type Deduction = { factor: string; points: number; reason: string; detail: string };
-export type DiagnoseStepState = { n: number; status: 'pass' | 'fail' | 'skipped'; ms: number | null };
-export type LastDiagnose = {
+type DiagnoseStepState = { n: number; status: 'pass' | 'fail' | 'skipped'; ms: number | null };
+type LastDiagnose = {
   command_id: string;
   finished_at: string;
   root_cause_step: number | null;

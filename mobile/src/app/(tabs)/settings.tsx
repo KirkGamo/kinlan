@@ -23,7 +23,7 @@ import { AccountButton, ROLE_WORD } from '@/features/account/account-sheet';
 import { Avatar } from '@/features/account/avatar';
 import { SITE_STATUS } from '@/features/overview/site-header';
 import { haptics, setHapticsEnabled, useHapticsEnabled } from '@/haptics';
-import { colors, radius, space } from '@/theme';
+import { colors, radius, size, space } from '@/theme';
 
 const ROLES: { key: Role; label: string }[] = [
   { key: 'viewer', label: 'Viewer' },
@@ -627,12 +627,12 @@ function AccountSection({ circle }: { circle: Circle | undefined }) {
 }
 
 const styles = StyleSheet.create({
-  center: { minHeight: 100, alignItems: 'center', justifyContent: 'center' },
+  center: { minHeight: size.loading, alignItems: 'center', justifyContent: 'center' },
   about: { alignItems: 'center', gap: space.s2, paddingTop: space.s8, paddingBottom: space.s2 },
   bar: { flexDirection: 'row', alignItems: 'flex-start', gap: space.s3 },
   title: { flex: 1, gap: 2 },
   row: {
-    minHeight: 68,
+    minHeight: size.row,
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.s3,

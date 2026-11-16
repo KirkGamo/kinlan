@@ -5,7 +5,7 @@ import type { Device, Member } from '@/api/overview';
 import { useUpdateDevice } from '@/api/devices';
 import { Button, Sheet, StatusChip, Text, TextField } from '@/components/ui';
 import { haptics } from '@/haptics';
-import { colors, radius, space } from '@/theme';
+import { colors, radius, size, space } from '@/theme';
 
 import { ICON_PATHS, TYPE_LABEL } from './icons';
 import { chip } from './model';
@@ -186,7 +186,7 @@ function Action({ title, hint, disabled, onPress }: { title: string; hint: strin
 const styles = StyleSheet.create({
   list: { gap: space.s2 },
   action: {
-    minHeight: 68,
+    minHeight: size.row,
     justifyContent: 'center',
     gap: 2,
     paddingVertical: space.s3,

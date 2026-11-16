@@ -4,8 +4,9 @@ import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-q
 import { api } from './client';
 import { useSiteSummary, useSites } from './circles';
 import { useCurrentCircle, useSelectedSite } from './selection';
+import { keys } from './keys';
 
-export type AlertType = 'new_device' | 'risky_port' | 'unreachable' | 'back_online' | 'high_latency' | 'packet_loss' | string;
+type AlertType = 'new_device' | 'risky_port' | 'unreachable' | 'back_online' | 'high_latency' | 'packet_loss' | string;
 export type Alert = {
   id: string;
   site_id: string;
@@ -21,15 +22,10 @@ export type Alert = {
 };
 type Page = { items: Alert[]; next_cursor: string | null };
 
-export const alertKeys = {
-  site: (siteId: string) => ['sites', siteId, 'alerts'] as const,
-  list: (siteId: string, status: 'open' | 'resolved') => ['sites', siteId, 'alerts', status] as const,
-};
-
 /** One feed, newest first, 20 at a time; open alerts refresh every 15 s. */
 export function useAlerts(siteId: string, status: 'open' | 'resolved') {
   return useInfiniteQuery({
-    queryKey: alertKeys.list(siteId, status),
+    queryKey: keys.alertList(siteId, status),
     queryFn: ({ pageParam }) =>
       api<Page>(`/sites/${siteId}/alerts?status=${status}&limit=20${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`),
     initialPageParam: null as string | null,
@@ -43,8 +39,8 @@ export function useAcknowledge(siteId: string) {
   return useMutation({
     mutationFn: (alertId: string) => api<Alert>(`/alerts/${alertId}/ack`, { method: 'POST' }),
     onSuccess: () => {
-      void client.invalidateQueries({ queryKey: alertKeys.site(siteId) });
-      void client.invalidateQueries({ queryKey: ['sites', siteId, 'summary'] });
+      void client.invalidateQueries({ queryKey: keys.alerts(siteId) });
+      void client.invalidateQueries({ queryKey: keys.summary(siteId) });
     },
   });
 }

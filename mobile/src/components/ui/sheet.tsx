@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
   iconTile: {
     width: 52,
     height: 52,
-    borderRadius: 18,
+    borderRadius: radius.tile,
     borderCurve: 'continuous',
     backgroundColor: colors.raised,
     alignItems: 'center',

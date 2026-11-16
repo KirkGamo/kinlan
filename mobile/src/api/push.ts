@@ -13,6 +13,7 @@ import { Platform } from 'react-native';
 import { colors } from '@/theme';
 
 import { api } from './client';
+import { keys } from './keys';
 
 export const pushSupported = Platform.OS === 'android';
 
@@ -50,7 +51,7 @@ async function createChannels() {
   });
 }
 
-export type PushState = 'unsupported' | 'denied' | 'registered' | 'error';
+type PushState = 'unsupported' | 'denied' | 'registered' | 'error';
 
 /** Ask once, register the token. Safe to call on every launch; it only prompts the first time. */
 export async function registerForPush(): Promise<PushState> {
@@ -88,7 +89,7 @@ export type NotificationSwitches = {
 
 export function useNotificationSwitches(circleId: string | undefined) {
   return useQuery({
-    queryKey: ['circles', circleId, 'notifications'],
+    queryKey: keys.notifications(circleId),
     queryFn: () => api<NotificationSwitches>(`/circles/${circleId}/notifications`),
     enabled: !!circleId,
   });
@@ -99,6 +100,6 @@ export function useUpdateNotificationSwitches(circleId: string) {
   return useMutation({
     mutationFn: (patch: Partial<NotificationSwitches>) =>
       api<NotificationSwitches>(`/circles/${circleId}/notifications`, { method: 'PATCH', body: patch }),
-    onSuccess: (data) => client.setQueryData(['circles', circleId, 'notifications'], data),
+    onSuccess: (data) => client.setQueryData(keys.notifications(circleId), data),
   });
 }

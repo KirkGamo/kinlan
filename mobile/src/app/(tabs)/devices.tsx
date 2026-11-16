@@ -17,7 +17,7 @@ import { useMe } from '@/api/session';
 import { SiteHeader } from '@/features/overview/site-header';
 import { useNow } from '@/hooks/use-now';
 import { haptics } from '@/haptics';
-import { colors, radius, space } from '@/theme';
+import { colors, radius, size, space } from '@/theme';
 
 type View_ = 'people' | 'status' | 'map';
 const VIEWS: { key: View_; label: string }[] = [
@@ -355,13 +355,13 @@ function DeviceRow({
 
 
 const styles = StyleSheet.create({
-  center: { minHeight: 120, alignItems: 'center', justifyContent: 'center' },
+  center: { minHeight: size.loading, alignItems: 'center', justifyContent: 'center' },
   stale: { flexDirection: 'row', alignItems: 'center', gap: space.s3, paddingVertical: space.s3 },
   staleText: { flex: 1 },
   group: { gap: space.item },
   person: { flexDirection: 'row', alignItems: 'center', gap: space.s3, marginTop: space.s5, paddingHorizontal: space.s1 },
   row: {
-    minHeight: 68,
+    minHeight: size.row,
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.s3,
@@ -372,6 +372,6 @@ const styles = StyleSheet.create({
     paddingVertical: space.s3,
   },
   pressed: { backgroundColor: colors.raised },
-  icon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.raised, alignItems: 'center', justifyContent: 'center' },
+  icon: { width: size.well, height: size.well, borderRadius: radius.pill, backgroundColor: colors.raised, alignItems: 'center', justifyContent: 'center' },
   rowText: { flex: 1, gap: 2 },
 });

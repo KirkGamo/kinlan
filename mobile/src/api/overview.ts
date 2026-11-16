@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { api } from './client';
 import type { Role } from './circles';
+import { keys } from './keys';
 
 export type LatencyPoint = {
   t: string;
@@ -11,13 +12,13 @@ export type LatencyPoint = {
   loss_pct: number;
   samples: number;
 };
-export type LatencySummary = {
+type LatencySummary = {
   avg_ms: number | null;
   max_ms: number | null;
   loss_pct: number | null;
   samples: number;
 };
-export type OutageSpan = {
+type OutageSpan = {
   id: string;
   started_at: string;
   ended_at: string | null;
@@ -61,7 +62,7 @@ type List<T> = { items: T[]; next_cursor: string | null };
 
 export function useLatency(siteId: string | undefined, enabled = true) {
   return useQuery({
-    queryKey: ['sites', siteId, 'latency', '24h'],
+    queryKey: keys.latency(siteId, '24h'),
     queryFn: () => api<Latency>(`/sites/${siteId}/latency?range=24h`),
     enabled: enabled && !!siteId,
     refetchInterval: 60_000, // one 15-minute bucket fills slowly; a minute is plenty
@@ -70,7 +71,7 @@ export function useLatency(siteId: string | undefined, enabled = true) {
 
 export function useDevices(siteId: string | undefined, enabled = true) {
   return useQuery({
-    queryKey: ['sites', siteId, 'devices'],
+    queryKey: keys.devices(siteId),
     queryFn: async () => (await api<List<Device>>(`/sites/${siteId}/devices`)).items,
     enabled: enabled && !!siteId,
     refetchInterval: 30_000,
@@ -79,7 +80,7 @@ export function useDevices(siteId: string | undefined, enabled = true) {
 
 export function useMembers(circleId: string | undefined) {
   return useQuery({
-    queryKey: ['circles', circleId, 'members'],
+    queryKey: keys.members(circleId),
     queryFn: async () => (await api<List<Member>>(`/circles/${circleId}/members`)).items,
     enabled: !!circleId,
   });

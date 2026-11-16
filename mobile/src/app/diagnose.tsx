@@ -10,10 +10,11 @@ import type { Command } from '@/api/devices';
 import { isActive, useDiagnoses, useStartDiagnose, type DiagnoseResult } from '@/api/diagnose';
 import { Button, Card, FormScreen, Loader, SectionLabel, StatusChip, Text, type ChipTone } from '@/components/ui';
 import { LightStrip } from '@/features/overview/light-strip';
-import { clock, isStale, ms, type Light } from '@/features/overview/model';
+import { clock, day, isStale, ms, type Light } from '@/features/overview/model';
 import { useNow } from '@/hooks/use-now';
 import { haptics } from '@/haptics';
-import { colors, motion, radius, space, strokes, tints } from '@/theme';
+import { colors, motion, radius, size, space, strokes, tints } from '@/theme';
+import { keys } from '@/api/keys';
 
 /** Plain names for the six checks, from this PC up to secure websites (briefs.md section 3). */
 const RUNGS = [
@@ -83,7 +84,7 @@ export default function DiagnoseScreen() {
   // A finished run changes the Overview's DNS and Web lights: refresh the site summary.
   const doneId = lastDone?.id;
   useEffect(() => {
-    if (doneId) void client.invalidateQueries({ queryKey: ['sites', siteId, 'summary'] });
+    if (doneId) void client.invalidateQueries({ queryKey: keys.summary(siteId) });
   }, [doneId, siteId, client]);
 
   if (runs.isPending) {
@@ -328,13 +329,6 @@ function History({ runs }: { runs: Command[] }) {
   );
 }
 
-function day(iso: string): string {
-  const d = new Date(iso);
-  return d.toDateString() === new Date().toDateString()
-    ? `Today ${clock(iso)}`
-    : `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${clock(iso)}`;
-}
-
 /** The pushed screen's title with the run's outcome below it (prototype). */
 function HeaderTitle({ sub }: { sub: string }) {
   return (
@@ -379,7 +373,7 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     paddingHorizontal: space.s4,
     paddingVertical: space.s3,
-    minHeight: 68,
+    minHeight: size.row,
     justifyContent: 'center',
     gap: space.s3,
     borderWidth: 2,
@@ -388,8 +382,8 @@ const styles = StyleSheet.create({
   root: { borderColor: colors.red },
   pressed: { backgroundColor: colors.raised },
   rungText: { flex: 1, gap: 2 },
-  badge: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  detail: { gap: space.s1, backgroundColor: colors.raised, borderRadius: 14, padding: space.s3 },
+  badge: { width: 32, height: 32, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  detail: { gap: space.s1, backgroundColor: colors.raised, borderRadius: radius.inner, padding: space.s3 },
   history: {
     flexDirection: 'row',
     alignItems: 'center',
