@@ -73,7 +73,7 @@ export function LatencyChart({ data, loading, error }: { data?: Latency; loading
             </LinearGradient>
           </Defs>
           {model.outages.map((o) => (
-            <Rect key={o.key} x={o.x} y={PAD_TOP} width={Math.max(2, o.w)} height={H} rx={6} fill={colors.red} fillOpacity={0.14} />
+            <Rect key={o.key} x={o.x} y={PAD_TOP} width={Math.max(2, o.w)} height={H} rx={6} fill={o.measured ? colors.red : colors.unlitRing} fillOpacity={o.measured ? 0.14 : 0.16} />
           ))}
           {model.grid.map((y) => (
             <Line key={y} x1={0} x2={width} y1={y} y2={y} stroke={colors.border} strokeWidth={1} />
@@ -103,6 +103,8 @@ export function LatencyChart({ data, loading, error }: { data?: Latency; loading
       <View style={styles.legend}>
         <Legend dashed={false} label="Internet" />
         <Legend dashed label="Router" />
+        {model?.measured ? <Swatch color={colors.red} opacity={0.35} label="Outage" /> : null}
+        {model?.silent ? <Swatch color={colors.unlitRing} opacity={0.45} label="Agent off" /> : null}
       </View>
       <View onLayout={onLayout}>{body}</View>
       {data && model && !model.empty ? (
@@ -111,6 +113,18 @@ export function LatencyChart({ data, loading, error }: { data?: Latency; loading
         </Text>
       ) : null}
     </Card>
+  );
+}
+
+/** A band's legend: a small filled block plus its word, so colour is never the only cue. */
+function Swatch({ color, opacity, label }: { color: string; opacity: number; label: string }) {
+  return (
+    <View style={styles.legendItem}>
+      <View style={[styles.swatch, { backgroundColor: color, opacity }]} />
+      <Text role="labelSmall" color="text2">
+        {label}
+      </Text>
+    </View>
   );
 }
 
@@ -204,17 +218,22 @@ function build(data: Latency, width: number) {
     .map((r) => `M${r.map(xy).join(' L')} L${r[r.length - 1].x.toFixed(1)} ${floor} L${r[0].x.toFixed(1)} ${floor} Z`)
     .join(' ');
 
+  // Red only where the agent measured the internet down. When the agent itself was silent (the
+  // server inferred the outage), nothing was measured: that span is grey "no data", not an outage.
   const outages = data.outages.map((o) => {
     const a = x(Math.max(t0, Date.parse(o.started_at)));
     const b = x(o.ended_at ? Math.min(t1, Date.parse(o.ended_at)) : t1);
-    return { key: o.id, x: a, w: b - a };
+    return { key: o.id, x: a, w: b - a, measured: o.detected_by === 'agent' };
   });
+  const measured = outages.filter((o) => o.measured).length;
+  const silent = outages.length - measured;
 
   const avg = data.summary.internet?.avg_ms;
   const label =
     `Latency over 24 hours: internet ${avg != null ? `about ${ms(avg)}` : 'no data'}, ` +
     `router ${ms(data.summary.gateway?.avg_ms)}` +
-    (data.outages.length ? `, ${data.outages.length} ${data.outages.length === 1 ? 'outage' : 'outages'}` : ', no outages');
+    (measured ? `, ${measured} ${measured === 1 ? 'outage' : 'outages'}` : ', no outages') +
+    (silent ? `, agent offline ${silent} ${silent === 1 ? 'time' : 'times'}` : '');
 
   return {
     internet,
@@ -223,6 +242,8 @@ function build(data: Latency, width: number) {
     routerPath: line(router),
     area,
     outages,
+    measured,
+    silent,
     max,
     y,
     bucketW,
@@ -234,7 +255,8 @@ function build(data: Latency, width: number) {
 }
 
 const styles = StyleSheet.create({
-  legend: { flexDirection: 'row', gap: space.s4 },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s4, rowGap: space.s1 },
+  swatch: { width: 12, height: 12, borderRadius: 3 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: space.s2 },
   plot: { gap: space.s1 },
   axis: { flexDirection: 'row', justifyContent: 'space-between' },

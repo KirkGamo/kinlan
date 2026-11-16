@@ -22,6 +22,13 @@ const FILL: Record<LightState, string> = {
   fail: colors.red,
   unlit: colors.unlit,
 };
+/** The glow ring around a lit light: its colour at about a fifth strength (prototype: 18-22%). */
+const GLOW: Record<LightState, string> = {
+  pass: 'rgba(48, 209, 88, 0.2)',
+  warn: 'rgba(255, 159, 10, 0.22)',
+  fail: 'rgba(255, 69, 58, 0.24)',
+  unlit: 'transparent',
+};
 const WORD: Record<LightState, string> = {
   pass: 'working',
   warn: 'slow',
@@ -161,7 +168,10 @@ function Lamp({ index, light, onPress }: { index: number; light: Light; onPress:
         {failing ? <Animated.View style={[styles.halo, halo]} /> : null}
         <View style={styles.unlit} />
         {unlit ? null : (
-          <Animated.View style={[styles.dot, { backgroundColor: FILL[light.state], shadowColor: FILL[light.state] }, dot]} />
+          // A real 4-dp ring in the light's colour (the prototype's glow); Android draws no shadow here.
+          <Animated.View style={[styles.glow, { backgroundColor: GLOW[light.state] }, dot]}>
+            <View style={[styles.dot, { backgroundColor: FILL[light.state] }]} />
+          </Animated.View>
         )}
       </View>
       <Text role="silk" color="text2" align="center" numberOfLines={1}>
@@ -191,16 +201,15 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.unlitRing,
   },
-  dot: {
-    width: DOT,
-    height: DOT,
-    borderRadius: DOT / 2,
-    // Only status lights glow (brand.md): a soft ring in the light's own colour.
-    shadowOpacity: 0.8,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 0,
+  // Only status lights glow (brand.md): a soft ring in the light's own colour around the dot.
+  glow: {
+    width: DOT + 8,
+    height: DOT + 8,
+    borderRadius: (DOT + 8) / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  dot: { width: DOT, height: DOT, borderRadius: DOT / 2 },
   halo: {
     position: 'absolute',
     width: DOT + 14,

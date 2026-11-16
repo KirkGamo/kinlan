@@ -12,7 +12,7 @@ import { ICON_PATHS } from './icons';
 import { matches, type Filter } from './model';
 
 const NODE = 20; // node radius
-const MAX_RING = 30; // beyond this, offline devices collapse into one node
+const MIN_GAP = 54; // ring spacing between node centres: a 32-dp node, its 14-dp label and a gap
 
 type Node = {
   key: string;
@@ -38,6 +38,7 @@ export function DeviceMap({
   gatewayIp,
   selectedId,
   onSelect,
+  onMore,
   stale,
 }: {
   devices: Device[];
@@ -46,6 +47,8 @@ export function DeviceMap({
   gatewayIp: string | null;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** The "+N more" node: open the full list. */
+  onMore: () => void;
   stale: boolean;
 }) {
   const [width, setWidth] = useState(0);
@@ -54,9 +57,6 @@ export function DeviceMap({
   const router = devices.find((d) => gatewayIp && d.ip === gatewayIp);
   const agentPc = devices.find((d) => d.is_agent && d !== router);
   const others = devices.filter((d) => d !== router && d !== agentPc);
-  const collapse = others.length > MAX_RING;
-  const ringDevices = collapse ? others.filter((d) => d.online || d.needs_review) : others;
-  const hidden = others.length - ringDevices.length;
 
   const H = Math.max(340, Math.round(width * 1.05));
   const cx = width / 2;
@@ -64,10 +64,21 @@ export function DeviceMap({
   const R = Math.min(width * 0.38, H * 0.36);
   const internetY = 36;
 
+  // The ring holds as many nodes as fit 54 dp apart along its 290 degree arc (about 12 at phone
+  // width), one of them the agent's PC. Past that, the most useful devices stay and the rest fold
+  // into a "+N more" node that opens the list: the selected one, then new and online, online, new,
+  // offline.
+  const fits = Math.max(6, Math.floor((R * 290 * Math.PI) / 180 / MIN_GAP)) - 1;
+  const rank = (d: Device) =>
+    d.id === selectedId ? 0 : d.needs_review && d.online ? 1 : d.online ? 2 : d.needs_review ? 3 : 4;
+  const ringDevices =
+    others.length <= fits ? others : [...others].sort((a, b) => rank(a) - rank(b)).slice(0, fits - 1);
+  const hidden = others.length - ringDevices.length;
+
   const ringColor = (d: Device) =>
     d.needs_review ? colors.orange : stale ? colors.unlitRing : d.online ? colors.green : colors.unlitRing;
 
-  // Slots from 35° to 325° clockwise from the top, so the internet link stays clear; the
+  // Slots from 35 to 325 degrees clockwise from the top, so the internet link stays clear; the
   // agent's PC takes the bottom slot.
   const slots = ringDevices.length + 1 + (hidden ? 1 : 0);
   const pcSlot = Math.floor(slots / 2);
@@ -76,9 +87,10 @@ export function DeviceMap({
     const rad = (deg * Math.PI) / 180;
     return { x: cx + R * Math.sin(rad), y: cy - R * Math.cos(rad) };
   };
-  // A phone-width ring fits about 10 names. Past that, only new devices and the selected one are
-  // named on the map (the lists name everything), so labels never pile onto other nodes.
-  const nameAll = ringDevices.length <= 10;
+  // Full names need about 80 dp between nodes (around 7 devices at phone width). Closer than that,
+  // only the selected device is named and new ones say just "New" (the lists name everything), so
+  // labels never pile onto other nodes.
+  const nameAll = (R * 290 * Math.PI) / 180 / slots >= 80;
   const nodes: Node[] = [];
   let slot = 0;
   const next = () => {
@@ -99,7 +111,7 @@ export function DeviceMap({
     });
   }
   if (hidden) {
-    nodes.push({ key: 'offline', ...next(), label: `+${hidden} offline`, type: 'unknown', ring: colors.unlitRing, dim: filter === 'online' || filter === 'review' });
+    nodes.push({ key: 'more', ...next(), label: `+${hidden} more`, type: 'unknown', ring: colors.unlitRing, dim: false });
   }
   // The agent's PC is a scanned device when its hostname matches; otherwise draw it anyway,
   // since the router link's latency is measured from it.
@@ -175,7 +187,7 @@ export function DeviceMap({
                 key={n.key}
                 n={{ ...n, dim: n.dim || (!!sel && n.device?.id !== sel) }}
                 selected={!!n.device && n.device.id === sel}
-                onPress={n.device ? () => onSelect(n.device!.id) : undefined}
+                onPress={n.device ? () => onSelect(n.device!.id) : n.key === 'more' ? onMore : undefined}
                 small={!nameAll}
               />
             ))}
@@ -185,7 +197,7 @@ export function DeviceMap({
         )}
       </View>
       <Text role="bodySmall" color="text2">
-        {nameAll ? '' : 'Tap a device to see its name. '}
+        {nameAll ? '' : hidden ? `Tap a device to see its name, or +${hidden} more for the full list. ` : 'Tap a device to see its name. '}
         Shows which devices share this network, not how they’re wired: KinLAN can’t tell Wi-Fi from cable or see extenders.
       </Text>
     </Card>

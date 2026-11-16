@@ -23,6 +23,8 @@ export type OutageSpan = {
   ended_at: string | null;
   ongoing: boolean;
   cause: 'isp' | 'lan' | 'unknown';
+  /** agent: the agent measured the internet down; server: the agent itself went silent. */
+  detected_by: 'agent' | 'server';
 };
 export type Latency = {
   bucket_seconds: number;
