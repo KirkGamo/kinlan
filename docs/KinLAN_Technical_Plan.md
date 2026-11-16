@@ -134,7 +134,7 @@ For the final zip, `/SourceCode` = a clean copy of the repository. Make it with 
 | Install Python 3.12 | Download from python.org (keep 3.10 alongside), then use `py -3.12 -m venv .venv` in `agent/` and `server/` |
 | Agent dependencies | `pip install scapy icmplib dnspython httpx psutil pywin32 pydantic-settings rich pyinstaller pytest ruff` |
 | Server dependencies | `pip install "fastapi[standard]" "sqlalchemy>=2" alembic "psycopg[binary]" pyjwt "pwdlib[argon2]" pydantic-settings slowapi apscheduler reportlab matplotlib httpx pytest ruff` |
-| Mobile app | `npx create-expo-app@latest mobile`, then `npx expo install expo-router react-native-paper react-native-svg expo-secure-store expo-notifications expo-device expo-dev-client expo-sharing expo-file-system` and `npm i @tanstack/react-query react-native-gifted-charts react-native-tcp-socket zod` |
+| Mobile app | `npx create-expo-app@latest mobile`, then `npx expo install expo-router react-native-svg expo-secure-store expo-notifications expo-device expo-dev-client expo-sharing expo-file-system` and `npm i @tanstack/react-query` (the stack that shipped is in Section 6.1) |
 | Pin versions | After installing, run `pip freeze > requirements.txt` in `agent/` and `server/`, and move pytest, ruff and pyinstaller into `requirements-dev.txt`. The mobile app is pinned by `package-lock.json`. Commit all of them. |
 | Local database | Your PostgreSQL 15 is already running, on port **5433** (port 5432 is a separate EDB Postgres 17 install). Run `createdb -U postgres -h localhost -p 5433 kinlan_dev` and the same for `kinlan_test`. Done on Nov 7. |
 | Accounts | GitHub (repo), Neon (database), Render (API + static web), Expo (EAS builds + push), Firebase (FCM for Android push, free) |
@@ -407,10 +407,10 @@ Use Neon's **pooled** connection string (the host containing `-pooler`) with SQL
 
 ### 6.1 Stack
 - **Framework:** Expo (latest SDK) with **TypeScript** and **Expo Router** (file-based navigation).
-- **UI:** **React Native Paper** (Material Design 3) with `@expo/vector-icons` (MaterialCommunityIcons).
+- **UI:** the app's own components in `src/components/ui`, built on the `src/theme` tokens: Material Design 3 in structure (native tab bar, FAB, bottom sheets, chips, switches) and KinLAN in theming. Icons are drawn with `react-native-svg`. Motion uses Reanimated and gestures use react-native-gesture-handler; feedback uses `expo-haptics`. *Changed from React Native Paper: the Status Lights direction restyles almost every component, so the app builds its own and DESIGN.md documents them.*
 - **Data:** **TanStack Query** for API calls, caching and polling.
-- **Types and validation:** API types generated with `openapi-typescript` from the server's `/openapi.json`; `zod` for forms.
-- **Charts:** `react-native-gifted-charts` (built on react-native-svg, also works on web).
+- **Types and validation:** typed API calls written by hand in `src/api/` against the server's OpenAPI schema; forms validate inline. *Changed: `openapi-typescript` and `zod` weren't needed at this size.*
+- **Charts:** drawn directly with `react-native-svg` (works on web too). *Changed from `react-native-gifted-charts` so the chart could carry the crosshair, outage gaps and line styles in DESIGN.md.*
 - **API address:** read from `EXPO_PUBLIC_API_URL` (`.env` locally, set per build profile in `eas.json`), so the same code points at the local server or production.
 - **Device features:** `expo-secure-store` for tokens on the phone, `expo-notifications` + `expo-device` for push, `expo-sharing` + `expo-file-system` for PDFs.
 
@@ -503,7 +503,7 @@ Use Neon's **pooled** connection string (the host containing `-pooler`) with SQL
 - **Path note:** ui-ux-pro-max's SKILL.md shows `${CLAUDE_PLUGIN_ROOT}/…`, which isn't set for a project install. Run it as `python .claude/skills/ui-ux-pro-max/scripts/search.py …` from the repository root.
 
 ### 8.2 Design language decisions (inputs to DESIGN.md)
-- **Base:** Material Design 3 through React Native Paper. Impeccable's Android guide also says MD3 should govern structure and navigation on Android.
+- **Base:** Material Design 3 for structure and navigation, as Impeccable's Android guide recommends, with KinLAN's own components on top (Section 6.1).
 - **Mode:** Impeccable "Operate" (task-focused app UI): clear and consistent first, brand expressed in precise details.
 - **Personality:** calm, trustworthy, technical but friendly. Warm, like people looking out for each other, but just as at home in an office as in a living room.
 - **Group-neutral copy:** "Circle", "members" and "your people". Never "family" or "household" as the default. Run `/impeccable clarify` against this rule.
@@ -831,31 +831,31 @@ Write each chapter of the report **at the end of the sprint it covers**, not in 
 - [x] Agent pairing + ingest + heartbeat + command long-poll; uploader with backoff and resend-safe batches.
 - [x] Alert engine v1 (new device, unreachable, back online); scheduled jobs (heartbeat, rollup, retention). *Also high latency, packet loss and risky ports.*
 - [x] Deploy to Render + Neon; run the agent against production. *Live at https://kinlan-api.onrender.com since Nov 7 (`docs/deploy.md`).*
-- [ ] Set up Firebase/FCM credentials in EAS now, so push isn't blocked in Sprint 3.
-- [ ] **Tue Nov 17 — Progress Report (2–3 pages).** *Written Nov 7 (3 pages, `course/`); to submit.* Contents:
+- [x] Set up Firebase/FCM credentials in EAS now, so push isn't blocked in Sprint 3. *Done with push (#78); the standalone APK re-checks them (#92).*
+- [ ] **Tue Nov 17 — Progress Report (2–3 pages).** *Written Nov 7, updated Nov 16 (3 pages, `course/`); to submit.* Contents:
   - system design (architecture, ERD, flowchart)
   - screenshots of the agent CLI, the Swagger `/docs` page, Wireshark captures and Figma mockups
   - sample code (`diagnose.py`, ingest endpoint)
   - accomplishments and remaining tasks
-- [ ] **Done when:** two agents (home + a second network) upload to the live API and data is visible in `/docs` and in pgAdmin.
+- [ ] **Done when:** two agents (home + a second network) upload to the live API and data is visible in `/docs` and in pgAdmin. *Home reports since Nov 7; the second network is #94.*
 
 ### Sprint 3 — Mobile app (Sun Nov 22 – Sat Nov 28)
-- [ ] Theme from the direction contract; auth screens; onboarding/pairing; Overview; Devices + Device detail with ping test; network map (List | Map); Diagnose screen; Site detail charts; Alerts; Settings (members, invites, thresholds).
-- [ ] Development build on your phone; push notifications end to end.
+- [x] Theme from the direction contract; auth screens; onboarding/pairing; Overview; Devices + Device detail with ping test; network map (List | Map); Diagnose screen; Site detail charts; Alerts; Settings (members, invites, thresholds). *All built (#65–#75) except Site detail, moved to Sprint 4 (#90). Also added: haptics, deep links and gestures (#85–#87).*
+- [x] Development build on your phone; push notifications end to end. *Nov 16, on an Android 16 phone (#77, #78).*
 - [ ] Per screen: vercel-react-native-skills while coding, then `/impeccable audit`, `clarify` and `onboard` for the first-run flow.
-- [ ] End of sprint: Impeccable finish review against the direction contract, then `/impeccable document` writes DESIGN.md from the built app.
-- [ ] **Done when:** a second user joins with an invite code on another phone, sees the same site, and receives a "new device" push.
+- [x] End of sprint: Impeccable finish review against the direction contract, then `/impeccable document` writes DESIGN.md from the built app. *DESIGN.md (#76), then matched to the prototype (#79–#81).*
+- [ ] **Done when:** a second user joins with an invite code on another phone, sees the same site, and receives a "new device" push. *App installed on the second phone Nov 16; test in #63.*
 
 ### Sprint 4 — Finish, test, document (Sun Nov 29 – Fri Dec 4)
 - [ ] **Sun–Mon:**
-  - PDF report, port check + findings, health grade breakdown, "Test from this phone"
-  - agent `.exe` + `install` command
-  - APK (`preview`) + web export
+  - PDF report (#88), port check + findings (#89), Site detail (#90), "Test from this phone" (first to cut, Section 13); the health grade breakdown is done
+  - agent `.exe` + `install` command (#91); rate limits (#93)
+  - APK (`preview`) + web export (#92)
 - [ ] **Tue:**
-  - run the entire Section 9 test plan and record the results
+  - run the entire Section 9 test plan and record the results (#95), with the second network and three roles (#94)
   - `/impeccable harden`, `critique` and `polish`
   - `/web-design-guidelines` on the web build
-  - SUS sessions with 5 users
+  - SUS sessions with 5 users (#96)
 - [ ] **Wed:**
   - finish the Final Technical Report (8–12 pages, Times New Roman 12, double-spaced, justified, on the page template)
   - slides (10–15)
@@ -864,7 +864,7 @@ Write each chapter of the report **at the end of the sprint it covers**, not in 
   - edit the video
 - [ ] **Fri Dec 4 — Submit:**
   - `LASTNAME_FIRSTNAME_FINALPROJECT.zip` with `/SourceCode`, `/Presentation`, `/VideoDemo` and `README.txt`
-  - the documentation separately via Teams
+  - the documentation separately via Teams (#97)
 
 ### Dec 5–7 — Defense preparation
 - [ ] Rehearse a live demo plus a backup recording. Pre-seed demo data. Take a `pg_dump`.
