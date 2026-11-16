@@ -83,6 +83,7 @@ function Body({
   stale: boolean;
 }) {
   const update = useUpdateDevice(d.id, siteId);
+  const ping = usePing(d, siteId);
   const [name, setName] = useState(d.custom_name ?? '');
   const st = chip(d, stale);
   const owners = [
@@ -112,12 +113,13 @@ function Body({
         </Text>
       ) : null}
 
+      {/* Prototype facts: label left, value right, one hairline-separated row each. */}
       <View style={styles.facts}>
         <Fact label="Manufacturer" value={d.vendor ?? 'Unknown'} />
         <Fact label="IP address" value={d.ip ?? 'Unknown'} />
         <Fact label="Hardware address" value={d.mac} />
         <Fact label="First seen" value={day(d.first_seen_at)} />
-        <Fact label="Last seen" value={day(d.last_seen_at)} />
+        <Fact label="Last seen" value={day(d.last_seen_at)} last />
       </View>
 
       <Text role="silk" color="text2">
@@ -135,52 +137,42 @@ function Body({
         <Text role="body">{d.owner?.display_name ?? 'Shared'}</Text>
       )}
 
+      {/* The two actions side by side, high enough to reach without scrolling. */}
       {canManage ? (
-        <>
-          <Text role="silk" color="text2">
-            Type
-          </Text>
-          <Chips
-            label="Device type"
-            options={TYPES}
-            value={d.device_type}
-            disabled={update.isPending}
-            onChange={(key) => update.mutate({ device_type: key })}
-          />
-          <TextField
-            label="Name"
-            value={name}
-            onChangeText={setName}
-            placeholder={d.hostname ?? d.vendor ?? 'Living room TV'}
-            autoCapitalize="words"
-            returnKeyType="done"
-            onSubmitEditing={() => renamed && update.mutate({ custom_name: name.trim() || null })}
-            hint="Leave empty to use the name the device reports."
-          />
-          {renamed ? (
-            <Button label="Save name" variant="ghost" loading={update.isPending} onPress={() => update.mutate({ custom_name: name.trim() || null })} />
-          ) : null}
-          {!d.trusted ? (
+        <View style={styles.actions}>
+          <View style={styles.action}>
             <Button
-              label="Mark as trusted"
-              variant="ghost"
-              loading={update.isPending}
-              onPress={() => update.mutate({ trusted: true })}
-              accessibilityHint="It stops counting as a new device to review"
+              label={ping.running ? 'Pinging…' : ping.shown ? 'Ping again' : 'Ping test'}
+              variant={d.trusted ? 'primary' : 'ghost'}
+              onPress={ping.run}
+              loading={ping.running}
+              disabled={!d.ip || stale}
             />
+          </View>
+          {!d.trusted ? (
+            <View style={styles.action}>
+              <Button
+                label="Mark as trusted"
+                loading={update.isPending && update.variables?.trusted === true}
+                onPress={() => update.mutate({ trusted: true })}
+                accessibilityHint="It stops counting as a new device to review"
+              />
+            </View>
           ) : null}
-          {update.isError ? (
-            <Text role="bodySmall" color="red" accessibilityRole="alert">
-              {update.error.message}
-            </Text>
-          ) : null}
-        </>
+        </View>
+      ) : null}
+      {canManage && stale ? (
+        <Text role="bodySmall" color="text2">
+          Ping tests run from the agent, which is offline right now.
+        </Text>
+      ) : null}
+      {update.isError ? (
+        <Text role="bodySmall" color="red" accessibilityRole="alert">
+          {update.error.message}
+        </Text>
       ) : null}
 
-      <Text role="silk" color="text2">
-        Ping test
-      </Text>
-      <Ping d={d} siteId={siteId} canManage={canManage} stale={stale} />
+      <PingResult d={d} ping={ping} />
 
       {d.risky_ports.length ? (
         <>
@@ -197,11 +189,40 @@ function Body({
           ))}
         </>
       ) : null}
+
+      {canManage ? (
+        <>
+          <Text role="silk" color="text2">
+            Name and type
+          </Text>
+          <TextField
+            label="Name"
+            value={name}
+            onChangeText={setName}
+            placeholder={d.hostname ?? d.vendor ?? 'Living room TV'}
+            autoCapitalize="words"
+            returnKeyType="done"
+            onSubmitEditing={() => renamed && update.mutate({ custom_name: name.trim() || null })}
+            hint="Leave empty to use the name the device reports."
+          />
+          {renamed ? (
+            <Button label="Save name" variant="ghost" loading={update.isPending} onPress={() => update.mutate({ custom_name: name.trim() || null })} />
+          ) : null}
+          <Chips
+            label="Device type"
+            options={TYPES}
+            value={d.device_type}
+            disabled={update.isPending}
+            onChange={(key) => update.mutate({ device_type: key })}
+          />
+        </>
+      ) : null}
     </>
   );
 }
 
-function Ping({ d, siteId, canManage, stale }: { d: DeviceDetail; siteId: string; canManage: boolean; stale: boolean }) {
+/** A ping test from the agent: start it, then poll the command until it finishes. */
+function usePing(d: DeviceDetail, siteId: string) {
   const start = useStartPing(siteId, d.id);
   const [commandId, setCommandId] = useState<string | null>(null);
   const cmd = useCommand(commandId);
@@ -209,15 +230,17 @@ function Ping({ d, siteId, canManage, stale }: { d: DeviceDetail; siteId: string
   const running = start.isPending || (commandId != null && (status == null || status === 'pending' || status === 'running'));
   const result = status === 'done' ? (cmd.data?.result as Partial<PingTest> | null) : null;
   const shown: Partial<PingTest> | null = result ?? (commandId ? null : d.last_ping_test);
+  const run = () => start.mutate(undefined, { onSuccess: (c) => setCommandId(c.id) });
+  return { run, running, status, result, shown, error: start.isError ? start.error.message : null };
+}
 
-  const run = () =>
-    start.mutate(undefined, {
-      onSuccess: (c) => setCommandId(c.id),
-    });
-
+/** The result card: five reply cells, a plain verdict and the numbers; hidden until there is one. */
+function PingResult({ d, ping }: { d: DeviceDetail; ping: ReturnType<typeof usePing> }) {
+  const { running, status, shown, result, error } = ping;
+  if (!running && !shown && status !== 'expired' && status !== 'failed' && !error) return null;
   return (
     <View style={styles.ping}>
-      <Cells sent={shown?.sent ?? PING_COUNT} received={shown?.received} running={running} />
+      <Cells sent={shown?.sent ?? PING_COUNT} received={running ? undefined : shown?.received} running={running} />
       {running ? (
         <Text role="body" color="text2">{`Sending ${PING_COUNT} pings from the agent…`}</Text>
       ) : status === 'expired' || status === 'failed' ? (
@@ -234,24 +257,11 @@ function Ping({ d, siteId, canManage, stale }: { d: DeviceDetail; siteId: string
             {!result && d.last_ping_test ? ` · ${day(d.last_ping_test.ts)}` : ''}
           </Text>
         </>
-      ) : (
-        <Text role="body" color="text2">
-          No ping test yet.
-        </Text>
-      )}
-      {start.isError ? (
-        <Text role="bodySmall" color="red" accessibilityRole="alert">
-          {start.error.message}
-        </Text>
       ) : null}
-      {canManage ? (
-        stale ? (
-          <Text role="bodySmall" color="text2">
-            Ping tests run from the agent, which is offline right now.
-          </Text>
-        ) : (
-          <Button label={shown ? 'Run again' : 'Run a ping test'} variant="ghost" onPress={run} loading={running} disabled={!d.ip} />
-        )
+      {error ? (
+        <Text role="bodySmall" color="red" accessibilityRole="alert">
+          {error}
+        </Text>
       ) : null}
     </View>
   );
@@ -283,15 +293,17 @@ function day(iso: string): string {
   return same ? `Today ${clock(iso)}` : `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${clock(iso)}`;
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
+function Fact({ label, value, last }: { label: string; value: string; last?: boolean }) {
   return (
-    <View style={styles.fact}>
+    <View style={[styles.fact, last && styles.factLast]}>
       <Text role="bodySmall" color="text2">
         {label}
       </Text>
-      <Text role="body" tabular selectable>
-        {value}
-      </Text>
+      <View style={styles.factValue}>
+        <Text role="bodySmall" align="right" tabular selectable numberOfLines={1}>
+          {value}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -299,8 +311,19 @@ function Fact({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   center: { minHeight: 120, alignItems: 'center', justifyContent: 'center' },
   meta: { flexDirection: 'row', alignItems: 'center', gap: space.s2, flexWrap: 'wrap' },
-  facts: { gap: space.s3, backgroundColor: colors.raised, borderRadius: radius.row, padding: space.s4 },
-  fact: { gap: 2 },
+  facts: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  fact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s3,
+    minHeight: 36,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  factLast: { borderBottomWidth: 0 },
+  factValue: { flex: 1 },
+  actions: { flexDirection: 'row', gap: space.s2 },
+  action: { flex: 1 },
   ping: { gap: space.s2, backgroundColor: colors.raised, borderRadius: radius.row, padding: space.s4 },
   cells: { flexDirection: 'row', alignItems: 'center', gap: space.s2 },
   cell: { width: 28, height: 28, borderRadius: 8, backgroundColor: colors.unlit, borderWidth: 1.5, borderColor: colors.unlitRing },

@@ -144,6 +144,7 @@ function Live({ circle, site, sites, canManage }: { circle: Circle; site: Site; 
         gatewayIp={site.gateway_ip}
         selectedId={selected}
         onSelect={setSelected}
+        onMore={() => setView('status')}
         stale={stale}
       />
     );
