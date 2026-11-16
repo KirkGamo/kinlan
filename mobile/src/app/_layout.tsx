@@ -3,7 +3,7 @@ import { useFonts, type FontFamilyDefinition } from 'expo-font';
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useCallback, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -12,6 +12,7 @@ import { useCircles } from '@/api/circles';
 import { pushSupported } from '@/api/push';
 import { SessionProvider, useSession } from '@/api/session';
 import { Button, FormScreen, Mark, Text } from '@/components/ui';
+import { BootSplash } from '@/features/boot/boot-splash';
 import { PushBridge } from '@/features/push/push-bridge';
 import { loadHapticsPref } from '@/haptics';
 import { colors, FONT_FAMILY, space } from '@/theme';
@@ -87,12 +88,29 @@ function RootNavigator() {
   const signedIn = status === 'signedIn';
   const circles = useCircles(signedIn);
   const deciding = status === 'loading' || (signedIn && circles.isPending);
+  // The animated splash replaces the native one as soon as it's drawn (they match), plays once
+  // per cold start, and leaves when we know where to go; the app mounts underneath meanwhile.
+  const [booted, setBooted] = useState(false);
+  const hideNative = useCallback(() => void SplashScreen.hideAsync(), []);
+  const done = useCallback(() => setBooted(true), []);
 
-  useEffect(() => {
-    if (!deciding) SplashScreen.hideAsync(); // keep the splash until we know where to go
-  }, [deciding]);
+  return (
+    <View style={styles.root}>
+      {deciding ? null : <Routes signedIn={signedIn} status={status} circles={circles} />}
+      {booted ? null : <BootSplash ready={!deciding} onShown={hideNative} onDone={done} />}
+    </View>
+  );
+}
 
-  if (deciding) return null;
+function Routes({
+  signedIn,
+  status,
+  circles,
+}: {
+  signedIn: boolean;
+  status: ReturnType<typeof useSession>['status'];
+  circles: ReturnType<typeof useCircles>;
+}) {
   if (signedIn && circles.isError && !circles.data) { // a failed refresh keeps the app
     return <StartupError message={circles.error.message} onRetry={() => circles.refetch()} />;
   }
