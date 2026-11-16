@@ -28,9 +28,12 @@ def test_production_refuses_the_development_jwt_secret():
     import pytest
     from pydantic import ValidationError
 
+    from app.config import DEV_JWT_SECRET
+
     with pytest.raises(ValidationError, match="JWT_SECRET"):
-        Settings(env="production", _env_file=None)
+        Settings(env="production", jwt_secret=DEV_JWT_SECRET, _env_file=None)
     with pytest.raises(ValidationError, match="JWT_SECRET"):
         Settings(env="production", jwt_secret="short", _env_file=None)
     assert Settings(env="production", jwt_secret="x" * 40, _env_file=None).env == "production"
-    assert Settings(env="development", _env_file=None).jwt_secret  # local runs keep the default
+    local = Settings(env="development", jwt_secret=DEV_JWT_SECRET, _env_file=None)
+    assert local.jwt_secret == DEV_JWT_SECRET  # local runs keep the default
