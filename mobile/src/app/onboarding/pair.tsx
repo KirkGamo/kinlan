@@ -1,10 +1,11 @@
 import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { usePairingCode, useSite, useSiteSummary } from '@/api/circles';
 import { Button, Card, FormScreen, Loader, SectionLabel, StatusChip, Text } from '@/components/ui';
+import { haptics } from '@/haptics';
 import { colors, radius, space } from '@/theme';
 
 /**
@@ -16,6 +17,17 @@ export default function PairScreen() {
   const site = useSite(siteId, true); // polls every 3 s until the agent connects
   const connected = !!site.data && site.data.status !== 'pending';
   const summary = useSiteSummary(siteId, connected);
+
+  // Confirm once when the agent connects while the user waits here (not on a revisit).
+  const waited = useRef(false);
+  useEffect(() => {
+    if (!site.data) return;
+    if (!connected) waited.current = true;
+    else if (waited.current) {
+      waited.current = false;
+      haptics.confirm();
+    }
+  }, [connected, site.data]);
 
   if (site.isPending) {
     return (
@@ -59,6 +71,7 @@ function Waiting({ siteId, siteName }: { siteId: string; siteName: string }) {
   async function copy() {
     if (!code) return;
     await Clipboard.setStringAsync(code);
+    haptics.confirm();
     setCopied(true);
     setTimeout(() => setCopied(false), 2_000);
   }

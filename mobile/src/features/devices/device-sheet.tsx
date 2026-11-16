@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -13,6 +13,7 @@ import {
 import type { DeviceType, Member } from '@/api/overview';
 import { Button, Chips, Facts, Loader, Sheet, StatusChip, Text, TextField } from '@/components/ui';
 import { clock, ms } from '@/features/overview/model';
+import { haptics } from '@/haptics';
 import { colors, radius, space } from '@/theme';
 
 import { ICON_PATHS, TYPE_LABEL } from './icons';
@@ -164,7 +165,7 @@ function Body({
               <Button
                 label="Mark as trusted"
                 loading={update.isPending && update.variables?.trusted === true}
-                onPress={() => update.mutate({ trusted: true })}
+                onPress={() => update.mutate({ trusted: true }, { onSuccess: haptics.confirm })}
                 accessibilityHint="It stops counting as a new device to review"
               />
             </View>
@@ -240,7 +241,15 @@ function usePing(d: DeviceDetail, siteId: string) {
   const running = start.isPending || (commandId != null && (status == null || status === 'pending' || status === 'running'));
   const result = status === 'done' ? (cmd.data?.result as Partial<PingTest> | null) : null;
   const shown: Partial<PingTest> | null = result ?? (commandId ? null : d.last_ping_test);
-  const run = () => start.mutate(undefined, { onSuccess: (c) => setCommandId(c.id) });
+  const run = () => start.mutate(undefined, { onSuccess: (c) => setCommandId(c.id), onError: haptics.reject });
+  // The result of a ping the user started: confirm on replies, reject on none or no result.
+  const finished = status === 'done' || status === 'expired' || status === 'failed';
+  const received = result?.received;
+  useEffect(() => {
+    if (!commandId || !finished) return;
+    if (status === 'done' && received) haptics.confirm();
+    else haptics.reject();
+  }, [commandId, finished, status, received]);
   return { run, running, status, result, shown, error: start.isError ? start.error.message : null };
 }
 

@@ -15,6 +15,7 @@ import { Avatar } from '@/features/account/avatar';
 import { useMe } from '@/api/session';
 import { SiteHeader } from '@/features/overview/site-header';
 import { useNow } from '@/hooks/use-now';
+import { haptics } from '@/haptics';
 import { colors, radius, space } from '@/theme';
 
 type View_ = 'people' | 'status' | 'map';
@@ -112,6 +113,7 @@ function Live({ circle, site, sites, canManage }: { circle: Circle; site: Site; 
     : 'Loading…';
 
   async function refresh() {
+    haptics.tick(); // released past the pull threshold
     setRefreshing(true);
     await Promise.all([devices.refetch(), members.refetch(), summary.refetch()]);
     setRefreshing(false);

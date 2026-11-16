@@ -14,6 +14,7 @@ import { ago, isStale, lights, problems, verdict, type Light } from '@/features/
 import { People } from '@/features/overview/people';
 import { SiteHeader } from '@/features/overview/site-header';
 import { useNow } from '@/hooks/use-now';
+import { haptics } from '@/haptics';
 import { colors, radius, space } from '@/theme';
 
 const UNLIT: Light[] = Array.from({ length: 5 }, () => ({ state: 'unlit', value: '—' }));
@@ -54,6 +55,7 @@ function Live({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
   const [refreshing, setRefreshing] = useState(false);
 
   async function refresh() {
+    haptics.tick(); // released past the pull threshold
     setRefreshing(true);
     await Promise.all([summary.refetch(), latency.refetch(), devices.refetch(), members.refetch()]);
     setRefreshing(false);

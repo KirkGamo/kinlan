@@ -10,6 +10,7 @@ import { Button, Card, Loader, Screen, Segmented, StatusChip, Text, type ChipTon
 import { ago, clock } from '@/features/overview/model';
 import { SiteHeader } from '@/features/overview/site-header';
 import { useNow } from '@/hooks/use-now';
+import { haptics } from '@/haptics';
 import { colors, motion, radius, space } from '@/theme';
 
 /** Severity as icon + word (never colour alone); "back online" reads as good news. */
@@ -84,6 +85,7 @@ function Feed({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
   const sub = open.data ? (openItems.length ? `${openItems.length}${open.hasNextPage ? '+' : ''} open` : 'Nothing open') : 'Loading…';
 
   async function refresh() {
+    haptics.tick(); // released past the pull threshold
     setRefreshing(true);
     await Promise.all([open.refetch(), resolved.refetch()]);
     setRefreshing(false);

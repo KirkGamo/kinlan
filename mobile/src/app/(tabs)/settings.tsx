@@ -2,7 +2,7 @@ import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { useSites, type Circle, type Role, type Site } from '@/api/circles';
 import { useMembers, type Member } from '@/api/overview';
@@ -22,6 +22,7 @@ import { Button, Card, Chips, Loader, Mark, Screen, SectionLabel, Sheet, StatusC
 import { AccountButton, ROLE_WORD } from '@/features/account/account-sheet';
 import { Avatar } from '@/features/account/avatar';
 import { SITE_STATUS } from '@/features/overview/site-header';
+import { haptics, setHapticsEnabled, useHapticsEnabled } from '@/haptics';
 import { colors, radius, space } from '@/theme';
 
 const ROLES: { key: Role; label: string }[] = [
@@ -72,6 +73,7 @@ export default function SettingsScreen() {
           <SitesSection key={`s-${circle.id}`} circle={circle} />
           <AlertsSection key={`a-${circle.id}`} circle={circle} />
           <PushSection key={`p-${circle.id}`} circle={circle} />
+          {Platform.OS === 'web' ? null : <VibrationSection />}
         </>
       ) : null}
       <AccountSection key={`acc-${circle?.id}`} circle={circle} />
@@ -179,7 +181,14 @@ function MemberSheet({ circle, member, onClose }: { circle: Circle; member: Memb
               <Button label="Keep them" variant="ghost" onPress={() => setConfirm(false)} />
             </Card>
           ) : (
-            <Button label="Remove from this Circle" variant="danger" onPress={() => setConfirm(true)} />
+            <Button
+              label="Remove from this Circle"
+              variant="danger"
+              onPress={() => {
+                haptics.reject(); // a destructive step is one tap away
+                setConfirm(true);
+              }}
+            />
           )}
           {change.isError || remove.isError ? (
             <Text role="bodySmall" color="red" accessibilityRole="alert">
@@ -221,6 +230,7 @@ function InviteSheet({ circle, open, onClose }: { circle: Circle; open: boolean;
             label={copied ? 'Copied' : 'Copy code'}
             onPress={async () => {
               await Clipboard.setStringAsync(code);
+              haptics.confirm();
               setCopied(true);
               setTimeout(() => setCopied(false), 2_000);
             }}
@@ -382,7 +392,10 @@ function Thresholds({ siteId, value, manage }: { siteId: string; value: AlertSet
         <Switch
           value={value.notify_new_device}
           disabled={!manage || update.isPending}
-          onValueChange={(on) => update.mutate({ notify_new_device: on })}
+          onValueChange={(on) => {
+            haptics.toggle(on);
+            update.mutate({ notify_new_device: on });
+          }}
           trackColor={{ false: colors.unlit, true: colors.yellow }}
           thumbColor={value.notify_new_device ? colors.onYellow : colors.text2}
           // react-native-web reads its own props for the thumb; without them it paints a default teal.
@@ -456,7 +469,10 @@ function PushSection({ circle }: { circle: Circle }) {
                 <Switch
                   value={on}
                   disabled={update.isPending}
-                  onValueChange={(v) => update.mutate({ [row.key]: v })}
+                  onValueChange={(v) => {
+                    haptics.toggle(v);
+                    update.mutate({ [row.key]: v });
+                  }}
                   trackColor={{ false: colors.unlit, true: colors.yellow }}
                   thumbColor={on ? colors.onYellow : colors.text2}
                   accessibilityLabel={`Push for ${row.title.toLowerCase()}`}
@@ -472,6 +488,36 @@ function PushSection({ circle }: { circle: Circle }) {
           ) : null}
         </Card>
       )}
+    </>
+  );
+}
+
+/** The in-app Vibration switch: saved on this phone, on by default. */
+function VibrationSection() {
+  const on = useHapticsEnabled();
+  return (
+    <>
+      <SectionLabel end="this phone">Feel</SectionLabel>
+      <Card>
+        <View style={styles.switchRow}>
+          <View style={styles.rowText}>
+            <Text role="title">Vibration</Text>
+            <Text role="bodySmall" color="text2">
+              A light tap when you pick, switch or finish something. Follows your phone’s touch feedback setting.
+            </Text>
+          </View>
+          <Switch
+            value={on}
+            onValueChange={(v) => {
+              setHapticsEnabled(v);
+              haptics.toggle(v); // plays only when turning on: the switch is already off otherwise
+            }}
+            trackColor={{ false: colors.unlit, true: colors.yellow }}
+            thumbColor={on ? colors.onYellow : colors.text2}
+            accessibilityLabel="Vibration"
+          />
+        </View>
+      </Card>
     </>
   );
 }
@@ -538,7 +584,14 @@ function AccountSection({ circle }: { circle: Circle | undefined }) {
             <Button label="Stay" variant="ghost" onPress={() => setConfirm(null)} />
           </Card>
         ) : (
-          <Button label={`Leave ${circle.name}`} variant="danger" onPress={() => setConfirm('leave')} />
+          <Button
+            label={`Leave ${circle.name}`}
+            variant="danger"
+            onPress={() => {
+              haptics.reject();
+              setConfirm('leave');
+            }}
+          />
         )
       ) : null}
       {confirm === 'delete' ? (
@@ -555,7 +608,14 @@ function AccountSection({ circle }: { circle: Circle | undefined }) {
           <Button label="Keep my account" variant="ghost" onPress={() => setConfirm(null)} />
         </Card>
       ) : (
-        <Button label="Delete account" variant="danger" onPress={() => setConfirm('delete')} />
+        <Button
+          label="Delete account"
+          variant="danger"
+          onPress={() => {
+            haptics.reject();
+            setConfirm('delete');
+          }}
+        />
       )}
       {leave.isError || del.isError ? (
         <Text role="bodySmall" color="red" accessibilityRole="alert">

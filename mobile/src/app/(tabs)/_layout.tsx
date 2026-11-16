@@ -1,6 +1,7 @@
 import { NativeTabs } from 'expo-router/native-tabs';
 
 import { useOpenAlertCount } from '@/api/alerts';
+import { haptics } from '@/haptics';
 import { colors } from '@/theme';
 
 /**
@@ -18,7 +19,13 @@ export default function TabsLayout() {
       labelStyle={{ default: { color: colors.text2 }, selected: { color: colors.text } }}
       badgeBackgroundColor={colors.red}
       badgeTextColor={colors.onRed}
-      labelVisibilityMode="labeled">
+      labelVisibilityMode="labeled"
+      // A tick when the tab changes; pressing the tab you're on stays quiet.
+      screenListeners={({ navigation }) => ({
+        tabPress: () => {
+          if (!navigation.isFocused()) haptics.tick();
+        },
+      })}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Overview</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon md="home" />
