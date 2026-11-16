@@ -5,7 +5,10 @@
  */
 import { useSyncExternalStore } from 'react';
 
-import { useCircles, useSites, type Circle, type Site } from './circles';
+import type { QueryClient } from '@tanstack/react-query';
+
+import { fetchSites, fetchSummary, useCircles, useSites, type Circle, type Site } from './circles';
+import { keys } from './keys';
 
 let selectedSite: string | null = null;
 let selectedCircle: string | null = null;
@@ -73,4 +76,17 @@ export function useTabData(): TabData {
       : { state: 'loading' };
   }
   return { state: 'ready', circle, sites: sites.data, site, canManage: canManage(circle) };
+}
+
+/**
+ * Load what the first screen draws (the chosen Circle's sites, then its site's summary) while the
+ * cold-start splash plays, so the splash fades into a finished Overview instead of a loader.
+ */
+export async function prefetchFirstScreen(client: QueryClient, circles: Circle[]): Promise<void> {
+  const circle = circles.find((c) => c.id === selectedCircle) ?? circles[0];
+  if (!circle) return;
+  const sites = await client.fetchQuery({ queryKey: keys.sites(circle.id), queryFn: () => fetchSites(circle.id) });
+  const site = sites.find((s) => s.id === selectedSite) ?? sites[0];
+  if (!site || site.status === 'pending') return;
+  await client.fetchQuery({ queryKey: keys.summary(site.id), queryFn: () => fetchSummary(site.id) });
 }

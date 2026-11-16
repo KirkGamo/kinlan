@@ -43,11 +43,24 @@ const SLOW_AT = PLAYED_AT + 1000; // still loading by now: show the loader under
 /**
  * The cold-start splash (brand.md section 6). It takes over from the native splash, which shows
  * the same five lights unlit in the same place, lights them left to right, raises the wordmark
- * and tagline, and fades out once the app knows where to go (`ready`). A fast start doesn't wait
+ * and tagline, and fades out once the app underneath has been drawn (`ready`). A fast start doesn't wait
  * for more than the ignition; a slow one keeps the lit mark and adds the loader. Reduce Motion:
  * the lights are already on and the words fade in. No haptics: nothing was tapped (DESIGN.md).
  */
-export function BootSplash({ ready, onShown, onDone }: { ready: boolean; onShown: () => void; onDone: () => void }) {
+export function BootSplash({
+  ready,
+  onShown,
+  onPlayed,
+  onDone,
+}: {
+  /** The app underneath has been drawn: fade out (once the ignition has played). */
+  ready: boolean;
+  /** The splash has drawn: hide the native one. */
+  onShown: () => void;
+  /** The lamps are lit and the words are in: the app may start mounting underneath. */
+  onPlayed: () => void;
+  onDone: () => void;
+}) {
   const reduce = useReducedMotion();
   const lights = [useSharedValue(0), useSharedValue(0), useSharedValue(0), useSharedValue(0), useSharedValue(0)];
   const pops = [useSharedValue(1), useSharedValue(1), useSharedValue(1), useSharedValue(1), useSharedValue(1)];
@@ -81,7 +94,13 @@ export function BootSplash({ ready, onShown, onDone }: { ready: boolean; onShown
       words.set(withDelay(WORDS_AT, withTiming(1, { duration: WORDS_MS, easing: motion.easing.decelerate })));
       tag.set(withDelay(WORDS_AT + TAG_DELAY, withTiming(1, { duration: WORDS_MS, easing: motion.easing.decelerate })));
     }
-    const played = setTimeout(() => setPlayed(true), reduce ? motion.reducedFade : PLAYED_AT);
+    const played = setTimeout(
+      () => {
+        setPlayed(true);
+        onPlayed();
+      },
+      reduce ? motion.reducedFade : PLAYED_AT,
+    );
     const slowTimer = setTimeout(() => setSlow(true), reduce ? motion.reducedFade + 1000 : SLOW_AT);
     return () => {
       clearTimeout(played);
