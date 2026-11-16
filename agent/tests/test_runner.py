@@ -79,12 +79,30 @@ def test_an_outage_is_recorded_diagnosed_and_queued_when_it_ends(buffer):
         rt.tick()
     assert buffer.current_outage() is not None and buffer.current_outage().cause == "isp"
     assert len(diagnoses) == 1
+    [queued] = [i.payload for i in buffer.peek(100) if i.kind == "diagnose"]
+    assert queued["result"]["root_cause_step"] == 4 and queued["finished_at"].endswith("Z")
     net.internet_up = True
     for _ in range(2):
         rt.tick()
     outages = [i.payload for i in buffer.peek(100) if i.kind == "outage"]
     assert len(outages) == 1 and outages[0]["cause"] == "isp" and outages[0]["ended_at"]
     assert buffer.current_outage() is None
+
+
+def test_internet_targets_are_picked_again_but_not_mid_outage(buffer):
+    net = Net()
+    d = deps(net)
+    rt = Runtime(AgentConfig(), buffer, d)
+    rt.start()
+    d.choose_targets = lambda candidates, send: ["9.9.9.9", "208.67.222.222"]
+    assert rt.recheck_targets() is True
+    assert (rt.monitor.primary, rt.monitor.confirm) == ("9.9.9.9", "208.67.222.222")
+    assert rt.recheck_targets() is False  # unchanged
+    net.internet_up = False
+    for _ in range(3):
+        rt.tick()
+    d.choose_targets = lambda candidates, send: ["1.1.1.1", "8.8.8.8"]
+    assert rt.recheck_targets() is False and rt.monitor.primary == "9.9.9.9"
 
 
 def test_an_outage_open_before_a_restart_keeps_its_start_time(buffer):

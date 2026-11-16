@@ -53,7 +53,9 @@ class Batch:
         return self.items[-1].id
 
 
-def build_payload(batch: Batch, version: str = __version__) -> dict:
+def build_payload(
+    batch: Batch, version: str = __version__, scan_interval_s: float | None = None
+) -> dict:
     """Turn outbox rows into the ingest payload (plan, Section 4.3)."""
     payload: dict = {
         "batch_id": batch.batch_id,
@@ -63,7 +65,10 @@ def build_payload(batch: Batch, version: str = __version__) -> dict:
         "devices": [],
         "outages": [],
         "port_findings": [],
+        "diagnoses": [],
     }
+    if scan_interval_s:
+        payload["scan_interval_s"] = scan_interval_s  # the server's offline rule follows it
     for item in batch.items:
         if item.kind == "sample":
             payload["samples"].append(item.payload)
@@ -77,6 +82,8 @@ def build_payload(batch: Batch, version: str = __version__) -> dict:
             payload["outages"].append(item.payload)
         elif item.kind == "port_finding":
             payload["port_findings"].append(item.payload)
+        elif item.kind == "diagnose":
+            payload["diagnoses"].append(item.payload)
         else:
             log.warning("skipping unknown outbox item kind %r", item.kind)
     return payload
@@ -91,6 +98,7 @@ class Uploader:
         client: httpx.Client | None = None,
         batch_size: int = 500,
         version: str = __version__,
+        scan_interval_s: float | None = None,
     ):
         self.buffer = buffer
         self.url = api_url.rstrip("/") + "/api/v1/agent/ingest"
@@ -98,6 +106,7 @@ class Uploader:
         self.client = client or httpx.Client(timeout=30)
         self.batch_size = batch_size
         self.version = version
+        self.scan_interval_s = scan_interval_s
         self.failures = 0
         self.stopped_reason: str | None = None
 
@@ -129,7 +138,8 @@ class Uploader:
         batch = self.next_batch()
         if batch is None:
             return Outcome.EMPTY
-        body = gzip.compress(json.dumps(build_payload(batch, self.version)).encode())
+        payload = build_payload(batch, self.version, self.scan_interval_s)
+        body = gzip.compress(json.dumps(payload).encode())
         headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",

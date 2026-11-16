@@ -30,6 +30,7 @@ from kinlan_agent.uploader import Uploader
 
 log = logging.getLogger("kinlan.runner")
 PRUNE_EVERY_S = 3600
+RECHECK_TARGETS_EVERY_S = 3600  # some networks block a resolver for a while (plan 3.2)
 
 
 @dataclass
@@ -185,12 +186,28 @@ class Runtime:
             try:
                 result = self.deps.run_diagnose(internet_targets=tuple(self.targets[:2]))
                 log.warning("diagnose: %s", result.summary)
+                # Kept for the app's diagnose history; it uploads once the internet is back.
+                finished = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+                self.buffer.add("diagnose", {"finished_at": finished, "result": result.to_dict()})
             except Exception:
                 log.exception("automatic diagnose failed")
         elif event and event.kind == "ended" and self.open_outage_id is not None:
             self.buffer.close_outage(self.open_outage_id, event.outage.ended_at)
             log.warning("internet back after %.0f s", event.outage.duration_s or 0)
             self.open_outage_id = None
+
+    def recheck_targets(self) -> bool:
+        """Pick the internet targets again (not mid-outage, when none would answer).
+        Returns True if they changed."""
+        if self.monitor is None or self.monitor.detector.current is not None:
+            return False
+        chosen = self.deps.choose_targets(self.config.internet_targets, send=self.deps.send)
+        if chosen[:2] == self.targets[:2]:
+            return False
+        log.info("internet targets now %s (were %s)", ", ".join(chosen), ", ".join(self.targets))
+        self.targets = chosen
+        self.monitor.primary, self.monitor.confirm = chosen[0], chosen[1]
+        return True
 
     def scan_now(self) -> tuple[netinfo.NetInfo, discovery.ScanResult]:
         with self._scan_lock:
@@ -226,12 +243,16 @@ def run(
     stop = stop or threading.Event()
     runtime = Runtime(config, buffer, deps or CloudDeps())
     runtime.start()
-    uploader = Uploader(buffer, config.api_url, token)
+    uploader = Uploader(buffer, config.api_url, token, scan_interval_s=config.scan_interval_s)
     poller = CommandPoller(runtime, config.api_url, token)
     last_prune = [0.0]
+    last_targets = [time.monotonic()]
 
     def scan_and_prune() -> None:
         runtime.scan_now()
+        if time.monotonic() - last_targets[0] > RECHECK_TARGETS_EVERY_S:
+            last_targets[0] = time.monotonic()
+            runtime.recheck_targets()
         if time.monotonic() - last_prune[0] > PRUNE_EVERY_S:
             removed = buffer.prune()
             last_prune[0] = time.monotonic()
