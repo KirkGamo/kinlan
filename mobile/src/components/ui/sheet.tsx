@@ -16,11 +16,17 @@ export function Sheet({
   open,
   onClose,
   title,
+  icon,
+  meta,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
+  /** A 24-unit icon path, drawn in a raised tile beside the title (prototype). */
+  icon?: string;
+  /** A line under the title: usually a status chip and a short fact. */
+  meta?: ReactNode;
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
@@ -37,11 +43,20 @@ export function Sheet({
             exiting={SlideOutDown.duration(motion.small)}
             accessibilityViewIsModal
             style={[styles.sheet, { paddingBottom: space.card + insets.bottom }]}>
+            <View style={styles.handle} />
             <View style={styles.head}>
+              {icon ? (
+                <View style={styles.iconTile}>
+                  <Svg width={26} height={26} viewBox="0 0 24 24">
+                    <Path d={icon} fill={colors.text} />
+                  </Svg>
+                </View>
+              ) : null}
               <View style={styles.title}>
                 <Text role="titleLarge" accessibilityRole="header">
                   {title}
                 </Text>
+                {meta ? <View style={styles.meta}>{meta}</View> : null}
               </View>
               <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8} style={({ pressed }) => [styles.close, pressed && styles.pressed]}>
                 <Svg width={20} height={20} viewBox="0 0 24 24">
@@ -73,9 +88,20 @@ const styles = StyleSheet.create({
     maxWidth: 560,
     alignSelf: 'center',
   },
-  head: { flexDirection: 'row', alignItems: 'center', gap: space.s3 },
+  handle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: colors.raised, marginTop: -8 },
+  head: { flexDirection: 'row', alignItems: 'center', gap: space.s4 },
+  iconTile: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    borderCurve: 'continuous',
+    backgroundColor: colors.raised,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: space.s2, flexWrap: 'wrap', marginTop: 6 },
   body: { gap: space.s3 },
-  title: { flex: 1 },
+  title: { flex: 1, gap: 0 },
   close: {
     width: 44,
     height: 44,

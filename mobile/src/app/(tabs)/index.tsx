@@ -6,7 +6,7 @@ import Svg, { Path } from 'react-native-svg';
 import { useSiteSummary, useSites, type Circle, type Site, type SiteSummary } from '@/api/circles';
 import { useDevices, useLatency, useMembers } from '@/api/overview';
 import { selectSite, useCurrentCircle, useSelectedSite } from '@/api/selection';
-import { Button, Card, Loader, Screen, SectionLabel, StatusChip, Text } from '@/components/ui';
+import { Button, Card, Loader, Perforation, Screen, SectionLabel, StatusChip, Text } from '@/components/ui';
 import { HealthCard } from '@/features/overview/health-card';
 import { LatencyChart } from '@/features/overview/latency-chart';
 import { LightStrip } from '@/features/overview/light-strip';
@@ -103,6 +103,7 @@ function Live({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
       <LightStrip lights={lit} igniteKey={`${site.id}-${ignite}`} onDiagnose={canManage && !stale ? diagnose : undefined} />
 
       <Card style={styles.verdict}>
+        <Perforation />
         <View style={styles.meta}>
           <StatusChip tone={v.tone} label={v.chip} />
           <Text role="bodySmall" color={stale ? 'orange' : 'text2'} tabular>
@@ -178,7 +179,7 @@ function DiagnoseFab({ onPress }: { onPress: () => void }) {
       style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}>
       <Svg width={20} height={20} viewBox="0 0 24 24">
         <Path
-          d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
+          d="M15.9 5c-.17 0-.32.09-.41.23l-.07.15-5.18 11.65c-.16.29-.26.61-.26.96 0 1.11.9 2.01 2.01 2.01.96 0 1.77-.68 1.96-1.59l.01-.03L16.4 5.5c0-.28-.22-.5-.5-.5zM1 9l2 2c2.88-2.88 6.79-4.08 10.53-3.62l1.19-2.68C9.89 3.84 4.74 5.27 1 9zm20 2l2-2c-1.64-1.64-3.55-2.82-5.59-3.57l-.53 2.82c1.5.62 2.9 1.53 4.12 2.75zm-4 4l2-2c-.8-.8-1.7-1.42-2.66-1.89l-.55 2.92c.42.27.83.59 1.21.97zM5 13l2 2c1.13-1.13 2.56-1.79 4.03-2l1.28-2.88c-2.63-.08-5.3.87-7.31 2.88z"
           fill={colors.onYellow}
         />
       </Svg>
@@ -221,6 +222,7 @@ function Unpaired({ site, sites, canManage }: { site: Site; sites: Site[]; canMa
       <SiteHeader site={site} sites={sites} sub="Not paired yet" onSwitch={selectSite} />
       <LightStrip lights={UNLIT} igniteKey="pending" />
       <Card style={styles.verdict}>
+        <Perforation />
         <StatusChip tone="neutral" label="Not paired" />
         <Text role="headline" accessibilityRole="header">
           Pair the agent to start
@@ -245,6 +247,7 @@ function NoSites({ circle, canManage }: { circle: Circle; canManage: boolean }) 
         {circle.name}
       </Text>
       <Card style={styles.verdict}>
+        <Perforation />
         <Text role="headline">No sites yet</Text>
         <Text role="body" color="text2">
           {canManage
@@ -284,7 +287,7 @@ function ErrorCard({ message, onRetry }: { message: string; onRetry: () => void 
 }
 
 const styles = StyleSheet.create({
-  verdict: { paddingTop: space.s6, gap: space.s2 },
+  verdict: { paddingTop: space.s6, gap: space.s2, overflow: 'hidden' }, // clips the perforation
   meta: { flexDirection: 'row', alignItems: 'center', gap: space.s3, flexWrap: 'wrap' },
   loading: { alignItems: 'center', justifyContent: 'center', minHeight: 120 },
   row: {

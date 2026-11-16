@@ -1,4 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
+import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
@@ -17,7 +18,7 @@ import {
   useUpdateAlertSettings,
   type AlertSettings,
 } from '@/api/settings';
-import { Button, Card, Chips, Loader, Screen, SectionLabel, Sheet, StatusChip, Text } from '@/components/ui';
+import { Button, Card, Chips, Loader, Mark, Screen, SectionLabel, Sheet, StatusChip, Text, Wordmark } from '@/components/ui';
 import { AccountButton, ROLE_WORD } from '@/features/account/account-sheet';
 import { Avatar } from '@/features/account/avatar';
 import { SITE_STATUS } from '@/features/overview/site-header';
@@ -74,6 +75,14 @@ export default function SettingsScreen() {
         </>
       ) : null}
       <AccountSection key={`acc-${circle?.id}`} circle={circle} />
+      {/* The brand sign-off at the foot of Settings (prototype "about"). */}
+      <View style={styles.about} accessible accessibilityLabel={`KinLAN, version ${Constants.expoConfig?.version ?? ''}`}>
+        <Mark width={54} />
+        <Wordmark size={26} />
+        <Text role="bodySmall" color="text2">
+          {`Your people, your network. · v${Constants.expoConfig?.version ?? ''}`}
+        </Text>
+      </View>
     </Screen>
   );
 }
@@ -126,7 +135,7 @@ function MembersSection({ circle }: { circle: Circle }) {
           );
         })
       )}
-      {isOwner ? <Button label="Invite a member" variant="ghost" onPress={() => setInviting(true)} /> : null}
+      {isOwner ? <Button label="Invite a member" onPress={() => setInviting(true)} /> : null}
       <MemberSheet circle={circle} member={picked} onClose={() => setPicked(null)} />
       <InviteSheet circle={circle} open={inviting} onClose={() => setInviting(false)} />
     </>
@@ -559,6 +568,7 @@ function AccountSection({ circle }: { circle: Circle | undefined }) {
 
 const styles = StyleSheet.create({
   center: { minHeight: 100, alignItems: 'center', justifyContent: 'center' },
+  about: { alignItems: 'center', gap: space.s2, paddingTop: space.s8, paddingBottom: space.s2 },
   bar: { flexDirection: 'row', alignItems: 'flex-start', gap: space.s3 },
   title: { flex: 1, gap: 2 },
   row: {

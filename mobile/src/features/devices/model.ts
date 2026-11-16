@@ -20,7 +20,7 @@ export function matches(d: Device, f: Filter): boolean {
 export function chip(d: Device, stale = false): { tone: ChipTone; label: string } {
   if (d.needs_review) return { tone: 'new', label: 'New' };
   if (stale) return { tone: 'neutral', label: 'Unknown' }; // agent offline: online flags are old
-  return d.online ? { tone: 'ok', label: 'Online' } : { tone: 'neutral', label: 'Offline' };
+  return d.online ? { tone: 'ok', label: 'Healthy' } : { tone: 'neutral', label: 'Offline' }; // prototype wording
 }
 
 /** "Apple · 192.168.1.23", leaving out what isn't known. */
