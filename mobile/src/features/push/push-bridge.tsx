@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 
 import { registerForPush } from '@/api/push';
+import { selectSite } from '@/api/selection';
 
 /**
  * Mounted while signed in with a Circle (Android only): registers this phone for push once per
@@ -21,8 +22,11 @@ export function PushBridge() {
     const id = response.notification.request.identifier;
     if (handled.current === id) return;
     handled.current = id;
-    const url = response.notification.request.content.data?.url;
-    if (typeof url === 'string' && url.startsWith('/')) router.push(url as never);
+    const data = response.notification.request.content.data;
+    // Show the site the alert is about first, so the device or light it links to is there.
+    if (typeof data?.siteId === 'string') selectSite(data.siteId);
+    const url = data?.url;
+    if (typeof url === 'string' && url.startsWith('/')) router.navigate(url as never);
   }, [response]);
 
   return null;

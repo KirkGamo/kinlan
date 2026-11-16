@@ -99,7 +99,7 @@ function Body({
   canManage: boolean;
   stale: boolean;
 }) {
-  const update = useUpdateDevice(d.id, siteId);
+  const update = useUpdateDevice(d.id, siteId, members);
   const ping = usePing(d, siteId);
   const [name, setName] = useState(d.custom_name ?? '');
   const owners = [

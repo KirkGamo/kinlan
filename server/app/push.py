@@ -72,6 +72,9 @@ def link_for(alert: Alert) -> str:
     """Where tapping the notification goes in the app."""
     if alert.type in ("new_device", "risky_port") and alert.subject_ref:
         return f"/devices?device={alert.subject_ref.split(':')[0]}"
+    if alert.type == "unreachable":
+        # Overview opens with the failing light's sheet; `at` makes each push a new link.
+        return f"/?light=failing&at={alert.id}"
     return "/alerts"
 
 

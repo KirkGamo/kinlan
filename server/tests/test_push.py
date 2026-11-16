@@ -154,6 +154,19 @@ def test_slow_internet_stays_in_the_app_unless_switched_on(client, ana, home):
     assert [m["data"]["url"] for m in fake.sent] == ["/alerts"]
 
 
+def test_an_outage_links_to_the_failing_light_and_recovery_to_alerts(client, ana, home):
+    register(client, ana, TOKEN_A)
+    down = add_alert(home["id"], type_="unreachable", severity="critical")
+    fake = FakeExpo()
+    run_dispatch(fake)
+    add_alert(home["id"], type_="back_online", severity="info")
+    back = FakeExpo(tickets={TOKEN_A: {"status": "ok", "id": "ticket-back"}})
+    run_dispatch(back)
+    assert [m["data"]["url"] for m in back.sent] == ["/alerts"]
+    assert fake.sent[0]["data"]["url"] == f"/?light=failing&at={down}"
+    assert fake.sent[0]["data"]["siteId"] == str(home["id"])
+
+
 def test_old_alerts_are_never_pushed_and_failures_retry(client, ana, home):
     register(client, ana, TOKEN_A)
     stale = add_alert(home["id"], type_="unreachable", severity="critical", ago=timedelta(hours=1))
