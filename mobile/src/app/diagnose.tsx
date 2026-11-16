@@ -1,9 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
-import Svg, { Path } from 'react-native-svg';
 
 import { useSiteSummary } from '@/api/circles';
 import { canManage as manages, useCurrentCircle } from '@/api/selection';
@@ -13,7 +12,7 @@ import { Button, Card, FormScreen, Loader, SectionLabel, StatusChip, Text, type 
 import { LightStrip } from '@/features/overview/light-strip';
 import { clock, isStale, ms, type Light } from '@/features/overview/model';
 import { useNow } from '@/hooks/use-now';
-import { colors, motion, radius, space } from '@/theme';
+import { colors, motion, radius, space, tints } from '@/theme';
 
 /** Plain names for the six checks, from this PC up to secure websites (briefs.md section 3). */
 const RUNGS = [
@@ -93,8 +92,17 @@ export default function DiagnoseScreen() {
   const shown = running ? undefined : lastDone;
   const result = shown?.result as DiagnoseResult | undefined;
 
+  const headerSub = running
+    ? 'Running the checks…'
+    : latest?.status === 'expired'
+      ? 'The agent didn’t respond'
+      : result && shown?.finished_at
+        ? `Finished ${clock(shown.finished_at)} · ${result.root_cause_step ? `root cause: step ${result.root_cause_step}` : 'all six passed'}`
+        : 'Not run yet';
+
   return (
     <FormScreen>
+      <Stack.Screen options={{ headerTitle: () => <HeaderTitle sub={headerSub} /> }} />
       <LightStrip lights={result ? toLights(result) : UNLIT} igniteKey={shown?.id ?? 'none'} />
       <Verdict latest={latest} running={running} shown={shown} result={result} stale={stale} />
 
@@ -113,7 +121,7 @@ export default function DiagnoseScreen() {
         </Text>
       ) : null}
 
-      <SectionLabel>The six checks</SectionLabel>
+      <SectionLabel end="tap for details">The six checks</SectionLabel>
       <Ladder key={shown?.id ?? 'none'} result={result} running={running} />
 
       <History runs={(runs.data ?? []).filter((c) => c.id !== shown?.id && c.status === 'done')} />
@@ -214,8 +222,14 @@ function Ladder({ result, running }: { result: DiagnoseResult | undefined; runni
         const state = running ? 'waiting' : (step?.status ?? 'none');
         const isRoot = result?.root_cause_step === n;
         const expanded = open === n && !!step;
+        const lastRung = n === RUNGS.length;
         return (
-          <Animated.View key={n} entering={reduce || !result ? undefined : FadeIn.delay(i * motion.lightStagger).duration(motion.small)}>
+          <Animated.View key={n} entering={reduce || !result ? undefined : FadeIn.delay(i * motion.lightStagger).duration(motion.small)} style={styles.rungRow}>
+            {/* The rail: each step's number, joined to the next by a line (prototype). */}
+            <View style={styles.rail}>
+              <Badge n={n} state={state} />
+              {lastRung ? null : <View style={[styles.railLine, state === 'pass' && styles.railLinePass]} />}
+            </View>
             <Pressable
               disabled={!step}
               onPress={() => setOpen(expanded ? null : n)}
@@ -223,14 +237,11 @@ function Ladder({ result, running }: { result: DiagnoseResult | undefined; runni
               accessibilityState={{ expanded, disabled: !step }}
               accessibilityLabel={`Step ${n}, ${name}: ${WORD[state]}. ${step?.summary ?? ''}`}
               style={({ pressed }) => [styles.rung, isRoot && styles.root, pressed && styles.pressed]}>
-              <View style={styles.rungHead}>
-                <Badge n={n} state={state} />
-                <View style={styles.rungText}>
-                  <Text role="title">{name}</Text>
-                  <Text role="bodySmall" color={state === 'fail' ? 'red' : 'text2'}>
-                    {step?.summary || WORD[state]}
-                  </Text>
-                </View>
+              <View style={styles.rungText}>
+                <Text role="title">{name}</Text>
+                <Text role="bodySmall" color={state === 'fail' ? 'red' : 'text2'}>
+                  {step?.summary || WORD[state]}
+                </Text>
               </View>
               {expanded ? (
                 <View style={styles.detail}>
@@ -263,26 +274,20 @@ const WORD: Record<string, string> = {
   none: 'Not checked yet',
 };
 
-const BADGE_ICON = {
-  pass: 'M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z',
-  fail: 'M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
-};
 
-/** The rung's number in a circle; a check or a cross once it has a result (never colour alone). */
+/** The step's number on the rail, tinted by its state; the rung's text says the state in words. */
 function Badge({ n, state }: { n: number; state: string }) {
-  const fill = state === 'pass' ? colors.green : state === 'fail' ? colors.red : colors.raised;
-  const icon = state === 'pass' ? BADGE_ICON.pass : state === 'fail' ? BADGE_ICON.fail : null;
+  const look =
+    state === 'pass'
+      ? { bg: tints.green, fg: 'green' as const }
+      : state === 'fail'
+        ? { bg: colors.red, fg: 'onRed' as const }
+        : { bg: colors.raised, fg: 'text2' as const };
   return (
-    <View style={[styles.badge, { backgroundColor: fill }]}>
-      {icon ? (
-        <Svg width={16} height={16} viewBox="0 0 24 24">
-          <Path d={icon} fill={colors.onRed} />
-        </Svg>
-      ) : (
-        <Text role="labelSmall" color="text2">
-          {String(n)}
-        </Text>
-      )}
+    <View style={[styles.badge, { backgroundColor: look.bg }]}>
+      <Text role="labelSmall" color={look.fg} tabular>
+        {String(n)}
+      </Text>
     </View>
   );
 }
@@ -315,6 +320,20 @@ function day(iso: string): string {
     : `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${clock(iso)}`;
 }
 
+/** The pushed screen's title with the run's outcome below it (prototype). */
+function HeaderTitle({ sub }: { sub: string }) {
+  return (
+    <View>
+      <Text role="titleLarge" accessibilityRole="header">
+        Diagnose
+      </Text>
+      <Text role="bodySmall" color="text2" numberOfLines={1}>
+        {sub}
+      </Text>
+    </View>
+  );
+}
+
 /** Six steps onto five lights (direction.md): PC = 1, Router = 2 and 3, Provider = 4, DNS = 5, Web = 6. */
 function toLights(r: DiagnoseResult): Light[] {
   const st = (n: number) => r.steps.find((s) => s.n === n);
@@ -332,8 +351,14 @@ function toLights(r: DiagnoseResult): Light[] {
 const styles = StyleSheet.create({
   verdict: { paddingTop: space.s6, gap: space.s2 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: space.s3, flexWrap: 'wrap' },
-  ladder: { gap: space.item },
+  ladder: { gap: 0 },
+  rungRow: { flexDirection: 'row', gap: space.s3 },
+  rail: { width: 32, alignItems: 'center' },
+  railLine: { flex: 1, width: 2, marginVertical: 4, backgroundColor: colors.unlit },
+  railLinePass: { backgroundColor: 'rgba(48, 209, 88, 0.35)' },
   rung: {
+    flex: 1,
+    marginBottom: space.item,
     backgroundColor: colors.card,
     borderRadius: radius.row,
     borderCurve: 'continuous',
@@ -347,7 +372,6 @@ const styles = StyleSheet.create({
   },
   root: { borderColor: colors.red },
   pressed: { backgroundColor: colors.raised },
-  rungHead: { flexDirection: 'row', alignItems: 'center', gap: space.s3 },
   rungText: { flex: 1, gap: 2 },
   badge: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   detail: { gap: space.s1, backgroundColor: colors.raised, borderRadius: 14, padding: space.s3 },
