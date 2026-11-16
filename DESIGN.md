@@ -380,6 +380,11 @@ The system's way of saying state.
 ### Loader
 - Five small lights blinking in sequence (yellow), the brand's replacement for a spinner. It also fills the loading slot of buttons.
 
+### Splash (cold start)
+- The native splash shows the mark as five unlit lamps (`unlit` with an `unlit-ring` rim), 132 dp wide at the exact centre of Night Ground. The app's own splash takes over in the same place, so the handoff is invisible.
+- After a 250-ms beat the lamps light left to right (110-ms stagger, each fading to yellow over 220 ms with a pop to 1.18), then the wordmark and "Your people, your network." rise 8 dp into place (420 ms decelerate, the tagline 120 ms behind), over the perforation centred just above the middle.
+- It leaves with a 350-ms fade as soon as the ignition has played and the app knows where to go; the destination screen is already drawn underneath. If loading takes more than about a second longer, the Loader appears under the tagline. It plays once per cold start and never vibrates (nothing was tapped). Reduce Motion: the lamps are already lit and the words fade in over 120 ms.
+
 ## Haptics
 Haptics confirm what the user did; they never announce what the network did.
 

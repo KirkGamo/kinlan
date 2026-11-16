@@ -3,15 +3,17 @@ import { useFonts, type FontFamilyDefinition } from 'expo-font';
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { queryClient } from '@/api/query-client';
 import { useCircles } from '@/api/circles';
+import { prefetchFirstScreen } from '@/api/selection';
 import { pushSupported } from '@/api/push';
 import { SessionProvider, useSession } from '@/api/session';
 import { Button, FormScreen, Mark, Text } from '@/components/ui';
+import { BootSplash } from '@/features/boot/boot-splash';
 import { PushBridge } from '@/features/push/push-bridge';
 import { loadHapticsPref } from '@/haptics';
 import { colors, FONT_FAMILY, space } from '@/theme';
@@ -87,12 +89,60 @@ function RootNavigator() {
   const signedIn = status === 'signedIn';
   const circles = useCircles(signedIn);
   const deciding = status === 'loading' || (signedIn && circles.isPending);
+  // Cold start, with no blank frame anywhere: the native splash stays until the animated one has
+  // drawn (they match), the lamps light with nothing else competing for the thread, the first
+  // screen's data loads meanwhile, then the app mounts under the lit mark and the splash fades
+  // only once that screen has been drawn.
+  const [booted, setBooted] = useState(false);
+  const [played, setPlayed] = useState(false);
+  const [warm, setWarm] = useState(false);
+  const [drawn, setDrawn] = useState(false);
+  const warming = useRef(false);
+  const hideNative = useCallback(() => void SplashScreen.hideAsync(), []);
+  const onPlayed = useCallback(() => setPlayed(true), []);
+  const done = useCallback(() => setBooted(true), []);
+  const circleList = circles.data;
+  const needsWarm = signedIn && !!circleList?.length; // signed out or no Circle: nothing to load
 
   useEffect(() => {
-    if (!deciding) SplashScreen.hideAsync(); // keep the splash until we know where to go
-  }, [deciding]);
+    if (deciding || !needsWarm || warming.current) return;
+    warming.current = true;
+    // Runs once. The cap isn't cleared on a re-render, so a slow API can never hold the splash.
+    setTimeout(() => setWarm(true), WARM_CAP_MS);
+    prefetchFirstScreen(queryClient, circleList)
+      .catch(() => undefined) // the screen shows its own loading or error state
+      .finally(() => setWarm(true));
+  }, [deciding, needsWarm, circleList]);
 
-  if (deciding) return null;
+  const mountApp = booted || (!deciding && played && (warm || !needsWarm));
+  const onAppLayout = useCallback(() => {
+    // Wait for the frame that draws the app before fading the splash off it.
+    requestAnimationFrame(() => requestAnimationFrame(() => setDrawn(true)));
+  }, []);
+
+  return (
+    <View style={styles.root}>
+      {mountApp ? (
+        <View style={styles.root} onLayout={onAppLayout}>
+          <Routes signedIn={signedIn} status={status} circles={circles} />
+        </View>
+      ) : null}
+      {booted ? null : (
+        <BootSplash ready={mountApp && drawn} onShown={hideNative} onPlayed={onPlayed} onDone={done} />
+      )}
+    </View>
+  );
+}
+
+function Routes({
+  signedIn,
+  status,
+  circles,
+}: {
+  signedIn: boolean;
+  status: ReturnType<typeof useSession>['status'];
+  circles: ReturnType<typeof useCircles>;
+}) {
   if (signedIn && circles.isError && !circles.data) { // a failed refresh keeps the app
     return <StartupError message={circles.error.message} onRetry={() => circles.refetch()} />;
   }
@@ -142,5 +192,8 @@ function StartupError({ message, onRetry }: { message: string; onRetry: () => vo
     </FormScreen>
   );
 }
+
+/** The longest the splash waits for the first screen's data before showing it loading. */
+const WARM_CAP_MS = 4_000;
 
 const styles = StyleSheet.create({ root: { flex: 1 } });

@@ -36,10 +36,13 @@ export function useCircles(enabled = true) {
   });
 }
 
+export const fetchSites = async (circleId: string) => (await api<List<Site>>(`/circles/${circleId}/sites`)).items;
+export const fetchSummary = (siteId: string) => api<SiteSummary>(`/sites/${siteId}/summary`);
+
 export function useSites(circleId: string | undefined) {
   return useQuery({
     queryKey: keys.sites(circleId ?? 'none'),
-    queryFn: async () => (await api<List<Site>>(`/circles/${circleId}/sites`)).items,
+    queryFn: () => fetchSites(circleId!),
     enabled: !!circleId,
   });
 }
@@ -85,7 +88,7 @@ export type SiteSummary = {
 export function useSiteSummary(siteId: string | undefined, enabled = true, everyMs = 5_000) {
   return useQuery({
     queryKey: keys.summary(siteId ?? 'none'),
-    queryFn: () => api<SiteSummary>(`/sites/${siteId}/summary`),
+    queryFn: () => fetchSummary(siteId!),
     enabled: enabled && !!siteId,
     refetchInterval: enabled ? everyMs : false,
   });
