@@ -11,6 +11,8 @@ import { readSession, writeSession } from './session-storage';
 
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'https://kinlan-api.onrender.com').replace(/\/$/, '');
 const BASE = `${API_URL}/api/v1`;
+/** Long enough for the free server to wake up (about 50 s), short enough never to hang. */
+const TIMEOUT_MS = 60_000;
 
 export type Session = { accessToken: string; refreshToken: string };
 
@@ -66,14 +68,22 @@ async function send(path: string, { method = 'GET', body, auth = true }: Options
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (auth && session) headers.Authorization = `Bearer ${session.accessToken}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     return await fetch(`${BASE}${path}`, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: controller.signal,
     });
   } catch {
+    if (controller.signal.aborted) {
+      throw new ApiError(0, 'timeout', 'KinLAN took too long to answer. Try again in a moment.');
+    }
     throw new ApiError(0, 'offline', "Can't reach KinLAN. Check your internet connection.");
+  } finally {
+    clearTimeout(timer);
   }
 }
 

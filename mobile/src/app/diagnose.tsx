@@ -31,7 +31,7 @@ const NEXT: Record<number, string> = {
   2: 'Make sure the router is on and this PC is on the router’s Wi-Fi.',
   3: 'Move the PC closer to the router, or restart the router.',
   4: 'Wait a few minutes, or call your internet provider. Your router is fine.',
-  5: 'Restart the router, or set its DNS servers to 8.8.8.8 and 1.1.1.1.',
+  5: 'Restart the router, or set its DNS servers to 8.8.8.8 and 9.9.9.9.',
   6: 'If the Wi-Fi has a sign-in page, sign in. Otherwise check a firewall or web filter.',
 };
 

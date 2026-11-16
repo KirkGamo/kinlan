@@ -5,7 +5,7 @@
  */
 import { useSyncExternalStore } from 'react';
 
-import { useCircles, type Circle } from './circles';
+import { useCircles, useSites, type Circle, type Site } from './circles';
 
 let selectedSite: string | null = null;
 let selectedCircle: string | null = null;
@@ -45,4 +45,32 @@ export function useCurrentCircle(): { circles: ReturnType<typeof useCircles>; ci
 
 export function canManage(circle: Circle | undefined): boolean {
   return circle?.role === 'owner' || circle?.role === 'admin';
+}
+
+/**
+ * What every tab needs before it can draw: the chosen Circle and its sites. A failed refresh
+ * keeps showing the data already loaded; only a first load that fails is an error, and its retry
+ * re-runs the request that failed (the Circles list, or that Circle's sites).
+ */
+export type TabData =
+  | { state: 'loading' }
+  | { state: 'error'; message: string; retry: () => void }
+  | { state: 'ready'; circle: Circle; sites: Site[]; site: Site | undefined; canManage: boolean };
+
+export function useTabData(): TabData {
+  const { circles, circle } = useCurrentCircle();
+  const sites = useSites(circle?.id);
+  const site = useSelectedSite(sites.data);
+  if (!circles.data) {
+    return circles.isError
+      ? { state: 'error', message: circles.error.message, retry: () => void circles.refetch() }
+      : { state: 'loading' };
+  }
+  if (!circle) return { state: 'loading' }; // no Circle yet: the root layout opens onboarding
+  if (!sites.data) {
+    return sites.isError
+      ? { state: 'error', message: sites.error.message, retry: () => void sites.refetch() }
+      : { state: 'loading' };
+  }
+  return { state: 'ready', circle, sites: sites.data, site, canManage: canManage(circle) };
 }

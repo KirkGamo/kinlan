@@ -4,9 +4,9 @@ import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, LinearTransition, SlideOutRight, useReducedMotion } from 'react-native-reanimated';
 
 import { useAcknowledge, useAlerts, type Alert } from '@/api/alerts';
-import { useSites, type Circle, type Site } from '@/api/circles';
-import { selectSite, useCurrentCircle, useSelectedSite } from '@/api/selection';
-import { Button, Card, Loader, Screen, Segmented, StatusChip, Text, type ChipTone } from '@/components/ui';
+import type { Site } from '@/api/circles';
+import { selectSite, useTabData } from '@/api/selection';
+import { Button, Card, ErrorCard, Loader, Screen, Segmented, StatusChip, Text, type ChipTone } from '@/components/ui';
 import { ago, clock } from '@/features/overview/model';
 import { SiteHeader } from '@/features/overview/site-header';
 import { useNow } from '@/hooks/use-now';
@@ -34,11 +34,8 @@ function deviceOf(a: Alert): string | null {
  * repeats within 30 minutes, so the list shows exactly what it sends.
  */
 export default function AlertsScreen() {
-  const { circles, circle } = useCurrentCircle();
-  const sites = useSites(circle?.id);
-  const site = useSelectedSite(sites.data);
-
-  if (circles.isPending || sites.isPending) {
+  const tab = useTabData();
+  if (tab.state === 'loading') {
     return (
       <Screen>
         <Card style={styles.center}>
@@ -47,13 +44,14 @@ export default function AlertsScreen() {
       </Screen>
     );
   }
-  if (circles.isError || sites.isError || !circle) {
+  if (tab.state === 'error') {
     return (
       <Screen>
-        <ErrorCard message={(circles.error ?? sites.error)?.message ?? 'Something went wrong.'} onRetry={() => void sites.refetch()} />
+        <ErrorCard message={tab.message} onRetry={tab.retry} />
       </Screen>
     );
   }
+  const { sites, site, canManage } = tab;
   if (!site) {
     return (
       <Screen>
@@ -68,10 +66,10 @@ export default function AlertsScreen() {
       </Screen>
     );
   }
-  return <Feed key={site.id} circle={circle} site={site} sites={sites.data} />;
+  return <Feed key={site.id} site={site} sites={sites} canManage={canManage} />;
 }
 
-function Feed({ circle, site, sites }: { circle: Circle; site: Site; sites: Site[] }) {
+function Feed({ site, sites, canManage }: { site: Site; sites: Site[]; canManage: boolean }) {
   const open = useAlerts(site.id, 'open');
   const resolved = useAlerts(site.id, 'resolved');
   const ack = useAcknowledge(site.id);
@@ -79,7 +77,6 @@ function Feed({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
   const reduce = useReducedMotion();
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<'open' | 'resolved'>('open');
-  const canManage = circle.role === 'owner' || circle.role === 'admin';
 
   const openItems = open.data?.pages.flatMap((p) => p.items) ?? [];
   const resolvedItems = resolved.data?.pages.flatMap((p) => p.items) ?? [];
@@ -269,18 +266,6 @@ function AlertCard({
         {children ? <View style={styles.actions}>{children}</View> : null}
       </View>
     </View>
-  );
-}
-
-function ErrorCard({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <Card>
-      <StatusChip tone="down" label="Couldn’t load" />
-      <Text role="body" color="text2">
-        {message}
-      </Text>
-      <Button label="Try again" variant="ghost" onPress={onRetry} />
-    </Card>
   );
 }
 

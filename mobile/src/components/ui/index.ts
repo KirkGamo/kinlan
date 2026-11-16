@@ -9,3 +9,4 @@ export { Sheet } from './sheet';
 export { Chips, Segmented } from './choice';
 export { Facts } from './facts';
 export { Perforation } from './perforation';
+export { ErrorCard } from './error-card';

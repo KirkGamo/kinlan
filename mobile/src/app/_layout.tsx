@@ -93,7 +93,7 @@ function RootNavigator() {
   }, [deciding]);
 
   if (deciding) return null;
-  if (signedIn && circles.isError) {
+  if (signedIn && circles.isError && !circles.data) { // a failed refresh keeps the app
     return <StartupError message={circles.error.message} onRetry={() => circles.refetch()} />;
   }
   const hasCircle = (circles.data?.length ?? 0) > 0;
