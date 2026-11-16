@@ -1,5 +1,5 @@
-import { useEffect, type ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Keyboard, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { GestureDetector, GestureHandlerRootView, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
   FadeIn,
@@ -47,10 +47,16 @@ export function Sheet({
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const drag = useSheetDrag(open, onClose);
+  // The sheet rides on top of the keyboard, and its body shrinks so the head stays on screen.
+  // (Keyboard events, not Reanimated's keyboard hook: that one can't see a Modal's keyboard.)
+  const keyboard = useKeyboardHeight(open);
+  const lift = { paddingBottom: keyboard };
+  const bodyHeight = { maxHeight: Math.max(160, height * 0.72 - keyboard) };
   return (
     <Modal visible={open} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       {open ? (
         <GestureHandlerRootView style={styles.root}>
+          <View style={[styles.root, lift]}>
           <Animated.View entering={FadeIn.duration(motion.screen)} exiting={FadeOut.duration(motion.small)} style={StyleSheet.absoluteFill}>
             <Animated.View style={[StyleSheet.absoluteFill, drag.scrimStyle]}>
               <Pressable style={styles.scrim} onPress={onClose} accessibilityLabel="Close" accessibilityRole="button" />
@@ -87,14 +93,31 @@ export function Sheet({
                 </View>
               </View>
             </GestureDetector>
-            <ScrollView style={{ maxHeight: height * 0.72 }} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+            <ScrollView style={bodyHeight} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
               {children}
             </ScrollView>
           </Animated.View>
+          </View>
         </GestureHandlerRootView>
       ) : null}
     </Modal>
   );
+}
+
+/** The keyboard's height while it's up and this sheet is open; 0 otherwise. */
+function useKeyboardHeight(open: boolean): number {
+  const [h, setH] = useState(0);
+  useEffect(() => {
+    if (!open) return;
+    const show = Keyboard.addListener('keyboardDidShow', (e) => setH(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setH(0));
+    return () => {
+      show.remove();
+      hide.remove();
+      setH(0);
+    };
+  }, [open]);
+  return h;
 }
 
 /** Past this share of the sheet's height, or faster than FLING, a drag closes the sheet. */
