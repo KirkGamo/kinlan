@@ -1,7 +1,7 @@
 import { useNavigation } from 'expo-router';
 import { useEffect, useRef, type ReactElement, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View, type RefreshControlProps, type ScrollViewInstance, type ViewStyle } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, radius, space } from '@/theme';
 
@@ -42,8 +42,11 @@ export function Screen({
     });
   }, [navigation]);
 
+  // Insets from the provider, not a native SafeAreaView: those pad a frame late on mount, which
+  // showed as the header jumping under the status bar when a loading screen gave way to content.
+  const insets = useSafeAreaInsets();
   return (
-    <SafeAreaView edges={['top']} style={styles.screen}>
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
       {scroll ? (
         <ScrollView
           ref={ref}
@@ -60,7 +63,7 @@ export function Screen({
         <View style={styles.content}>{children}</View>
       )}
       {fab ? <View style={styles.fab}>{fab}</View> : null}
-    </SafeAreaView>
+    </View>
   );
 }
 
