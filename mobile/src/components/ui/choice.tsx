@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { haptics } from '@/haptics';
 import { colors, radius, space } from '@/theme';
 
 import { Text } from './text';
@@ -23,7 +24,7 @@ export function Segmented<K extends string>({
         return (
           <Pressable
             key={o.key}
-            onPress={() => onChange(o.key)}
+            onPress={() => pick(o.key, value, onChange)}
             accessibilityRole="tab"
             accessibilityLabel={o.label}
             accessibilityState={{ selected: on }}
@@ -66,7 +67,7 @@ export function Chips<K extends string>({
           <Pressable
             key={o.key}
             disabled={disabled}
-            onPress={() => onChange(o.key)}
+            onPress={() => pick(o.key, value, onChange)}
             accessibilityRole="button"
             accessibilityLabel={o.label}
             accessibilityState={{ selected: on, disabled }}
@@ -84,6 +85,12 @@ export function Chips<K extends string>({
       })}
     </ScrollView>
   );
+}
+
+/** A different choice ticks; pressing the selected one again stays quiet. */
+function pick<K extends string>(key: K, value: K | null, onChange: (key: K) => void) {
+  if (key !== value) haptics.tick();
+  onChange(key);
 }
 
 const styles = StyleSheet.create({

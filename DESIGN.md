@@ -351,7 +351,7 @@ The system's way of saying state.
 - **Error:** red border and a red Body-small line below; otherwise a muted hint line. Passwords get a yellow Show/Hide text button.
 
 ### Bottom sheets
-- `card` surface with 28-dp top corners over a 60% scrim; slide up in 350 ms (decelerate). A 36 x 4 grab handle, then the head: an optional 52-dp `raised` icon tile (18-dp corners), the Title large heading with an optional meta line under it (a status chip and a short fact), and a 44-dp round close button. Facts sit below a top hairline as label-left (muted Body small) and value-right (Body small at 700, tabular) rows. Content scrolls past 72% of the screen height. Closes with the button, the scrim, Esc or system Back. Used for the light layer, device detail, the account sheet, the site switcher, member and invite.
+- `card` surface with 28-dp top corners over a 60% scrim; slide up in 350 ms (decelerate). A 36 x 4 grab handle, then the head: an optional 52-dp `raised` icon tile (18-dp corners), the Title large heading with an optional meta line under it (a status chip and a short fact), and a 44-dp round close button. Facts sit below a top hairline as label-left (muted Body small) and value-right (Body small at 700, tabular) rows. Content scrolls past 72% of the screen height. Closes with the button, the scrim, Esc, system Back, or a drag down on the handle and head: past 30% of its height or a quick flick it closes (a tick as it crosses that point, the scrim fading with it), otherwise it springs back (a short fade under Reduce Motion). The body keeps its own scrolling. Used for the light layer, device detail, the account sheet, the site switcher, member and invite.
 
 ### Navigation
 - Material navigation bar on `card` with a top hairline: four destinations (Overview, Devices, Alerts, Settings). The active destination is a yellow pill with black icon and label; inactive ones are muted. Alerts carries a red count badge with black numerals. On web the same bar is drawn with headless tabs.
@@ -367,6 +367,18 @@ The system's way of saying state.
 
 ### Loader
 - Five small lights blinking in sequence (yellow), the brand's replacement for a spinner. It also fills the loading slot of buttons.
+
+## Haptics
+Haptics confirm what the user did; they never announce what the network did.
+
+- **Tick:** a different tab, segment or chip, the pull-to-refresh release, and a sheet drag crossing its close point. Pressing the current choice again is silent.
+- **Toggle:** switches, on and off.
+- **Confirm:** the result of something the user started went well: a ping with replies, a diagnose where all six pass, the agent connecting while you wait on Pair, a device marked trusted, a code copied.
+- **Reject:** the result went badly (no replies, a root cause, no result), or a destructive step is one tap away (Remove, Leave, Delete account).
+
+**The Quiet Network Rule.** Polling, background refreshes, new alerts and push arrivals never vibrate the open app; the system notification already did. One vibration per action, and ordinary buttons, scrolling and opening a sheet stay silent.
+
+Android uses the system's own patterns (`Segment_Tick`, `Toggle_On/Off`, `Confirm`, `Reject`), so the phone's touch-feedback setting is respected. Settings → Feel → Vibration turns them all off for this phone. Web does nothing.
 
 ## Do's and Don'ts
 

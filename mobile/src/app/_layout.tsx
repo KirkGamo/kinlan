@@ -4,7 +4,8 @@ import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { Platform, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { queryClient } from '@/api/query-client';
 import { useCircles } from '@/api/circles';
@@ -12,9 +13,11 @@ import { pushSupported } from '@/api/push';
 import { SessionProvider, useSession } from '@/api/session';
 import { Button, FormScreen, Mark, Text } from '@/components/ui';
 import { PushBridge } from '@/features/push/push-bridge';
+import { loadHapticsPref } from '@/haptics';
 import { colors, FONT_FAMILY, space } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
+void loadHapticsPref();
 
 // Web: paint the page dark before React renders, so a dark app never flashes white.
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -61,14 +64,16 @@ export default function RootLayout() {
   if (!fontsReady) return null;
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <SessionProvider>
-        <ThemeProvider value={navigationTheme}>
-          <StatusBar style="light" />
-          <RootNavigator />
-        </ThemeProvider>
-      </SessionProvider>
-    </QueryClientProvider>
+    <GestureHandlerRootView style={styles.root}>
+      <QueryClientProvider client={queryClient}>
+        <SessionProvider>
+          <ThemeProvider value={navigationTheme}>
+            <StatusBar style="light" />
+            <RootNavigator />
+          </ThemeProvider>
+        </SessionProvider>
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }
 
@@ -137,3 +142,5 @@ function StartupError({ message, onRetry }: { message: string; onRetry: () => vo
     </FormScreen>
   );
 }
+
+const styles = StyleSheet.create({ root: { flex: 1 } });

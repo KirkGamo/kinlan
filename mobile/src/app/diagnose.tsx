@@ -12,6 +12,7 @@ import { Button, Card, FormScreen, Loader, SectionLabel, StatusChip, Text, type 
 import { LightStrip } from '@/features/overview/light-strip';
 import { clock, isStale, ms, type Light } from '@/features/overview/model';
 import { useNow } from '@/hooks/use-now';
+import { haptics } from '@/haptics';
 import { colors, motion, radius, space, tints } from '@/theme';
 
 /** Plain names for the six checks, from this PC up to secure websites (briefs.md section 3). */
@@ -64,6 +65,20 @@ export default function DiagnoseScreen() {
     autoStarted.current = true;
     if (!isActive(runs.data?.[0])) startRun();
   }, [run, runs.isSuccess, runs.data, canManage, stale, startRun]);
+
+  // The end of a run watched here: confirm when all six pass, reject on a root cause or no result.
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (running) {
+      wasRunning.current = true;
+      return;
+    }
+    if (!wasRunning.current || !latest) return;
+    wasRunning.current = false;
+    const cause = (latest.result as DiagnoseResult | undefined)?.root_cause_step;
+    if (latest.status === 'done' && !cause) haptics.confirm();
+    else haptics.reject();
+  }, [running, latest]);
 
   // A finished run changes the Overview's DNS and Web lights: refresh the site summary.
   const doneId = lastDone?.id;
