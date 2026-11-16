@@ -7,6 +7,7 @@ import { useDevices, useMembers, type Device, type Member } from '@/api/overview
 import { selectSite, useCurrentCircle, useSelectedSite } from '@/api/selection';
 import { Button, Card, Chips, Loader, Screen, SectionLabel, Segmented, StatusChip, Text } from '@/components/ui';
 import { DeviceMap } from '@/features/devices/device-map';
+import { DeviceActions } from '@/features/devices/device-actions';
 import { DeviceSheet } from '@/features/devices/device-sheet';
 import { DeviceIcon } from '@/features/devices/icons';
 import { chip, facts, FILTERS, matches, type Filter } from '@/features/devices/model';
@@ -95,6 +96,14 @@ function Live({ circle, site, sites, canManage }: { circle: Circle; site: Site; 
   const [view, setView] = useState<View_>('people');
   const [filter, setFilter] = useState<Filter>('all');
   const [selected, setSelected] = useState<string | null>(null);
+  const [pingOnOpen, setPingOnOpen] = useState(false);
+  // Long-press (or a row's TalkBack action) opens quick actions; `rename` jumps to the form.
+  const [actions, setActions] = useState<{ device: Device; rename: boolean } | null>(null);
+  const open = (id: string, ping = false) => {
+    setActions(null);
+    setPingOnOpen(ping);
+    setSelected(id);
+  };
   // Links into Devices: ?device=… opens that device's sheet (an alert's Review, a push), and
   // ?filter=…&at=… sets the filter (Overview's "new devices to review"). `at` makes a repeat
   // tap of the same link apply again.
@@ -172,7 +181,16 @@ function Live({ circle, site, sites, canManage }: { circle: Circle; site: Site; 
             <SectionLabel end={String(g.items.length)}>{g.title}</SectionLabel>
           )}
           {g.items.length ? (
-            g.items.map((d) => <DeviceRow key={d.id} d={d} stale={stale} onPress={() => setSelected(d.id)} />)
+            g.items.map((d) => (
+              <DeviceRow
+                key={d.id}
+                d={d}
+                stale={stale}
+                onPress={() => open(d.id)}
+                onActions={canManage ? (rename) => setActions({ device: d, rename }) : undefined}
+                onPing={canManage ? () => open(d.id, true) : undefined}
+              />
+            ))
           ) : (
             <Text role="bodySmall" color="text2">
               No devices yet. Open one and choose them under “Whose is this?”.
@@ -219,7 +237,21 @@ function Live({ circle, site, sites, canManage }: { circle: Circle; site: Site; 
         members={members.data ?? []}
         canManage={canManage}
         stale={stale}
-        onClose={() => setSelected(null)}
+        startPing={pingOnOpen}
+        onClose={() => {
+          setSelected(null);
+          setPingOnOpen(false);
+        }}
+      />
+      <DeviceActions
+        device={actions?.device ?? null}
+        rename={actions?.rename ?? false}
+        siteId={site.id}
+        members={members.data ?? []}
+        stale={stale}
+        onClose={() => setActions(null)}
+        onPing={(id) => open(id, true)}
+        onOpen={(id) => open(id)}
       />
     </Screen>
   );
@@ -259,14 +291,54 @@ function PersonHeader({ name, items, stale, me }: { name: string; items: Device[
   );
 }
 
-function DeviceRow({ d, stale, onPress }: { d: Device; stale: boolean; onPress: () => void }) {
+function DeviceRow({
+  d,
+  stale,
+  onPress,
+  onActions,
+  onPing,
+}: {
+  d: Device;
+  stale: boolean;
+  onPress: () => void;
+  /** Owners and admins: long-press opens quick actions (`true` opens on Rename). */
+  onActions?: (rename: boolean) => void;
+  onPing?: () => void;
+}) {
   const st = chip(d, stale);
+  const canPing = !!d.ip && !stale;
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={
+        onActions
+          ? () => {
+              haptics.longPress();
+              onActions(false);
+            }
+          : undefined
+      }
       accessibilityRole="button"
       accessibilityLabel={`${d.display_name}, ${st.label}${d.trusted ? ', trusted' : ''}. ${facts(d)}`}
       accessibilityHint="Opens the device"
+      // The same quick actions for TalkBack, where long-press isn't practical.
+      accessibilityActions={
+        onActions
+          ? [
+              { name: 'activate' },
+              ...(onPing && canPing ? [{ name: 'ping', label: 'Ping test' }] : []),
+              { name: 'actions', label: 'Quick actions' },
+              { name: 'rename', label: 'Rename' },
+            ]
+          : undefined
+      }
+      onAccessibilityAction={(e) => {
+        const name = e.nativeEvent.actionName;
+        if (name === 'ping') onPing?.();
+        else if (name === 'actions') onActions?.(false);
+        else if (name === 'rename') onActions?.(true);
+        else onPress();
+      }}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       <View style={styles.icon}>
         <DeviceIcon type={d.device_type} size={20} color={d.online && !stale ? colors.text : colors.text2} />

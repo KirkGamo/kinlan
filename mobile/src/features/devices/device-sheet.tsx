@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -41,6 +41,7 @@ export function DeviceSheet({
   members,
   canManage,
   stale,
+  startPing = false,
   onClose,
 }: {
   deviceId: string | null;
@@ -48,6 +49,8 @@ export function DeviceSheet({
   members: Member[];
   canManage: boolean;
   stale: boolean;
+  /** Start a ping test as the sheet opens (a row's quick Ping action). */
+  startPing?: boolean;
   onClose: () => void;
 }) {
   const device = useDevice(deviceId);
@@ -80,7 +83,7 @@ export function DeviceSheet({
         </Text>
       ) : !d ? null : (
         // Keyed by device, so switching devices resets the rename field and ping state.
-        <Body key={d.id} d={d} siteId={siteId} members={members} canManage={canManage} stale={stale} />
+        <Body key={d.id} d={d} siteId={siteId} members={members} canManage={canManage} stale={stale} startPing={startPing} />
       )}
     </Sheet>
   );
@@ -92,15 +95,24 @@ function Body({
   members,
   canManage,
   stale,
+  startPing,
 }: {
   d: DeviceDetail;
   siteId: string;
   members: Member[];
   canManage: boolean;
   stale: boolean;
+  startPing: boolean;
 }) {
   const update = useUpdateDevice(d.id, siteId, members);
   const ping = usePing(d, siteId);
+  const { run: runPing } = ping;
+  const autoPinged = useRef(false);
+  useEffect(() => {
+    if (!startPing || autoPinged.current || !canManage || !d.ip || stale) return;
+    autoPinged.current = true;
+    runPing();
+  }, [startPing, canManage, d.ip, stale, runPing]);
   const [name, setName] = useState(d.custom_name ?? '');
   const owners = [
     ...members.map((m) => ({ key: m.user_id, label: m.display_name })),

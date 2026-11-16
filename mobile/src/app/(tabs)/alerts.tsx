@@ -10,6 +10,7 @@ import { Button, Card, Loader, Screen, Segmented, StatusChip, Text, type ChipTon
 import { ago, clock } from '@/features/overview/model';
 import { SiteHeader } from '@/features/overview/site-header';
 import { useNow } from '@/hooks/use-now';
+import { SwipeToAck } from '@/features/alerts/swipe-to-ack';
 import { haptics } from '@/haptics';
 import { colors, motion, radius, space } from '@/theme';
 
@@ -122,21 +123,26 @@ function Feed({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
         {openItems.length ? (
           openItems.map((a) => (
             <Animated.View key={a.id} exiting={reduce ? undefined : SlideOutRight.duration(motion.screen)} layout={reduce ? undefined : LinearTransition.duration(motion.small)}>
-              <AlertCard a={a} now={now} onOpen={() => go(a)}>
-                {/* One action per card (prototype): a device alert is reviewed (trusting the
-                    device resolves it); anything else is acknowledged. */}
-                {!canManage ? null : deviceOf(a) ? (
-                  <Button label="Review" variant="ghost" onPress={() => go(a)} accessibilityHint="Opens the device to say whose it is or trust it" />
-                ) : (
-                  <Button
-                    label="Acknowledge"
-                    variant="ghost"
-                    loading={ack.isPending && ack.variables === a.id}
-                    onPress={() => ack.mutate(a.id)}
-                    accessibilityHint="Marks it as seen and moves it to Resolved"
-                  />
-                )}
-              </AlertCard>
+              <Ackable
+                can={canManage && !deviceOf(a)}
+                onAck={() => ack.mutate(a.id, { onSuccess: haptics.confirm, onError: haptics.reject })}
+                failed={ack.isError && ack.variables === a.id}>
+                <AlertCard a={a} now={now} onOpen={() => go(a)} onAck={canManage && !deviceOf(a) ? () => ack.mutate(a.id) : undefined}>
+                  {/* One action per card (prototype): a device alert is reviewed (trusting the
+                      device resolves it); anything else is acknowledged. */}
+                  {!canManage ? null : deviceOf(a) ? (
+                    <Button label="Review" variant="ghost" onPress={() => go(a)} accessibilityHint="Opens the device to say whose it is or trust it" />
+                  ) : (
+                    <Button
+                      label="Acknowledge"
+                      variant="ghost"
+                      loading={ack.isPending && ack.variables === a.id}
+                      onPress={() => ack.mutate(a.id)}
+                      accessibilityHint="Marks it as seen and moves it to Resolved"
+                    />
+                  )}
+                </AlertCard>
+              </Ackable>
             </Animated.View>
           ))
         ) : (
@@ -210,16 +216,30 @@ function day(iso: string): string {
 }
 
 /** Text above a footer with the chip (left) and actions (right), so actions never squeeze it. */
+/** Open alerts an owner or admin can acknowledge also take a swipe to the right. */
+function Ackable({ can, onAck, failed, children }: { can: boolean; onAck: () => void; failed: boolean; children: React.ReactNode }) {
+  return can ? (
+    <SwipeToAck onAck={onAck} failed={failed}>
+      {children}
+    </SwipeToAck>
+  ) : (
+    children
+  );
+}
+
 function AlertCard({
   a,
   now,
   onOpen,
+  onAck,
   ended,
   children,
 }: {
   a: Alert;
   now: number;
   onOpen: () => void;
+  /** Adds an Acknowledge action for TalkBack, matching the swipe and the button. */
+  onAck?: () => void;
   ended?: string;
   children?: React.ReactNode;
 }) {
@@ -230,6 +250,11 @@ function AlertCard({
         onPress={onOpen}
         accessibilityRole="button"
         accessibilityLabel={`${sev.label}: ${a.title}. ${a.body} ${ended ?? ''}`}
+        accessibilityActions={onAck ? [{ name: 'activate' }, { name: 'acknowledge', label: 'Acknowledge' }] : undefined}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === 'acknowledge') onAck?.();
+          else onOpen();
+        }}
         style={({ pressed }) => [styles.text, pressed && styles.pressed]}>
         <Text role="title">{a.title}</Text>
         <Text role="bodySmall" color="text2">

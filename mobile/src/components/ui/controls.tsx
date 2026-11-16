@@ -54,6 +54,7 @@ type FieldProps = Pick<
   | 'keyboardType'
   | 'autoCapitalize'
   | 'returnKeyType'
+  | 'autoFocus'
   | 'onSubmitEditing'
   | 'placeholder'
 > & {
