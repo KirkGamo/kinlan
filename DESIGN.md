@@ -77,8 +77,10 @@ typography:
     lineHeight: "14px"
     letterSpacing: "1.32px"
 rounded:
-  digit: "14px"
+  small: "8px"
+  inner: "14px"
   field: "16px"
+  tile: "18px"
   row: "20px"
   card: "24px"
   sheet: "28px"

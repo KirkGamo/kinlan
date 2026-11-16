@@ -19,7 +19,18 @@ export const radius = {
   card: 24,
   row: 20,
   sheet: 28,
+  tile: 18, // the sheet head's icon tile
+  field: 16, // text fields
+  inner: 14, // panels inside a card or row (Diagnose detail, pairing digits)
+  small: 8, // ping reply cells, skeleton bars
   pill: 999,
+} as const;
+
+/** Component sizes used on more than one screen. */
+export const size = {
+  row: 68, // a list row: device, problem, rung, member, action
+  loading: 120, // a card that only holds a loader
+  well: 40, // round icon wells and avatars in rows
 } as const;
 
 /** Touch targets: 48 dp minimum (PRODUCT.md, Material). */

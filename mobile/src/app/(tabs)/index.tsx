@@ -15,7 +15,7 @@ import { People } from '@/features/overview/people';
 import { SiteHeader } from '@/features/overview/site-header';
 import { useNow } from '@/hooks/use-now';
 import { haptics } from '@/haptics';
-import { colors, radius, space } from '@/theme';
+import { colors, radius, size, space } from '@/theme';
 
 const UNLIT: Light[] = Array.from({ length: 5 }, () => ({ state: 'unlit', value: '—' }));
 
@@ -290,9 +290,9 @@ function Skeleton() {
 const styles = StyleSheet.create({
   verdict: { paddingTop: space.s6, gap: space.s2, overflow: 'hidden' }, // clips the perforation
   meta: { flexDirection: 'row', alignItems: 'center', gap: space.s3, flexWrap: 'wrap' },
-  loading: { alignItems: 'center', justifyContent: 'center', minHeight: 120 },
+  loading: { alignItems: 'center', justifyContent: 'center', minHeight: size.loading },
   row: {
-    minHeight: 68,
+    minHeight: size.row,
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.s3,
@@ -319,5 +319,5 @@ const styles = StyleSheet.create({
   },
   fabPressed: { transform: [{ scale: 0.96 }] },
   rowText: { flex: 1, gap: 2 },
-  skelTitle: { width: 160, height: 28, borderRadius: 8, backgroundColor: colors.card, marginVertical: space.s2 },
+  skelTitle: { width: 160, height: 28, borderRadius: radius.small, backgroundColor: colors.card, marginVertical: space.s2 },
 });

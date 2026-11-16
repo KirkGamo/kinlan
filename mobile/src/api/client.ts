@@ -14,7 +14,7 @@ const BASE = `${API_URL}/api/v1`;
 /** Long enough for the free server to wake up (about 50 s), short enough never to hang. */
 const TIMEOUT_MS = 60_000;
 
-export type Session = { accessToken: string; refreshToken: string };
+type Session = { accessToken: string; refreshToken: string };
 
 export class ApiError extends Error {
   constructor(

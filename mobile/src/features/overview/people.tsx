@@ -5,7 +5,7 @@ import type { Device, Member } from '@/api/overview';
 import { useMe } from '@/api/session';
 import { Card, Text } from '@/components/ui';
 import { Avatar } from '@/features/account/avatar';
-import { colors, radius, space } from '@/theme';
+import { colors, radius, size, space } from '@/theme';
 
 /**
  * Your people (brand.md, people-first devices): a row of member tiles, each with how many of their
@@ -108,9 +108,9 @@ const styles = StyleSheet.create({
   },
   pressed: { backgroundColor: colors.raised },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: size.well,
+    height: size.well,
+    borderRadius: radius.pill,
     backgroundColor: colors.yellow,
     alignItems: 'center',
     justifyContent: 'center',

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from './client';
 import type { Device, DeviceType, Member } from './overview';
+import { keys } from './keys';
 
 export type PingTest = {
   id: string;
@@ -15,10 +16,10 @@ export type PingTest = {
   max_ms: number | null;
   jitter_ms: number | null;
 };
-export type PortFinding = { port: number; service: string; first_seen_at: string; last_seen_at: string };
+type PortFinding = { port: number; service: string; first_seen_at: string; last_seen_at: string };
 export type DeviceDetail = Device & { risky_ports: PortFinding[]; last_ping_test: PingTest | null };
 
-export type CommandStatus = 'pending' | 'running' | 'done' | 'failed' | 'expired';
+type CommandStatus = 'pending' | 'running' | 'done' | 'failed' | 'expired';
 export type Command = {
   id: string;
   type: string;
@@ -28,7 +29,7 @@ export type Command = {
   finished_at: string | null;
 };
 
-export type DevicePatch = {
+type DevicePatch = {
   custom_name?: string | null;
   device_type?: DeviceType;
   owner_user_id?: string | null;
@@ -37,7 +38,7 @@ export type DevicePatch = {
 
 export function useDevice(deviceId: string | null) {
   return useQuery({
-    queryKey: ['devices', deviceId],
+    queryKey: keys.device(deviceId),
     queryFn: () => api<DeviceDetail>(`/devices/${deviceId}`),
     enabled: !!deviceId,
   });
@@ -50,8 +51,8 @@ export function useDevice(deviceId: string | null) {
  */
 export function useUpdateDevice(deviceId: string, siteId: string, members: Member[] = []) {
   const client = useQueryClient();
-  const detailKey = ['devices', deviceId];
-  const listKey = ['sites', siteId, 'devices'];
+  const detailKey = keys.device(deviceId);
+  const listKey = keys.devices(siteId);
   return useMutation({
     mutationFn: (patch: DevicePatch) =>
       api<DeviceDetail>(`/devices/${deviceId}`, { method: 'PATCH', body: patch }),
@@ -72,7 +73,7 @@ export function useUpdateDevice(deviceId: string, siteId: string, members: Membe
       client.setQueryData(detailKey, detail);
     },
     onSettled: () => {
-      void client.invalidateQueries({ queryKey: ['sites', siteId] });
+      void client.invalidateQueries({ queryKey: keys.site(siteId) });
     },
   });
 }
@@ -111,7 +112,7 @@ export function useStartPing(siteId: string, deviceId: string) {
 /** Polls a command each second until it finishes, fails or expires. */
 export function useCommand(commandId: string | null) {
   return useQuery({
-    queryKey: ['commands', commandId],
+    queryKey: keys.command(commandId),
     queryFn: () => api<Command>(`/commands/${commandId}`),
     enabled: !!commandId,
     refetchInterval: (q) => {

@@ -12,9 +12,9 @@ import {
 } from '@/api/devices';
 import type { DeviceType, Member } from '@/api/overview';
 import { Button, Chips, Facts, Loader, Sheet, StatusChip, Text, TextField } from '@/components/ui';
-import { clock, ms } from '@/features/overview/model';
+import { day, ms } from '@/features/overview/model';
 import { haptics } from '@/haptics';
-import { colors, radius, space } from '@/theme';
+import { colors, radius, size, space } from '@/theme';
 
 import { ICON_PATHS, TYPE_LABEL } from './icons';
 import { chip, isPrivateAddress } from './model';
@@ -317,20 +317,13 @@ function verdict(name: string, t: Partial<PingTest>): string {
   return 'Responds well';
 }
 
-function day(iso: string): string {
-  const d = new Date(iso);
-  const today = new Date();
-  const same = d.toDateString() === today.toDateString();
-  return same ? `Today ${clock(iso)}` : `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${clock(iso)}`;
-}
-
 const styles = StyleSheet.create({
-  center: { minHeight: 120, alignItems: 'center', justifyContent: 'center' },
+  center: { minHeight: size.loading, alignItems: 'center', justifyContent: 'center' },
   actions: { flexDirection: 'row', gap: space.s2 },
   action: { flex: 1 },
   ping: { gap: space.s2, backgroundColor: colors.raised, borderRadius: radius.row, padding: space.s4 },
   cells: { flexDirection: 'row', alignItems: 'center', gap: space.s2 },
-  cell: { width: 28, height: 28, borderRadius: 8, backgroundColor: colors.unlit, borderWidth: 1.5, borderColor: colors.unlitRing },
+  cell: { width: 28, height: 28, borderRadius: radius.small, backgroundColor: colors.unlit, borderWidth: 1.5, borderColor: colors.unlitRing },
   cellOk: { backgroundColor: colors.green, borderColor: colors.green },
   cellLost: { backgroundColor: colors.red, borderColor: colors.red },
   port: { gap: space.s2 },

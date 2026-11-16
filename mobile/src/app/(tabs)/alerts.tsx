@@ -7,12 +7,12 @@ import { useAcknowledge, useAlerts, type Alert } from '@/api/alerts';
 import type { Site } from '@/api/circles';
 import { selectSite, useTabData } from '@/api/selection';
 import { Button, Card, ErrorCard, Loader, Screen, Segmented, StatusChip, Text, type ChipTone } from '@/components/ui';
-import { ago, clock } from '@/features/overview/model';
+import { ago, day } from '@/features/overview/model';
 import { SiteHeader } from '@/features/overview/site-header';
 import { useNow } from '@/hooks/use-now';
 import { SwipeToAck } from '@/features/alerts/swipe-to-ack';
 import { haptics } from '@/haptics';
-import { colors, motion, radius, space } from '@/theme';
+import { colors, motion, radius, size, space } from '@/theme';
 
 /** Severity as icon + word (never colour alone); "back online" reads as good news. */
 function severity(a: Alert): { tone: ChipTone; label: string } {
@@ -200,16 +200,9 @@ function Feed({ site, sites, canManage }: { site: Site; sites: Site[]; canManage
 
 /** How a resolved alert ended: the server resolved it, or someone acknowledged it. */
 function ending(a: Alert): string {
-  if (a.resolved_at) return `Resolved ${day(a.resolved_at)}`;
-  if (a.acked_at) return `Acknowledged ${day(a.acked_at)}`;
+  if (a.resolved_at) return `Resolved ${day(a.resolved_at, '')}`;
+  if (a.acked_at) return `Acknowledged ${day(a.acked_at, '')}`;
   return '';
-}
-
-function day(iso: string): string {
-  const d = new Date(iso);
-  return d.toDateString() === new Date().toDateString()
-    ? clock(iso)
-    : `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${clock(iso)}`;
 }
 
 /** Text above a footer with the chip (left) and actions (right), so actions never squeeze it. */
@@ -270,7 +263,7 @@ function AlertCard({
 }
 
 const styles = StyleSheet.create({
-  center: { minHeight: 120, alignItems: 'center', justifyContent: 'center' },
+  center: { minHeight: size.loading, alignItems: 'center', justifyContent: 'center' },
   card: {
     backgroundColor: colors.card,
     borderRadius: radius.row,
@@ -279,7 +272,7 @@ const styles = StyleSheet.create({
     gap: space.s3,
   },
   resolved: { opacity: 0.8 },
-  text: { gap: 2, borderRadius: 12 },
+  text: { gap: 2 },
   pressed: { opacity: 0.7 },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s3, flexWrap: 'wrap' },
   actions: { flexDirection: 'row', gap: space.s2, flexShrink: 1 },

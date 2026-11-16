@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.raised,
-    borderRadius: 16,
+    borderRadius: radius.field,
     borderCurve: 'continuous',
     borderWidth: 1.5,
     borderColor: colors.border,

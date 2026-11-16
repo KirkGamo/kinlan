@@ -65,6 +65,13 @@ export function clock(iso: string): string {
   return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+/** "Today 9:41" (or just "9:41" with `today` empty), else "Nov 16, 9:41". */
+export function day(iso: string, today = 'Today'): string {
+  const d = new Date(iso);
+  if (d.toDateString() === new Date().toDateString()) return today ? `${today} ${clock(iso)}` : clock(iso);
+  return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${clock(iso)}`;
+}
+
 /** "10 s ago", "3 min ago", "2 h ago". */
 export function ago(iso: string, now: number): string {
   const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
