@@ -30,4 +30,20 @@ export const tints = {
   red: 'rgba(255, 69, 58, 0.16)',
 } as const;
 
+/** The glow ring around a lit status light: its own colour at about a fifth strength. */
+export const glows = {
+  green: 'rgba(48, 209, 88, 0.2)',
+  orange: 'rgba(255, 159, 10, 0.22)',
+  red: 'rgba(255, 69, 58, 0.24)',
+} as const;
+
+/** Soft strokes: a passed Diagnose rail and the danger button's hairline. */
+export const strokes = {
+  green: 'rgba(48, 209, 88, 0.35)',
+  red: 'rgba(255, 69, 58, 0.45)',
+} as const;
+
+/** The 60% black scrim under bottom sheets (sheets cast no shadow). */
+export const scrim = 'rgba(0, 0, 0, 0.6)';
+
 export type ColorToken = keyof typeof colors;
