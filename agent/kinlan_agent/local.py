@@ -20,7 +20,7 @@ from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 
-from kinlan_agent import diagnose, discovery, health, monitor, netinfo
+from kinlan_agent import config, diagnose, discovery, health, monitor, netinfo
 from kinlan_agent.icmp import EchoReply, echo
 
 STATUS_STYLE = {"pass": "green", "fail": "bold red", "skipped": "dim"}
@@ -31,12 +31,22 @@ GRADE_STYLE = {"A": "bold green", "B": "green", "C": "yellow", "D": "bold yellow
 class LocalDeps:
     """The operations ``run_local`` uses; tests swap them for fakes."""
 
-    get_netinfo: Callable[[], netinfo.NetInfo] = netinfo.get_netinfo
+    get_netinfo: Callable[[], netinfo.NetInfo] | None = None  # None: read config.toml
     scan: Callable[[netinfo.NetInfo], discovery.ScanResult] = discovery.scan
-    choose_targets: Callable[[], list[str]] = monitor.choose_internet_targets
+    choose_targets: Callable[[], list[str]] | None = None  # None: read config.toml
     run_diagnose: Callable[..., diagnose.Diagnosis] = diagnose.run
     send: Callable[[str, int], EchoReply] = echo
     sleep: Callable[[float], None] = time.sleep
+
+    def __post_init__(self) -> None:
+        # Local mode honours config.toml like the real agent: scan size and internet targets.
+        settings = config.load()
+        if self.get_netinfo is None:
+            self.get_netinfo = lambda: netinfo.get_netinfo(max_prefix=settings.max_scan_prefix)
+        if self.choose_targets is None:
+            self.choose_targets = lambda: monitor.choose_internet_targets(
+                settings.internet_targets, send=self.send
+            )
 
 
 @dataclass

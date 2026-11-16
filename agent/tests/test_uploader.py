@@ -171,6 +171,16 @@ def test_payload_groups_outbox_kinds():
     assert payload["netinfo"]["gateway"] == "192.168.1.1" and len(payload["outages"]) == 1
 
 
+def test_payload_carries_diagnoses_and_the_scan_interval():
+    from kinlan_agent.uploader import Batch
+
+    run = {"finished_at": "2026-11-20T09:42:00Z", "result": {"root_cause_step": 4}}
+    rows = [type("Row", (), {"id": 1, "kind": "diagnose", "payload": run})()]
+    payload = build_payload(Batch("b-2", rows), version="0.1.0", scan_interval_s=300)
+    assert payload["diagnoses"] == [run] and payload["scan_interval_s"] == 300
+    assert "scan_interval_s" not in build_payload(Batch("b-3", rows), version="0.1.0")
+
+
 def test_run_drains_a_backlog_then_waits(buffer):
     buffer.add_many("sample", [sample(i) for i in range(5)])
     server = FakeServer()
