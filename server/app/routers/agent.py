@@ -49,7 +49,7 @@ from app.schemas import ErrorOut
 from app.security import keyed_hash, sha256_hex
 
 FUTURE_TOLERANCE = timedelta(minutes=5)
-OFFLINE_AFTER = timedelta(minutes=11)  # two missed 5-minute scans
+DEFAULT_SCAN_INTERVAL = timedelta(minutes=5)  # for agents that don't report their own
 MAX_WAIT = 25
 
 router = APIRouter(
@@ -124,6 +124,10 @@ def _store_devices(db: DB, site: Site, body: IngestIn, now: datetime) -> tuple[i
         )
     }
     gateway = str(body.netinfo.gateway) if body.netinfo and body.netinfo.gateway else None
+    scan_every = (
+        timedelta(seconds=body.scan_interval_s) if body.scan_interval_s else DEFAULT_SCAN_INTERVAL
+    )
+    offline_after = 2 * scan_every + timedelta(minutes=1)  # two missed scans
     new: list[Device] = []
     for item in body.devices:
         ip = str(item.ip) if item.ip else None
@@ -147,7 +151,7 @@ def _store_devices(db: DB, site: Site, body: IngestIn, now: datetime) -> tuple[i
     db.flush()
     db.execute(
         update(Device)
-        .where(Device.site_id == site.id, Device.last_seen_at < now - OFFLINE_AFTER)
+        .where(Device.site_id == site.id, Device.last_seen_at < now - offline_after)
         .values(online=False)
     )
     return len(body.devices), new
@@ -178,6 +182,23 @@ def _store_outages(db: DB, site: Site, body: IngestIn) -> tuple[int, list[Outage
             stored += 1
             closed.append(row)
     return stored, closed
+
+
+def _store_diagnoses(db: DB, site: Site, body: IngestIn) -> int:
+    """Diagnoses the agent ran by itself join the site's diagnose history like any other run."""
+    for item in body.diagnoses:
+        db.add(
+            Command(
+                site_id=site.id,
+                type="diagnose",
+                params={"auto": True},
+                status=CommandStatus.done,
+                result=item.result,
+                created_at=item.finished_at,
+                finished_at=item.finished_at,
+            )
+        )
+    return len(body.diagnoses)
 
 
 def _store_ports(
@@ -280,6 +301,7 @@ def ingest(body: IngestIn, agent: CurrentAgent, db: DB) -> IngestOut:
     devices, new_devices = _store_devices(db, site, body, now)
     outages, closed = _store_outages(db, site, body)
     ports, newly_open = _store_ports(db, site, body, now)
+    diagnoses = _store_diagnoses(db, site, body)
     db.flush()
     alerts.new_devices(db, site, new_devices, now)
     alerts.risky_ports(db, site, newly_open, now)
@@ -295,6 +317,7 @@ def ingest(body: IngestIn, agent: CurrentAgent, db: DB) -> IngestOut:
         new_devices=len(new_devices),
         outages=outages,
         port_findings=ports,
+        diagnoses=diagnoses,
     )
 
 

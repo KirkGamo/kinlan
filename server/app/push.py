@@ -140,9 +140,11 @@ def dispatch(db: Session, now: datetime | None = None, sender: Sender | None = N
             continue
         tokens = recipients(db, alert)
         dead: list[str] = []
+        sent_any = False
         try:
             for chunk in _chunks(tokens, SEND_CHUNK):
                 tickets = sender([message(alert, t) for t in chunk])
+                sent_any = True
                 for token, ticket in zip(chunk, tickets, strict=False):
                     if ticket.get("status") == "ok" and ticket.get("id"):
                         db.add(PushTicket(ticket_id=ticket["id"], token=token, created_at=now))
@@ -153,7 +155,9 @@ def dispatch(db: Session, now: datetime | None = None, sender: Sender | None = N
                         log.warning("push to a token failed: %s", ticket.get("message"))
         except httpx.HTTPError as exc:
             log.warning("Expo push unavailable, retrying next run: %s", exc)
-            break  # leave this and later alerts unpushed; FRESH_FOR caps the retries
+            if sent_any:  # some members already got it: never buzz them twice
+                alert.pushed_at = now
+            break  # leave the rest unpushed; FRESH_FOR caps the retries
         if tokens:
             db.execute(
                 update(PushToken).where(PushToken.token.in_(tokens)).values(last_used_at=now)

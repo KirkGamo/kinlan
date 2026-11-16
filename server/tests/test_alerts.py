@@ -113,6 +113,14 @@ def test_back_online_uses_the_agents_measured_outage(client, agent, home):
     [alert] = open_alerts(home["id"])
     assert alert.title == "Home is back online after 4 min 12 s"
     assert "internet provider outage" in alert.body
+    assert "UTC" not in alert.body  # members read the site's own clock
+
+
+def test_alert_times_use_the_sites_time_zone():
+    when = datetime(2026, 11, 16, 5, 41, tzinfo=UTC)
+    assert alerts.site_clock(when, Site(timezone="Asia/Manila")) == "13:41"
+    assert alerts.site_clock(when, Site(timezone="Europe/London")) == "5:41"
+    assert alerts.site_clock(when, Site(timezone="Not/AZone")) == "5:41"  # falls back to UTC
 
 
 def test_pending_sites_are_not_marked_unreachable(client, home):

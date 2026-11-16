@@ -181,6 +181,26 @@ def test_old_alerts_are_never_pushed_and_failures_retry(client, ana, home):
         assert db.get(Alert, stale).pushed_at is not None  # marked, never sent
 
 
+def test_a_failure_part_way_never_pushes_anyone_twice(client, ana, home, monkeypatch):
+    register(client, ana, TOKEN_A)
+    alert_id = add_alert(home["id"])
+    calls = []
+
+    def flaky(messages):
+        calls.append(messages)
+        if len(calls) > 1:
+            raise httpx.ConnectError("dropped mid-way")
+        return [{"status": "ok", "id": "ticket-first"} for _ in messages]
+
+    monkeypatch.setattr(push, "SEND_CHUNK", 1)
+    monkeypatch.setattr(push, "recipients", lambda db, alert: [TOKEN_A, TOKEN_J])
+    run_dispatch(flaky)
+    with get_session_factory()() as db:
+        assert db.get(Alert, alert_id).pushed_at is not None
+    run_dispatch(flaky)
+    assert len(calls) == 2  # no second attempt for the first chunk
+
+
 def test_dead_tokens_are_removed_at_once_or_from_receipts(client, ana, jun, home):
     join(client, ana, home["circle_id"], jun)
     register(client, ana, TOKEN_A)

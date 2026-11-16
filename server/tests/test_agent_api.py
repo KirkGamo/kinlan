@@ -150,6 +150,33 @@ def test_devices_missing_from_scans_for_eleven_minutes_go_offline(client, agent)
     assert online == {ROUTER[0]: True, PHONE[0]: False}
 
 
+def test_the_offline_rule_follows_the_agents_scan_interval(client, agent):
+    every_hour = {"scan_interval_s": 3600}
+    first = batch(devices=scan(ROUTER, PHONE), **every_hour)
+    client.post(f"{API}/agent/ingest", headers=agent["h"], json=first)
+    with get_session_factory()() as db:
+        phone = db.scalar(select(Device).where(Device.mac == PHONE[0]))
+        phone.last_seen_at = datetime.now(UTC) - timedelta(minutes=30)  # one hourly scan ago
+        db.commit()
+    client.post(
+        f"{API}/agent/ingest", headers=agent["h"], json=batch(devices=scan(ROUTER), **every_hour)
+    )
+    with get_session_factory()() as db:
+        assert db.scalar(select(Device).where(Device.mac == PHONE[0])).online is True
+
+
+def test_automatic_diagnoses_join_the_history(client, ana, agent, home):
+    run = {
+        "finished_at": iso(datetime.now(UTC) - timedelta(minutes=2)),
+        "result": {"steps": [], "root_cause_step": 4, "summary": "Provider not responding"},
+    }
+    r = client.post(f"{API}/agent/ingest", headers=agent["h"], json=batch(diagnoses=[run]))
+    assert r.json()["diagnoses"] == 1
+    [listed] = client.get(f"{API}/sites/{home['id']}/diagnoses", headers=ana.h).json()["items"]
+    assert listed["status"] == "done" and listed["params"] == {"auto": True}
+    assert listed["result"]["root_cause_step"] == 4
+
+
 def test_outages_from_the_buffer_are_stored_once_and_closed(client, agent):
     start = datetime.now(UTC) - timedelta(minutes=30)
     open_one = {"started_at": iso(start), "ended_at": None, "cause": "isp"}

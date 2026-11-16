@@ -42,6 +42,9 @@ RESOLVED_ALERTS_DAYS = 90
 INGEST_BATCH_DAYS = 2
 REPORT_DAYS = 30
 DEAD_TOKEN_DAYS = 30
+# Clean-up runs in the small hours where the sites are (Asia/Manila), when nobody is looking.
+QUIET_ZONE = "Asia/Manila"
+QUIET_HOUR = (3, 30)
 ROLLUP_LOOKBACK = timedelta(hours=3)  # re-roll recent hours so late (buffered) samples count
 
 
@@ -140,7 +143,10 @@ def start_scheduler():
     scheduler = BackgroundScheduler(timezone="UTC")
     scheduler.add_job(run(check_heartbeats), "interval", minutes=1, id="check_heartbeats")
     scheduler.add_job(run(rollup_hourly), "cron", minute=5, id="rollup_hourly")
-    scheduler.add_job(run(retention), "cron", hour=19, minute=30, id="retention")  # 03:30 PHT
+    scheduler.add_job(
+        run(retention), "cron", hour=QUIET_HOUR[0], minute=QUIET_HOUR[1], timezone=QUIET_ZONE,
+        id="retention",
+    )
     scheduler.add_job(run(push.dispatch), "interval", seconds=15, id="push_dispatch")
     scheduler.add_job(run(push.check_receipts), "interval", minutes=15, id="push_receipts")
     scheduler.start()
