@@ -457,7 +457,7 @@ Use Neon's **pooled** connection string (the host containing `-pooler`) with SQL
 
 ### 6.5 Web version
 - **Build:** `npx expo export --platform web` creates a static site, deployed to Render.
-- **Differences:** push isn't available on web, so alerts appear only in the app's Alerts tab. SecureStore isn't available on web, so tokens are kept in memory and the session lasts until the tab is closed.
+- **Differences:** push isn't available on web, so alerts appear only in the app's Alerts tab. SecureStore isn't available on web, so the session is kept in the browser's `localStorage` and survives a reload. *Changed from memory-only, so a reload doesn't sign you out. The risk is limited because access tokens last 15 minutes and a reused refresh token signs every session out (Section 4.2); the public web build (#92) should add a strict Content-Security-Policy and load no third-party scripts.*
 
 ### 6.6 Builds
 | Profile | Use | Command |
