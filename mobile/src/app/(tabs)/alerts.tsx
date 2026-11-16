@@ -6,7 +6,7 @@ import Animated, { FadeIn, LinearTransition, SlideOutRight, useReducedMotion } f
 import { useAcknowledge, useAlerts, type Alert } from '@/api/alerts';
 import { useSites, type Circle, type Site } from '@/api/circles';
 import { selectSite, useCurrentCircle, useSelectedSite } from '@/api/selection';
-import { Button, Card, Loader, Screen, SectionLabel, StatusChip, Text, type ChipTone } from '@/components/ui';
+import { Button, Card, Loader, Screen, Segmented, StatusChip, Text, type ChipTone } from '@/components/ui';
 import { ago, clock } from '@/features/overview/model';
 import { SiteHeader } from '@/features/overview/site-header';
 import { useNow } from '@/hooks/use-now';
@@ -76,11 +76,12 @@ function Feed({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
   const now = useNow(30_000);
   const reduce = useReducedMotion();
   const [refreshing, setRefreshing] = useState(false);
+  const [tab, setTab] = useState<'open' | 'resolved'>('open');
   const canManage = circle.role === 'owner' || circle.role === 'admin';
 
   const openItems = open.data?.pages.flatMap((p) => p.items) ?? [];
   const resolvedItems = resolved.data?.pages.flatMap((p) => p.items) ?? [];
-  const sub = open.data ? (openItems.length ? `${openItems.length}${open.hasNextPage ? '+' : ''} open` : 'Nothing open') : circle.name;
+  const sub = open.data ? (openItems.length ? `${openItems.length}${open.hasNextPage ? '+' : ''} open` : 'Nothing open') : 'Loading…';
 
   async function refresh() {
     setRefreshing(true);
@@ -113,16 +114,18 @@ function Feed({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
         </Text>
       </Card>
     );
-  } else {
+  } else if (tab === 'open') {
     body = (
       <>
-        <SectionLabel end={openItems.length ? String(openItems.length) : undefined}>Open</SectionLabel>
         {openItems.length ? (
           openItems.map((a) => (
             <Animated.View key={a.id} exiting={reduce ? undefined : SlideOutRight.duration(motion.screen)} layout={reduce ? undefined : LinearTransition.duration(motion.small)}>
               <AlertCard a={a} now={now} onOpen={() => go(a)}>
-                {deviceOf(a) && canManage ? <Button label="Review" variant="ghost" onPress={() => go(a)} /> : null}
-                {canManage ? (
+                {/* One action per card (prototype): a device alert is reviewed (trusting the
+                    device resolves it); anything else is acknowledged. */}
+                {!canManage ? null : deviceOf(a) ? (
+                  <Button label="Review" variant="ghost" onPress={() => go(a)} accessibilityHint="Opens the device to say whose it is or trust it" />
+                ) : (
                   <Button
                     label="Acknowledge"
                     variant="ghost"
@@ -130,12 +133,13 @@ function Feed({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
                     onPress={() => ack.mutate(a.id)}
                     accessibilityHint="Marks it as seen and moves it to Resolved"
                   />
-                ) : null}
+                )}
               </AlertCard>
             </Animated.View>
           ))
         ) : (
           <Card>
+            <StatusChip tone="ok" label="All clear" />
             <Text role="body" color="text2">
               Nothing needs attention right now.
             </Text>
@@ -147,27 +151,43 @@ function Feed({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
             {ack.error.message}
           </Text>
         ) : null}
-
-        {resolvedItems.length ? (
-          <>
-            <SectionLabel>Resolved</SectionLabel>
-            {resolvedItems.map((a) => (
-              <Animated.View key={a.id} entering={reduce ? undefined : FadeIn.duration(motion.small)}>
-                <AlertCard a={a} now={now} onOpen={() => go(a)} ended={ending(a)} />
-              </Animated.View>
-            ))}
-            {resolved.hasNextPage ? (
-              <Button label="Show older" variant="ghost" loading={resolved.isFetchingNextPage} onPress={() => void resolved.fetchNextPage()} />
-            ) : null}
-          </>
+      </>
+    );
+  } else {
+    body = resolvedItems.length ? (
+      <>
+        {resolvedItems.map((a) => (
+          <Animated.View key={a.id} entering={reduce ? undefined : FadeIn.duration(motion.small)}>
+            <AlertCard a={a} now={now} onOpen={() => go(a)} ended={ending(a)} />
+          </Animated.View>
+        ))}
+        {resolved.hasNextPage ? (
+          <Button label="Show older" variant="ghost" loading={resolved.isFetchingNextPage} onPress={() => void resolved.fetchNextPage()} />
         ) : null}
       </>
+    ) : (
+      <Card>
+        <Text role="body" color="text2">
+          Nothing resolved yet. Acknowledged and cleared alerts move here.
+        </Text>
+      </Card>
     );
   }
 
   return (
     <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.yellow} colors={[colors.onYellow]} progressBackgroundColor={colors.yellow} />}>
-      <SiteHeader site={site} sites={sites} sub={sub} onSwitch={selectSite} />
+      <SiteHeader title="Alerts" site={site} sites={sites} sub={sub} onSwitch={selectSite} />
+      {open.data && resolved.data && (openItems.length || resolvedItems.length) ? (
+        <Segmented
+          label="Show alerts"
+          options={[
+            { key: 'open', label: `Open (${openItems.length}${open.hasNextPage ? '+' : ''})` },
+            { key: 'resolved', label: 'Resolved' },
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
+      ) : null}
       {body}
     </Screen>
   );

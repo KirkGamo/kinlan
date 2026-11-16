@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import type { Device, Member } from '@/api/overview';
 import { useMe } from '@/api/session';
@@ -8,8 +8,9 @@ import { Avatar } from '@/features/account/avatar';
 import { colors, radius, space } from '@/theme';
 
 /**
- * Your people (brand.md, people-first devices): each member with how many of their devices are
- * online. Tapping one opens Devices. Avatars never use the status colours.
+ * Your people (brand.md, people-first devices): a row of member tiles, each with how many of their
+ * devices are online (prototype); more than three scroll sideways. Tapping one opens Devices.
+ * Avatars never use the status colours.
  */
 export function People({
   members,
@@ -40,7 +41,7 @@ export function People({
   }
   const shared = devices.filter((d) => !d.owner);
   return (
-    <View style={styles.list}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.list}>
       {members.map((m) => {
         const mine = owned.filter((d) => d.owner?.user_id === m.user_id);
         const sub = mine.length ? count(mine) : 'No devices yet';
@@ -49,7 +50,7 @@ export function People({
       {shared.length ? (
         <Person name="Shared" sub={count(shared)} shared />
       ) : null}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -81,30 +82,29 @@ function Person({
       ) : (
         <Avatar name={name} me={me} />
       )}
-      <View style={styles.text}>
-        <Text role="title" numberOfLines={1}>
-          {name}
-        </Text>
-        <Text role="bodySmall" color="text2" tabular>
-          {sub}
-        </Text>
-      </View>
+      <Text role="title" align="center" numberOfLines={1}>
+        {name}
+      </Text>
+      <Text role="bodySmall" color="text2" align="center" tabular numberOfLines={1}>
+        {sub}
+      </Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   list: { gap: space.item },
+  // Three tiles fill a phone's width (prototype); more scroll sideways.
   person: {
-    minHeight: 68,
-    flexDirection: 'row',
+    width: 116,
     alignItems: 'center',
-    gap: space.s3,
+    gap: space.s1,
     backgroundColor: colors.card,
     borderRadius: radius.row,
     borderCurve: 'continuous',
-    paddingHorizontal: space.s4,
-    paddingVertical: space.s3,
+    paddingHorizontal: space.s2,
+    paddingTop: space.s4,
+    paddingBottom: space.s3,
   },
   pressed: { backgroundColor: colors.raised },
   avatar: {
@@ -116,5 +116,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sharedAvatar: { backgroundColor: colors.raised },
-  text: { flex: 1, gap: 2 },
 });

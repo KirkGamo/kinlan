@@ -67,7 +67,7 @@ export default function DevicesScreen() {
   if (site.status === 'pending') {
     return (
       <Screen>
-        <SiteHeader site={site} sites={sites.data} sub="Not paired yet" onSwitch={selectSite} />
+        <SiteHeader title="Devices" site={site} sites={sites.data} sub="Not paired yet" onSwitch={selectSite} />
         <Card>
           <Text role="title">No devices yet</Text>
           <Text role="body" color="text2">
@@ -109,7 +109,7 @@ function Live({ circle, site, sites, canManage }: { circle: Circle; site: Site; 
   const fresh = list.filter((d) => d.needs_review).length;
   const sub = devices.data
     ? `${list.length} ${list.length === 1 ? 'device' : 'devices'}${stale ? '' : ` · ${online} online`}${fresh ? ` · ${fresh} new` : ''}`
-    : circle.name;
+    : 'Loading…';
 
   async function refresh() {
     setRefreshing(true);
@@ -181,7 +181,7 @@ function Live({ circle, site, sites, canManage }: { circle: Circle; site: Site; 
 
   return (
     <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.yellow} colors={[colors.onYellow]} progressBackgroundColor={colors.yellow} />}>
-      <SiteHeader site={site} sites={sites} sub={sub} onSwitch={selectSite} />
+      <SiteHeader title="Devices" site={site} sites={sites} sub={sub} onSwitch={selectSite} />
       {stale ? (
         <Card style={styles.stale}>
           <StatusChip tone="neutral" label="Offline" />
