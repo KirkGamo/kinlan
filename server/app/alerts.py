@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
@@ -114,6 +115,16 @@ def device_name(device: Device) -> str:
     return device.custom_name or device.hostname or device.vendor or device.mac
 
 
+def site_clock(when: datetime, site: Site) -> str:
+    """A time as the site's members read it ("9:41"), in the site's own time zone."""
+    try:
+        zone = ZoneInfo(site.timezone or "UTC")
+    except ZoneInfoNotFoundError:
+        zone = UTC
+    local = when.astimezone(zone)
+    return f"{local.hour}:{local.minute:02d}"
+
+
 def duration_words(seconds: float) -> str:
     seconds = int(round(seconds))
     if seconds < 60:
@@ -181,7 +192,8 @@ def went_unreachable(db: Session, site: Site, now: datetime) -> None:
         "unreachable",
         "critical",
         f"{site.name} is unreachable",
-        f"The agent hasn't reported since {since:%H:%M} UTC. Possible internet or power outage.",
+        f"The agent hasn't reported since {site_clock(since, site)}. "
+        "Possible internet or power outage.",
         now=now,
     )
 
@@ -209,7 +221,7 @@ def came_back(
         seconds = (measured.ended_at - measured.started_at).total_seconds()
         cause = CAUSE_WORDS.get(OutageCause(measured.cause).value, "cause unknown")
         title = f"{site.name} is back online after {duration_words(seconds)}"
-        body = f"The internet was down from {measured.started_at:%H:%M} UTC ({cause})."
+        body = f"The internet was down from {site_clock(measured.started_at, site)} ({cause})."
         ref = f"outage:{measured.started_at.isoformat()}"
     else:
         title, body, ref = f"{site.name} is back online", "The agent is reporting again.", None

@@ -4,7 +4,6 @@ Any member reads; admins and owners rename, set the type or owner, and mark devi
 Marking a device trusted resolves its open "new device" alert.
 """
 
-import base64
 import uuid
 from datetime import UTC, datetime
 from typing import Literal
@@ -12,6 +11,7 @@ from typing import Literal
 from fastapi import APIRouter, Query
 from sqlalchemy import case, func, select, tuple_, update
 
+from app import cursors
 from app.authz import require_device, require_site
 from app.deps import DB, CurrentUser
 from app.device_schemas import (
@@ -200,18 +200,6 @@ def update_device(
     return _detail(db, device)
 
 
-def _encode(t: PingTest) -> str:
-    return base64.urlsafe_b64encode(f"{t.ts.isoformat()}|{t.id}".encode()).decode()
-
-
-def _decode(cursor: str) -> tuple[datetime, uuid.UUID]:
-    try:
-        stamp, ident = base64.urlsafe_b64decode(cursor.encode()).decode().split("|")
-        return datetime.fromisoformat(stamp), uuid.UUID(ident)
-    except (ValueError, UnicodeDecodeError) as exc:
-        raise ApiError(
-            400, "bad_cursor", "That cursor isn't valid; start from the first page."
-        ) from exc
 
 
 @router.get("/devices/{device_id}/ping-tests", response_model=PingTestList)
@@ -226,11 +214,11 @@ def ping_tests(
     device = require_device(db, user, device_id, Role.viewer)
     query = select(PingTest).where(PingTest.device_id == device.id)
     if cursor:
-        query = query.where(tuple_(PingTest.ts, PingTest.id) < tuple_(*_decode(cursor)))
+        query = query.where(tuple_(PingTest.ts, PingTest.id) < tuple_(*cursors.decode(cursor)))
     rows = list(db.scalars(query.order_by(PingTest.ts.desc(), PingTest.id.desc()).limit(limit + 1)))
     more = len(rows) > limit
     rows = rows[:limit]
     return PingTestList(
         items=[PingTestOut.model_validate(t, from_attributes=True) for t in rows],
-        next_cursor=_encode(rows[-1]) if more and rows else None,
+        next_cursor=cursors.encode(rows[-1].ts, rows[-1].id) if more and rows else None,
     )

@@ -13,7 +13,6 @@ Buckets carry sums (not averages of averages), so merging rollups with raw sampl
 Buckets with no samples are left out: a gap means the agent wasn't reporting.
 """
 
-import base64
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -24,9 +23,9 @@ from pydantic import BaseModel
 from sqlalchemy import and_, exists, func, select, text, tuple_
 from sqlalchemy.orm import aliased
 
+from app import cursors
 from app.authz import require_site
 from app.deps import DB, CurrentUser
-from app.errors import ApiError
 from app.models import DetectedBy, Outage, OutageCause, PingHourly, Role
 from app.schemas import ErrorOut
 
@@ -250,18 +249,6 @@ def latency(
     )
 
 
-def _encode(o: Outage) -> str:
-    return base64.urlsafe_b64encode(f"{o.started_at.isoformat()}|{o.id}".encode()).decode()
-
-
-def _decode(cursor: str) -> tuple[datetime, uuid.UUID]:
-    try:
-        stamp, ident = base64.urlsafe_b64decode(cursor.encode()).decode().split("|")
-        return datetime.fromisoformat(stamp), uuid.UUID(ident)
-    except (ValueError, UnicodeDecodeError) as exc:
-        raise ApiError(
-            400, "bad_cursor", "That cursor isn't valid; start from the first page."
-        ) from exc
 
 
 @router.get("/sites/{site_id}/outages", response_model=OutageList)
@@ -276,7 +263,7 @@ def outages(
     site = require_site(db, user, site_id, Role.viewer)
     query = _outage_query(site.id)
     if cursor:
-        query = query.where(tuple_(Outage.started_at, Outage.id) < tuple_(*_decode(cursor)))
+        query = query.where(tuple_(Outage.started_at, Outage.id) < tuple_(*cursors.decode(cursor)))
     rows = list(
         db.scalars(query.order_by(Outage.started_at.desc(), Outage.id.desc()).limit(limit + 1))
     )
@@ -285,5 +272,5 @@ def outages(
     now = datetime.now(UTC)
     return OutageList(
         items=[_outage_out(o, now) for o in rows],
-        next_cursor=_encode(rows[-1]) if more and rows else None,
+        next_cursor=cursors.encode(rows[-1].started_at, rows[-1].id) if more and rows else None,
     )

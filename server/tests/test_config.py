@@ -22,3 +22,18 @@ def test_migrations_fall_back_to_the_main_url_locally():
 def test_postgres_scheme_alias_is_accepted():
     s = Settings(database_url="postgres://u:p@h/db", _env_file=None)
     assert s.database_url == "postgresql+psycopg://u:p@h/db"
+
+
+def test_production_refuses_the_development_jwt_secret():
+    import pytest
+    from pydantic import ValidationError
+
+    from app.config import DEV_JWT_SECRET
+
+    with pytest.raises(ValidationError, match="JWT_SECRET"):
+        Settings(env="production", jwt_secret=DEV_JWT_SECRET, _env_file=None)
+    with pytest.raises(ValidationError, match="JWT_SECRET"):
+        Settings(env="production", jwt_secret="short", _env_file=None)
+    assert Settings(env="production", jwt_secret="x" * 40, _env_file=None).env == "production"
+    local = Settings(env="development", jwt_secret=DEV_JWT_SECRET, _env_file=None)
+    assert local.jwt_secret == DEV_JWT_SECRET  # local runs keep the default

@@ -2,8 +2,11 @@
 
 from functools import lru_cache
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DEV_JWT_SECRET = "change-me-in-.env"
+MIN_SECRET_LENGTH = 32
 
 
 class Settings(BaseSettings):
@@ -16,7 +19,7 @@ class Settings(BaseSettings):
     # Neon: DATABASE_URL is the pooled string (host has "-pooler") for the app; migrations use
     # the direct string, because PgBouncer's transaction mode breaks session-level work.
     database_url_unpooled: str | None = None
-    jwt_secret: str = "change-me-in-.env"
+    jwt_secret: str = DEV_JWT_SECRET
     cors_origins: list[str] = ["http://localhost:8081"]
     expo_access_token: str | None = None
     run_jobs: bool = True  # scheduled jobs; set RUN_JOBS=false on extra instances
@@ -31,6 +34,16 @@ class Settings(BaseSettings):
             if v.startswith(prefix):
                 return "postgresql+psycopg://" + v[len(prefix) :]
         return v
+
+    @model_validator(mode="after")
+    def _real_secret_in_production(self) -> "Settings":
+        """JWT_SECRET signs every token and keys the code hashes: refuse to run on the default."""
+        weak = self.jwt_secret == DEV_JWT_SECRET or len(self.jwt_secret) < MIN_SECRET_LENGTH
+        if self.env == "production" and weak:
+            raise ValueError(
+                f"Set JWT_SECRET to a random value of at least {MIN_SECRET_LENGTH} characters."
+            )
+        return self
 
     @property
     def migration_url(self) -> str:

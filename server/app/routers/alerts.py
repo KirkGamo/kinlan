@@ -4,7 +4,6 @@ Any member reads alerts; admins and owners acknowledge them and change threshold
 Lists are newest first with cursor pagination (`?limit=50&cursor=…`).
 """
 
-import base64
 import uuid
 from datetime import UTC, datetime
 from typing import Literal
@@ -12,6 +11,7 @@ from typing import Literal
 from fastapi import APIRouter, Query
 from sqlalchemy import select, tuple_
 
+from app import cursors
 from app.alerts import settings_for
 from app.authz import require_site
 from app.deps import DB, CurrentUser
@@ -25,18 +25,6 @@ router = APIRouter(
 )
 
 
-def _encode(alert: Alert) -> str:
-    return base64.urlsafe_b64encode(f"{alert.created_at.isoformat()}|{alert.id}".encode()).decode()
-
-
-def _decode(cursor: str) -> tuple[datetime, uuid.UUID]:
-    try:
-        stamp, ident = base64.urlsafe_b64decode(cursor.encode()).decode().split("|")
-        return datetime.fromisoformat(stamp), uuid.UUID(ident)
-    except (ValueError, UnicodeDecodeError) as exc:
-        raise ApiError(
-            400, "bad_cursor", "That cursor isn't valid; start from the first page."
-        ) from exc
 
 
 @router.get("/sites/{site_id}/alerts", response_model=AlertList)
@@ -57,7 +45,7 @@ def list_alerts(
     elif status == "resolved":
         query = query.where(~is_open)
     if cursor:
-        query = query.where(tuple_(Alert.created_at, Alert.id) < tuple_(*_decode(cursor)))
+        query = query.where(tuple_(Alert.created_at, Alert.id) < tuple_(*cursors.decode(cursor)))
     rows = list(
         db.scalars(query.order_by(Alert.created_at.desc(), Alert.id.desc()).limit(limit + 1))
     )
@@ -65,7 +53,7 @@ def list_alerts(
     rows = rows[:limit]
     return AlertList(
         items=[AlertOut.model_validate(a) for a in rows],
-        next_cursor=_encode(rows[-1]) if more and rows else None,
+        next_cursor=cursors.encode(rows[-1].created_at, rows[-1].id) if more and rows else None,
     )
 
 

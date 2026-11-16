@@ -72,6 +72,13 @@ class PortFindingIn(BaseModel):
     service: str = Field(max_length=40)
 
 
+class DiagnoseIn(BaseModel):
+    """A diagnose the agent ran on its own at the start of an outage (plan, Section 3.4)."""
+
+    finished_at: datetime
+    result: dict = Field(description="Same shape as a diagnose command's result")
+
+
 class IngestIn(BaseModel):
     batch_id: uuid.UUID = Field(description="Random per batch; a resent batch is stored once")
     agent_version: Version
@@ -81,6 +88,10 @@ class IngestIn(BaseModel):
     devices: list[DeviceIn] = Field(default_factory=list, max_length=2_000)
     outages: list[OutageIn] = Field(default_factory=list, max_length=500)
     port_findings: list[PortFindingIn] = Field(default_factory=list, max_length=2_000)
+    diagnoses: list[DiagnoseIn] = Field(default_factory=list, max_length=50)
+    scan_interval_s: float | None = Field(
+        default=None, ge=30, le=86_400, description="How often the agent scans for devices"
+    )
 
 
 class IngestOut(BaseModel):
@@ -91,6 +102,7 @@ class IngestOut(BaseModel):
     new_devices: int = 0
     outages: int = 0
     port_findings: int = 0
+    diagnoses: int = 0
 
 
 CommandType = Literal["scan", "ping_test", "diagnose", "port_check"]
