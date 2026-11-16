@@ -11,7 +11,7 @@ import Svg, { Path } from 'react-native-svg';
 
 import type { Deduction } from '@/api/circles';
 import { Card, Text } from '@/components/ui';
-import { colors, radius, space } from '@/theme';
+import { colors, radius, space, touch } from '@/theme';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const ARC = 'M16 62 A40 40 0 0 1 96 62';
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   top: { flexDirection: 'row', alignItems: 'center', gap: space.s4 },
   score: { flex: 1, gap: 2 },
   number: { flexDirection: 'row', alignItems: 'baseline' },
-  why: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: space.s1, borderRadius: radius.pill },
+  why: { alignSelf: 'flex-start', minHeight: touch.min, justifyContent: 'center', paddingHorizontal: space.s1, borderRadius: radius.pill },
   pressed: { opacity: 0.7 },
   deductions: { gap: space.s2 },
   ded: {

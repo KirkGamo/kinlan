@@ -5,7 +5,7 @@ import Svg, { Path } from 'react-native-svg';
 import type { Site, SiteStatus } from '@/api/circles';
 import { Sheet, StatusChip, Text, type ChipTone } from '@/components/ui';
 import { AccountButton } from '@/features/account/account-sheet';
-import { colors, radius, space } from '@/theme';
+import { colors, radius, space, touch } from '@/theme';
 
 export const SITE_STATUS: Record<SiteStatus, { tone: ChipTone; label: string }> = {
   online: { tone: 'ok', label: 'Online' },
@@ -118,7 +118,7 @@ export function SiteHeader({
 const styles = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'flex-start', gap: space.s3 },
   head: { flex: 1, gap: 2 },
-  name: { flexDirection: 'row', alignItems: 'center', gap: space.s1, alignSelf: 'flex-start', minHeight: 44, borderRadius: radius.pill },
+  name: { flexDirection: 'row', alignItems: 'center', gap: space.s1, alignSelf: 'flex-start', minHeight: touch.min, borderRadius: radius.pill },
   subRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', minHeight: 24, flexShrink: 1 },
   pressed: { opacity: 0.7 },
   list: { gap: space.item },

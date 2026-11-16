@@ -3,10 +3,10 @@ import { useRef, useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { useSiteSummary, useSites, type Circle, type Site, type SiteSummary } from '@/api/circles';
+import { useSiteSummary, type Circle, type Site, type SiteSummary } from '@/api/circles';
 import { useDevices, useLatency, useMembers } from '@/api/overview';
-import { selectSite, useCurrentCircle, useSelectedSite } from '@/api/selection';
-import { Button, Card, Loader, Perforation, Screen, SectionLabel, StatusChip, Text } from '@/components/ui';
+import { canManage as manages, selectSite, useTabData } from '@/api/selection';
+import { Button, Card, ErrorCard, Loader, Perforation, Screen, SectionLabel, StatusChip, Text } from '@/components/ui';
 import { HealthCard } from '@/features/overview/health-card';
 import { LatencyChart } from '@/features/overview/latency-chart';
 import { LightStrip } from '@/features/overview/light-strip';
@@ -25,24 +25,19 @@ const UNLIT: Light[] = Array.from({ length: 5 }, () => ({ state: 'unlit', value:
  * follow. A site with no agent yet becomes the pairing call to action.
  */
 export default function OverviewScreen() {
-  const { circles, circle } = useCurrentCircle();
-  const sites = useSites(circle?.id);
-  const site = useSelectedSite(sites.data);
-
-  if (circles.isPending || sites.isPending) return <Skeleton />;
-  if (circles.isError || sites.isError) {
-    const error = circles.error ?? sites.error;
+  const tab = useTabData();
+  if (tab.state === 'loading') return <Skeleton />;
+  if (tab.state === 'error') {
     return (
       <Screen>
-        <ErrorCard message={error?.message ?? 'Something went wrong.'} onRetry={() => void sites.refetch()} />
+        <ErrorCard message={tab.message} onRetry={tab.retry} />
       </Screen>
     );
   }
-  if (!circle) return <Skeleton />;
-  const canManage = circle.role === 'owner' || circle.role === 'admin';
+  const { circle, sites, site, canManage } = tab;
   if (!site) return <NoSites circle={circle} canManage={canManage} />;
-  if (site.status === 'pending') return <Unpaired site={site} sites={sites.data} canManage={canManage} />;
-  return <Live key={site.id} circle={circle} site={site} sites={sites.data} />;
+  if (site.status === 'pending') return <Unpaired site={site} sites={sites} canManage={canManage} />;
+  return <Live key={site.id} circle={circle} site={site} sites={sites} />;
 }
 
 function Live({ circle, site, sites }: { circle: Circle; site: Site; sites: Site[] }) {
@@ -100,7 +95,7 @@ function Live({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
   const v = verdict(s, now, lit);
   const open = problems(s, now, v);
   const stale = staleNow;
-  const canManage = circle.role === 'owner' || circle.role === 'admin';
+  const canManage = manages(circle);
   const diagnose = () => router.push({ pathname: '/diagnose', params: { site: site.id, run: stale ? '0' : '1' } });
   // Each problem opens exactly where it's dealt with: an outage runs Diagnose (owners and admins),
   // new devices open Devices filtered to Needs review, anything else opens Alerts.
@@ -289,18 +284,6 @@ function Skeleton() {
         <Loader label="Loading" />
       </Card>
     </Screen>
-  );
-}
-
-function ErrorCard({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <Card>
-      <StatusChip tone="down" label="Couldn’t load" />
-      <Text role="body" color="text2">
-        {message}
-      </Text>
-      <Button label="Try again" variant="ghost" onPress={onRetry} />
-    </Card>
   );
 }
 

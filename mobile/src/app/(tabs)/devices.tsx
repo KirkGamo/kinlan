@@ -2,10 +2,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
-import { useSiteSummary, useSites, type Circle, type Site } from '@/api/circles';
+import { useSiteSummary, type Circle, type Site } from '@/api/circles';
 import { useDevices, useMembers, type Device, type Member } from '@/api/overview';
-import { selectSite, useCurrentCircle, useSelectedSite } from '@/api/selection';
-import { Button, Card, Chips, Loader, Screen, SectionLabel, Segmented, StatusChip, Text } from '@/components/ui';
+import { selectSite, useTabData } from '@/api/selection';
+import { Button, Card, Chips, ErrorCard, Loader, Screen, SectionLabel, Segmented, StatusChip, Text } from '@/components/ui';
 import { DeviceMap } from '@/features/devices/device-map';
 import { DeviceActions } from '@/features/devices/device-actions';
 import { DeviceSheet } from '@/features/devices/device-sheet';
@@ -31,11 +31,8 @@ const VIEWS: { key: View_; label: string }[] = [
  * same devices, filter chips, and the device sheet. Every action on the map is also in the lists.
  */
 export default function DevicesScreen() {
-  const { circles, circle } = useCurrentCircle();
-  const sites = useSites(circle?.id);
-  const site = useSelectedSite(sites.data);
-
-  if (circles.isPending || sites.isPending) {
+  const tab = useTabData();
+  if (tab.state === 'loading') {
     return (
       <Screen>
         <Card style={styles.center}>
@@ -44,14 +41,14 @@ export default function DevicesScreen() {
       </Screen>
     );
   }
-  if (circles.isError || sites.isError || !circle) {
+  if (tab.state === 'error') {
     return (
       <Screen>
-        <ErrorCard message={(circles.error ?? sites.error)?.message ?? 'Something went wrong.'} onRetry={() => void sites.refetch()} />
+        <ErrorCard message={tab.message} onRetry={tab.retry} />
       </Screen>
     );
   }
-  const canManage = circle.role === 'owner' || circle.role === 'admin';
+  const { circle, sites, site, canManage } = tab;
   if (!site) {
     return (
       <Screen>
@@ -69,7 +66,7 @@ export default function DevicesScreen() {
   if (site.status === 'pending') {
     return (
       <Screen>
-        <SiteHeader title="Devices" site={site} sites={sites.data} sub="Not paired yet" onSwitch={selectSite} />
+        <SiteHeader title="Devices" site={site} sites={sites} sub="Not paired yet" onSwitch={selectSite} />
         <Card>
           <Text role="title">No devices yet</Text>
           <Text role="body" color="text2">
@@ -84,7 +81,7 @@ export default function DevicesScreen() {
       </Screen>
     );
   }
-  return <Live key={site.id} circle={circle} site={site} sites={sites.data} canManage={canManage} />;
+  return <Live key={site.id} circle={circle} site={site} sites={sites} canManage={canManage} />;
 }
 
 function Live({ circle, site, sites, canManage }: { circle: Circle; site: Site; sites: Site[]; canManage: boolean }) {
@@ -353,18 +350,6 @@ function DeviceRow({
       </View>
       <StatusChip tone={st.tone} label={st.label} />
     </Pressable>
-  );
-}
-
-function ErrorCard({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <Card>
-      <StatusChip tone="down" label="Couldn’t load" />
-      <Text role="body" color="text2">
-        {message}
-      </Text>
-      <Button label="Try again" variant="ghost" onPress={onRetry} />
-    </Card>
   );
 }
 
