@@ -36,11 +36,21 @@ type DevicePatch = {
   trusted?: boolean;
 };
 
-export function useDevice(deviceId: string | null) {
+/**
+ * One device's detail. While it loads, the row the sheet was opened from stands in (the list
+ * already has its name, type, addresses and status), so the sheet opens complete; only the ports
+ * and the last ping test wait for the detail.
+ */
+export function useDevice(deviceId: string | null, siteId?: string) {
+  const client = useQueryClient();
   return useQuery({
     queryKey: keys.device(deviceId),
     queryFn: () => api<DeviceDetail>(`/devices/${deviceId}`),
     enabled: !!deviceId,
+    placeholderData: () => {
+      const row = client.getQueryData<Device[]>(keys.devices(siteId))?.find((d) => d.id === deviceId);
+      return row ? { ...row, risky_ports: [], last_ping_test: null } : undefined;
+    },
   });
 }
 

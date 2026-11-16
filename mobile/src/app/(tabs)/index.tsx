@@ -12,7 +12,7 @@ import { LatencyChart } from '@/features/overview/latency-chart';
 import { LightStrip } from '@/features/overview/light-strip';
 import { ago, isStale, lights, problems, verdict, type Light, type Problem } from '@/features/overview/model';
 import { People } from '@/features/overview/people';
-import { SiteHeader } from '@/features/overview/site-header';
+import { SiteHeader, SiteHeaderSkeleton } from '@/features/overview/site-header';
 import { useNow } from '@/hooks/use-now';
 import { haptics } from '@/haptics';
 import { colors, radius, size, space } from '@/theme';
@@ -278,7 +278,7 @@ function NoSites({ circle, canManage }: { circle: Circle; canManage: boolean }) 
 function Skeleton() {
   return (
     <Screen>
-      <View style={styles.skelTitle} />
+      <SiteHeaderSkeleton />
       <LightStrip lights={UNLIT} igniteKey="skeleton" />
       <Card style={styles.loading}>
         <Loader label="Loading" />
@@ -319,5 +319,4 @@ const styles = StyleSheet.create({
   },
   fabPressed: { transform: [{ scale: 0.96 }] },
   rowText: { flex: 1, gap: 2 },
-  skelTitle: { width: 160, height: 28, borderRadius: radius.small, backgroundColor: colors.card, marginVertical: space.s2 },
 });

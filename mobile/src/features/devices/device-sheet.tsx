@@ -53,7 +53,7 @@ export function DeviceSheet({
   startPing?: boolean;
   onClose: () => void;
 }) {
-  const device = useDevice(deviceId);
+  const device = useDevice(deviceId, siteId);
   const d = device.data;
   const st = d ? chip(d, stale) : null;
   return (
@@ -83,7 +83,7 @@ export function DeviceSheet({
         </Text>
       ) : !d ? null : (
         // Keyed by device, so switching devices resets the rename field and ping state.
-        <Body key={d.id} d={d} siteId={siteId} members={members} canManage={canManage} stale={stale} startPing={startPing} />
+        <Body key={d.id} d={d} siteId={siteId} members={members} canManage={canManage} stale={stale} startPing={startPing} partial={device.isPlaceholderData} />
       )}
     </Sheet>
   );
@@ -96,6 +96,7 @@ function Body({
   canManage,
   stale,
   startPing,
+  partial,
 }: {
   d: DeviceDetail;
   siteId: string;
@@ -103,6 +104,8 @@ function Body({
   canManage: boolean;
   stale: boolean;
   startPing: boolean;
+  /** Drawn from the list row while the detail loads: ports and the last ping test come later. */
+  partial: boolean;
 }) {
   const update = useUpdateDevice(d.id, siteId, members);
   const ping = usePing(d, siteId);
@@ -197,7 +200,9 @@ function Body({
 
       <PingResult d={d} ping={ping} />
 
-      {d.risky_ports.length ? (
+      {partial && d.open_risky_ports > 0 ? (
+        <Loader label="Loading open ports" />
+      ) : d.risky_ports.length ? (
         <>
           <Text role="silk" color="text2">
             Open ports to check

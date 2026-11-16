@@ -5,7 +5,7 @@ import Svg, { Path } from 'react-native-svg';
 import type { Site, SiteStatus } from '@/api/circles';
 import { Sheet, StatusChip, Text, type ChipTone } from '@/components/ui';
 import { AccountButton } from '@/features/account/account-sheet';
-import { colors, radius, size, space, touch } from '@/theme';
+import { colors, radius, size, space, touch, type } from '@/theme';
 
 export const SITE_STATUS: Record<SiteStatus, { tone: ChipTone; label: string }> = {
   online: { tone: 'ok', label: 'Online' },
@@ -115,7 +115,30 @@ export function SiteHeader({
   );
 }
 
+/**
+ * The header while the Circle and its sites load: the same rows and heights as the Overview
+ * header (name, subtitle line, avatar), so nothing below moves when the real one arrives.
+ */
+export function SiteHeaderSkeleton() {
+  return (
+    <View style={styles.bar} accessible={false}>
+      <View style={styles.head}>
+        <View style={styles.name}>
+          <View style={styles.skelName} />
+        </View>
+        <View style={styles.skelLine}>
+          <View style={styles.skelSub} />
+        </View>
+      </View>
+      <AccountButton />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  skelName: { width: 140, height: type.titleLarge.fontSize, borderRadius: radius.small, backgroundColor: colors.card },
+  skelLine: { height: type.bodySmall.lineHeight, justifyContent: 'center' },
+  skelSub: { width: 180, height: type.bodySmall.fontSize, borderRadius: radius.small, backgroundColor: colors.card },
   bar: { flexDirection: 'row', alignItems: 'flex-start', gap: space.s3 },
   head: { flex: 1, gap: 2 },
   name: { flexDirection: 'row', alignItems: 'center', gap: space.s1, alignSelf: 'flex-start', minHeight: touch.min, borderRadius: radius.pill },

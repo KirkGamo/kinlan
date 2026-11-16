@@ -37,7 +37,8 @@ export default function TabsLayout() {
       <NativeTabs.Trigger name="alerts">
         <NativeTabs.Trigger.Label>Alerts</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon md="notifications" />
-        <NativeTabs.Trigger.Badge hidden={open === 0}>{open > 99 ? '99+' : String(open)}</NativeTabs.Trigger.Badge>
+        {/* expo-router ignores `hidden` when the badge has a value, so 0 passes none. */}
+        <NativeTabs.Trigger.Badge hidden={open === 0}>{open === 0 ? undefined : open > 99 ? '99+' : String(open)}</NativeTabs.Trigger.Badge>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="settings">
         <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>
