@@ -252,7 +252,7 @@ A black-and-graphite instrument panel with one brand yellow and three status col
 ### Neutral
 - **Night Ground** (`ground`): every screen's background, the splash, the app icon field.
 - **Panel Graphite** (`card`): cards, list rows, sheets, the navigation bar.
-- **Raised Graphite** (`raised`): one step up: ghost buttons, chips, fields, the facts block inside sheets, pressed rows, icon wells.
+- **Raised Graphite** (`raised`): one step up: ghost buttons, chips, fields, sheet icon tiles and grab handles, pressed rows, icon wells.
 - **Hairline** (`hairline`): field borders and grid lines in the chart; the only stroke colour in the system.
 - **Readout White** (`text`): primary text and icons (16.6:1 on `card`).
 - **Muted Steel** (`text-secondary`): secondary lines, captions, silkscreen labels, the router line in the chart (7.05:1 on `card`).
@@ -324,7 +324,7 @@ Pill-shaped, confident, one primary per view.
 - **Ghost:** raised graphite with white text. Secondary actions: Acknowledge, Review, Add a site, Sign out.
 - **Danger:** raised graphite with a red label and a red hairline. Destructive actions only: Remove from this Circle, Leave, Delete account. Never filled red.
 - **Pressed:** scales to 0.97 (120 ms). **Loading:** the five-dot loader replaces the label. **Disabled:** 50% opacity.
-- **FAB (Diagnose):** a 56-dp yellow pill with a search icon and "Diagnose", bottom-right above the navigation bar, owners and admins only.
+- **FAB (Diagnose):** a 56-dp yellow pill with the prototype's magnifier-and-pulse glyph and "Diagnose", bottom-right above the navigation bar, owners and admins only.
 
 ### Status chips
 The system's way of saying state.
@@ -332,12 +332,13 @@ The system's way of saying state.
 - **Rule:** never colour alone, never a text glyph for the icon.
 
 ### Choice chips and the segmented switch
-- **Chips:** 36-dp raised pills in a horizontal scroll (filters, "Whose is this?", device type, alert thresholds); the selected one is yellow with black text.
+- **Chips:** 36-dp pills in a horizontal scroll, in three variants. Fill (device type, alert thresholds): raised, the selected one yellow with black text. Filter (the Devices filters): `card` with muted text, the selected one white with black text. Outline ("Whose is this?"): raised, the selected one ringed in 2-dp yellow with white text.
 - **Segmented switch:** a graphite track holding equal pills (People | Status | Map); the selected segment is the yellow pill.
 
 ### Cards / Containers
 - **Corner Style:** 24 dp continuous.
-- **Background:** `card` on the `ground`; nested facts use `raised` with a 20-dp radius.
+- **Background:** `card` on the `ground`.
+- **Verdict card:** the one card with the perforated texture: a 9-dp grid of 1.1-dp dots in `text` at 8%, strongest at the top-right corner and faded out by 60% of the way across.
 - **Shadow Strategy:** none (see Elevation).
 - **Internal Padding:** 20 dp; 8-dp gaps between children.
 
@@ -350,7 +351,7 @@ The system's way of saying state.
 - **Error:** red border and a red Body-small line below; otherwise a muted hint line. Passwords get a yellow Show/Hide text button.
 
 ### Bottom sheets
-- `card` surface with 28-dp top corners over a 60% scrim; slide up in 350 ms (decelerate). Title large heading with a 44-dp round close button. Content scrolls past 72% of the screen height. Closes with the button, the scrim, Esc or system Back. Used for the light layer, device detail, the account sheet, the site switcher, member and invite.
+- `card` surface with 28-dp top corners over a 60% scrim; slide up in 350 ms (decelerate). A 36 x 4 grab handle, then the head: an optional 52-dp `raised` icon tile (18-dp corners), the Title large heading with an optional meta line under it (a status chip and a short fact), and a 44-dp round close button. Facts sit below a top hairline as label-left (muted Body small) and value-right (Body small at 700, tabular) rows. Content scrolls past 72% of the screen height. Closes with the button, the scrim, Esc or system Back. Used for the light layer, device detail, the account sheet, the site switcher, member and invite.
 
 ### Navigation
 - Material navigation bar on `card` with a top hairline: four destinations (Overview, Devices, Alerts, Settings). The active destination is a yellow pill with black icon and label; inactive ones are muted. Alerts carries a red count badge with black numerals. On web the same bar is drawn with headless tabs.
@@ -388,4 +389,4 @@ The system's way of saying state.
 - **Don't** use avatars in status colours, or emoji and text glyphs as icons.
 - **Don't** suggest KinLAN can block a device or present the map as a wiring diagram.
 - **Don't** write "family" in UI copy; groups are Circles.
-- **Don't** put the perforated texture on more than the verdict card and the splash (`docs/design/brand.md`); it isn't built yet.
+- **Don't** put the perforated texture on more than the verdict card and the splash (`docs/design/brand.md`).

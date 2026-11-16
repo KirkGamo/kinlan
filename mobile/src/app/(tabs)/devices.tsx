@@ -194,7 +194,7 @@ function Live({ circle, site, sites, canManage }: { circle: Circle; site: Site; 
         </Card>
       ) : null}
       <Segmented label="Group devices by" options={VIEWS} value={view} onChange={setView} />
-      <Chips label="Filter devices" options={FILTERS} value={filter} onChange={setFilter} />
+      <Chips label="Filter devices" variant="filter" options={FILTERS} value={filter} onChange={setFilter} />
       {body}
       <DeviceSheet
         deviceId={selected}

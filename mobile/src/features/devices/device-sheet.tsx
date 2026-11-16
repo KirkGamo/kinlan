@@ -11,11 +11,11 @@ import {
   type PingTest,
 } from '@/api/devices';
 import type { DeviceType, Member } from '@/api/overview';
-import { Button, Chips, Loader, Sheet, StatusChip, Text, TextField } from '@/components/ui';
+import { Button, Chips, Facts, Loader, Sheet, StatusChip, Text, TextField } from '@/components/ui';
 import { clock, ms } from '@/features/overview/model';
 import { colors, radius, space } from '@/theme';
 
-import { TYPE_LABEL } from './icons';
+import { ICON_PATHS, TYPE_LABEL } from './icons';
 import { chip, isPrivateAddress } from './model';
 
 const TYPES = (Object.keys(TYPE_LABEL) as DeviceType[]).map((key) => ({ key, label: TYPE_LABEL[key] }));
@@ -51,8 +51,24 @@ export function DeviceSheet({
 }) {
   const device = useDevice(deviceId);
   const d = device.data;
+  const st = d ? chip(d, stale) : null;
   return (
-    <Sheet open={deviceId != null} onClose={onClose} title={d?.display_name ?? 'Device'}>
+    <Sheet
+      open={deviceId != null}
+      onClose={onClose}
+      title={d?.display_name ?? 'Device'}
+      icon={d ? ICON_PATHS[d.device_type] : undefined}
+      meta={
+        d && st ? (
+          <>
+            <StatusChip tone={st.tone} label={st.label} />
+            {d.trusted ? <StatusChip tone="ok" label="Trusted" /> : null}
+            <Text role="bodySmall" color="text2">
+              {TYPE_LABEL[d.device_type]}
+            </Text>
+          </>
+        ) : null
+      }>
       {deviceId != null && device.isPending ? (
         <View style={styles.center}>
           <Loader label="Loading the device" />
@@ -85,7 +101,6 @@ function Body({
   const update = useUpdateDevice(d.id, siteId);
   const ping = usePing(d, siteId);
   const [name, setName] = useState(d.custom_name ?? '');
-  const st = chip(d, stale);
   const owners = [
     ...members.map((m) => ({ key: m.user_id, label: m.display_name })),
     { key: SHARED, label: 'Shared' },
@@ -95,13 +110,6 @@ function Body({
 
   return (
     <>
-      <View style={styles.meta}>
-        <StatusChip tone={st.tone} label={st.label} />
-        {d.trusted ? <StatusChip tone="ok" label="Trusted" /> : null}
-        <Text role="bodySmall" color="text2">
-          {TYPE_LABEL[d.device_type]}
-        </Text>
-      </View>
       {d.is_agent ? (
         <Text role="bodySmall" color="text2">
           This PC runs the KinLAN agent: every check and ping test starts here.
@@ -113,14 +121,15 @@ function Body({
         </Text>
       ) : null}
 
-      {/* Prototype facts: label left, value right, one hairline-separated row each. */}
-      <View style={styles.facts}>
-        <Fact label="Manufacturer" value={d.vendor ?? 'Unknown'} />
-        <Fact label="IP address" value={d.ip ?? 'Unknown'} />
-        <Fact label="Hardware address" value={d.mac} />
-        <Fact label="First seen" value={day(d.first_seen_at)} />
-        <Fact label="Last seen" value={day(d.last_seen_at)} last />
-      </View>
+      <Facts
+        rows={[
+          ['Manufacturer', d.vendor ?? 'Unknown'],
+          ['IP address', d.ip ?? 'Unknown'],
+          ['Hardware address', d.mac],
+          ['First seen', day(d.first_seen_at)],
+          ['Last seen', day(d.last_seen_at)],
+        ]}
+      />
 
       <Text role="silk" color="text2">
         Whose is this?
@@ -128,6 +137,7 @@ function Body({
       {canManage ? (
         <Chips
           label="Whose is this?"
+          variant="outline"
           options={owners}
           value={whose}
           disabled={update.isPending}
@@ -293,35 +303,8 @@ function day(iso: string): string {
   return same ? `Today ${clock(iso)}` : `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${clock(iso)}`;
 }
 
-function Fact({ label, value, last }: { label: string; value: string; last?: boolean }) {
-  return (
-    <View style={[styles.fact, last && styles.factLast]}>
-      <Text role="bodySmall" color="text2">
-        {label}
-      </Text>
-      <View style={styles.factValue}>
-        <Text role="bodySmall" align="right" tabular selectable numberOfLines={1}>
-          {value}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   center: { minHeight: 120, alignItems: 'center', justifyContent: 'center' },
-  meta: { flexDirection: 'row', alignItems: 'center', gap: space.s2, flexWrap: 'wrap' },
-  facts: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  fact: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.s3,
-    minHeight: 36,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  factLast: { borderBottomWidth: 0 },
-  factValue: { flex: 1 },
   actions: { flexDirection: 'row', gap: space.s2 },
   action: { flex: 1 },
   ping: { gap: space.s2, backgroundColor: colors.raised, borderRadius: radius.row, padding: space.s4 },

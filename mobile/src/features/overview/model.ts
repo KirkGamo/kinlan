@@ -25,7 +25,7 @@ export const LAYERS = [
   },
   {
     name: 'Router',
-    title: 'Router',
+    title: 'Router (ARP and ping)',
     layer: 'Data link + network (LAN)',
     what: 'Your router answers on the local network. The agent pings it every few seconds.',
   },
@@ -37,7 +37,7 @@ export const LAYERS = [
   },
   {
     name: 'DNS',
-    title: 'Name lookup',
+    title: 'Name lookup (DNS)',
     layer: 'Application (DNS)',
     what: 'Website names turn into addresses. Checked each time a diagnose runs.',
   },

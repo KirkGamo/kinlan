@@ -11,7 +11,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { Button, Card, Sheet, StatusChip, Text, type ChipTone } from '@/components/ui';
+import { Button, Card, Facts, Sheet, StatusChip, Text, type ChipTone } from '@/components/ui';
 import { colors, motion, radius, space } from '@/theme';
 
 import { LAYERS, type Light, type LightState } from './model';
@@ -29,6 +29,10 @@ const GLOW: Record<LightState, string> = {
   fail: 'rgba(255, 69, 58, 0.24)',
   unlit: 'transparent',
 };
+/** Material "layers": the network layer a light stands for (prototype sheet icon). */
+const LAYERS_ICON =
+  'M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z';
+
 const WORD: Record<LightState, string> = {
   pass: 'working',
   warn: 'slow',
@@ -67,22 +71,32 @@ export function LightStrip({
           <Lamp key={`${igniteKey}-${i}`} index={i} light={l} onPress={() => setOpen(i)} />
         ))}
       </View>
-      <Sheet open={open != null} onClose={() => setOpen(null)} title={layer?.title ?? ''}>
-        {layer && light ? (
-          <>
-            <View style={styles.sheetMeta}>
+      <Sheet
+        open={open != null}
+        onClose={() => setOpen(null)}
+        title={layer?.title ?? ''}
+        icon={LAYERS_ICON}
+        meta={
+          layer && light ? (
+            <>
               <StatusChip {...CHIP[light.state]} />
               <Text role="bodySmall" color="text2">
                 {layer.layer}
               </Text>
-            </View>
+            </>
+          ) : null
+        }>
+        {layer && light ? (
+          <>
             <Text role="body" color="text2">
               {layer.what}
             </Text>
-            <View style={styles.facts}>
-              <Fact label="Now" value={light.value} />
-              <Fact label="What it means" value={meaning(light.state, open ?? 0)} />
-            </View>
+            <Facts
+              rows={[
+                ['Now', light.value],
+                ['What it means', meaning(light.state, open ?? 0)],
+              ]}
+            />
             {onDiagnose ? (
               <Button
                 label="Run diagnose"
@@ -112,19 +126,6 @@ function meaning(state: LightState, index: number): string {
         ? 'Not checked recently. DNS and secure web are checked each time a diagnose runs.'
         : 'Not checked: the agent isn’t reporting, or an earlier layer failed.';
   }
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.fact}>
-      <Text role="bodySmall" color="text2">
-        {label}
-      </Text>
-      <Text role="body" tabular>
-        {value}
-      </Text>
-    </View>
-  );
 }
 
 function Lamp({ index, light, onPress }: { index: number; light: Light; onPress: () => void }) {
@@ -218,7 +219,4 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: colors.red,
   },
-  sheetMeta: { flexDirection: 'row', alignItems: 'center', gap: space.s3, flexWrap: 'wrap' },
-  facts: { gap: space.s3, backgroundColor: colors.raised, borderRadius: radius.row, padding: space.s4 },
-  fact: { gap: 2 },
 });

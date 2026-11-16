@@ -38,19 +38,25 @@ export function Segmented<K extends string>({
   );
 }
 
-/** A row of toggle chips (filters, "Whose is this?", device type); one is selected. */
+/**
+ * A row of toggle chips; one is selected. `variant` follows the prototype: `fill` (yellow) for
+ * settings and types, `filter` (white when on) for list filters, `outline` (yellow ring) for
+ * "Whose is this?".
+ */
 export function Chips<K extends string>({
   options,
   value,
   onChange,
   label,
   disabled,
+  variant = 'fill',
 }: {
   options: { key: K; label: string }[];
   value: K | null;
   onChange: (key: K) => void;
   label: string;
   disabled?: boolean;
+  variant?: 'fill' | 'filter' | 'outline';
 }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityLabel={label}>
@@ -64,8 +70,13 @@ export function Chips<K extends string>({
             accessibilityRole="button"
             accessibilityLabel={o.label}
             accessibilityState={{ selected: on, disabled }}
-            style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && styles.pressed]}>
-            <Text role="labelSmall" color={on ? 'onYellow' : 'text'}>
+            style={({ pressed }) => [
+              styles.chip,
+              variant === 'filter' && styles.filter,
+              on && (variant === 'filter' ? styles.filterOn : variant === 'outline' ? styles.outlineOn : styles.chipOn),
+              pressed && styles.pressed,
+            ]}>
+            <Text role="labelSmall" color={on && variant !== 'outline' ? 'onYellow' : variant === 'filter' ? 'text2' : 'text'}>
               {o.label}
             </Text>
           </Pressable>
@@ -94,5 +105,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.raised,
   },
   chipOn: { backgroundColor: colors.yellow },
+  filter: { backgroundColor: colors.card },
+  filterOn: { backgroundColor: colors.text },
+  outlineOn: { borderWidth: 2, borderColor: colors.yellow, paddingHorizontal: space.s4 - 2 },
   pressed: { opacity: 0.75 },
 });

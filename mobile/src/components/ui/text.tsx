@@ -18,12 +18,15 @@ export type TextProps = Pick<
   align?: 'left' | 'center' | 'right';
   /** Tabular figures, so changing numbers don't shift (briefs.md: numbers are tabular). */
   tabular?: boolean;
+  /** 700 weight within the role's size: values in sheet facts (prototype). */
+  strong?: boolean;
 };
 
 const TABULAR = { fontVariant: ['tabular-nums' as const] };
+const STRONG = { fontWeight: '700' as const };
 
 /** All text in the app goes through this, so every string uses a theme role and Manrope. */
-export function Text({ role = 'body', color = 'text', align, tabular, ...props }: TextProps) {
+export function Text({ role = 'body', color = 'text', align, tabular, strong, ...props }: TextProps) {
   return (
     <RNText
       {...props}
@@ -31,6 +34,7 @@ export function Text({ role = 'body', color = 'text', align, tabular, ...props }
         { fontFamily: FONT_FAMILY, color: colors[color], textAlign: align },
         type[role],
         tabular && TABULAR,
+        strong && STRONG,
       ]}
     />
   );
