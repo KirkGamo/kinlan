@@ -12,7 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Button, Card, Facts, Sheet, StatusChip, Text, type ChipTone } from '@/components/ui';
-import { colors, motion, radius, space } from '@/theme';
+import { colors, glows, motion, radius, space } from '@/theme';
 
 import { LAYERS, type Light, type LightState } from './model';
 
@@ -24,9 +24,9 @@ const FILL: Record<LightState, string> = {
 };
 /** The glow ring around a lit light: its colour at about a fifth strength (prototype: 18-22%). */
 const GLOW: Record<LightState, string> = {
-  pass: 'rgba(48, 209, 88, 0.2)',
-  warn: 'rgba(255, 159, 10, 0.22)',
-  fail: 'rgba(255, 69, 58, 0.24)',
+  pass: glows.green,
+  warn: glows.orange,
+  fail: glows.red,
   unlit: 'transparent',
 };
 /** Material "layers": the network layer a light stands for (prototype sheet icon). */

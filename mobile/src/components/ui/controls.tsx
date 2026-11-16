@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
-import { colors, FONT_FAMILY, radius, space, touch, type } from '@/theme';
+import { colors, FONT_FAMILY, radius, space, strokes, touch, type } from '@/theme';
 
 import { Loader } from './brand';
 import { Text } from './text';
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   },
   primary: { backgroundColor: colors.yellow },
   ghost: { backgroundColor: colors.raised },
-  danger: { borderWidth: 1, borderColor: 'rgba(255, 69, 58, 0.45)' },
+  danger: { borderWidth: 1, borderColor: strokes.red },
   pressed: { transform: [{ scale: 0.97 }] },
   disabled: { opacity: 0.5 },
   field: { gap: space.s2 },

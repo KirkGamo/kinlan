@@ -17,7 +17,7 @@ import Svg, { Path } from 'react-native-svg';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { haptics } from '@/haptics';
-import { colors, motion, radius, space } from '@/theme';
+import { colors, motion, radius, scrim, space } from '@/theme';
 
 import { Text } from './text';
 
@@ -177,7 +177,7 @@ function useSheetDrag(open: boolean, onClose: () => void) {
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end' },
   grab: { gap: space.s3 },
-  scrim: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)' },
+  scrim: { flex: 1, backgroundColor: scrim },
   sheet: {
     backgroundColor: colors.card,
     borderTopLeftRadius: radius.sheet,

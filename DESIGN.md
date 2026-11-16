@@ -19,6 +19,12 @@ colors:
   tint-green: "rgba(48, 209, 88, 0.14)"
   tint-orange: "rgba(255, 159, 10, 0.16)"
   tint-red: "rgba(255, 69, 58, 0.16)"
+  glow-green: "rgba(48, 209, 88, 0.2)"
+  glow-orange: "rgba(255, 159, 10, 0.22)"
+  glow-red: "rgba(255, 69, 58, 0.24)"
+  stroke-green: "rgba(48, 209, 88, 0.35)"
+  stroke-red: "rgba(255, 69, 58, 0.45)"
+  scrim: "rgba(0, 0, 0, 0.6)"
 typography:
   display:
     fontFamily: "Manrope, sans-serif"

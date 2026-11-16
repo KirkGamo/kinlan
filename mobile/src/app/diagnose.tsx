@@ -13,7 +13,7 @@ import { LightStrip } from '@/features/overview/light-strip';
 import { clock, isStale, ms, type Light } from '@/features/overview/model';
 import { useNow } from '@/hooks/use-now';
 import { haptics } from '@/haptics';
-import { colors, motion, radius, space, tints } from '@/theme';
+import { colors, motion, radius, space, strokes, tints } from '@/theme';
 
 /** Plain names for the six checks, from this PC up to secure websites (briefs.md section 3). */
 const RUNGS = [
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
   rungRow: { flexDirection: 'row', gap: space.s3 },
   rail: { width: 32, alignItems: 'center' },
   railLine: { flex: 1, width: 2, marginVertical: 4, backgroundColor: colors.unlit },
-  railLinePass: { backgroundColor: 'rgba(48, 209, 88, 0.35)' },
+  railLinePass: { backgroundColor: strokes.green },
   rung: {
     flex: 1,
     marginBottom: space.item,
