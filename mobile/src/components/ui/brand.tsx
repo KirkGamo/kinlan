@@ -47,7 +47,7 @@ export function Wordmark({ size = 44 }: { size?: number }) {
   );
 }
 
-function Dot({ index }: { index: number }) {
+function Dot({ index, color }: { index: number; color: string }) {
   const reduce = useReducedMotion();
   const lit = useSharedValue(0);
   useEffect(() => {
@@ -58,15 +58,18 @@ function Dot({ index }: { index: number }) {
     );
   }, [index, lit, reduce]);
   const style = useAnimatedStyle(() => ({ opacity: 0.35 + lit.value * 0.65 }));
-  return <Animated.View style={[styles.dot, reduce ? styles.dotStill : style]} />;
+  return <Animated.View style={[styles.dot, { backgroundColor: color }, reduce ? styles.dotStill : style]} />;
 }
 
-/** Loading: five lights blinking in sequence instead of a spinner (brand.md section 6). */
-export function Loader({ label = 'Loading' }: { label?: string }) {
+/**
+ * Loading: five lights blinking in sequence instead of a spinner (brand.md section 6). Yellow by
+ * default; on a yellow button they take the button's black (`onYellow`) so they stay visible.
+ */
+export function Loader({ label = 'Loading', color = colors.yellow }: { label?: string; color?: string }) {
   return (
     <View style={styles.loader} accessibilityRole="progressbar" accessibilityLabel={label}>
       {[0, 1, 2, 3, 4].map((i) => (
-        <Dot key={i} index={i} />
+        <Dot key={i} index={i} color={color} />
       ))}
     </View>
   );
@@ -77,6 +80,6 @@ const styles = StyleSheet.create({
   kin: { fontFamily: FONT_FAMILY, fontWeight: '800', color: colors.text },
   lan: { fontFamily: FONT_FAMILY, fontWeight: '800', color: colors.yellow },
   loader: { flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.yellow },
+  dot: { width: 8, height: 8, borderRadius: 4 },
   dotStill: { opacity: 0.8 },
 });

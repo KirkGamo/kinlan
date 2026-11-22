@@ -35,7 +35,7 @@ export function Button({ label, onPress, variant = 'primary', loading, disabled,
         disabled && !loading && styles.disabled,
       ]}>
       {loading ? (
-        <Loader label={`${label}…`} />
+        <Loader label={`${label}…`} color={variant === 'primary' ? colors.onYellow : colors.yellow} />
       ) : (
         <Text role="label" color={variant === 'primary' ? 'onYellow' : variant === 'danger' ? 'red' : 'text'}>
           {label}
