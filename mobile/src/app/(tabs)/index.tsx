@@ -177,6 +177,23 @@ function Live({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
 
       <SectionLabel>Devices</SectionLabel>
       <DevicesRow summary={s} stale={stale} />
+
+      <SectionLabel>Report</SectionLabel>
+      <Pressable
+        onPress={() => router.push({ pathname: '/report', params: { site: site.id } })}
+        accessibilityRole="button"
+        accessibilityLabel="Network report. A PDF with the chart, devices, outages and security advice."
+        style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+        <View style={styles.rowText}>
+          <Text role="title">Network report</Text>
+          <Text role="bodySmall" color="text2">
+            A PDF with the chart, devices, outages and security advice.
+          </Text>
+        </View>
+        <Text role="label" color="yellow">
+          PDF
+        </Text>
+      </Pressable>
     </Screen>
   );
 }
