@@ -16,7 +16,8 @@ export type PingTest = {
   max_ms: number | null;
   jitter_ms: number | null;
 };
-type PortFinding = { port: number; service: string; first_seen_at: string; last_seen_at: string };
+/** An open port; `info` marks a web admin page (80, 8080), shown but not counted as a risk. */
+type PortFinding = { port: number; service: string; first_seen_at: string; last_seen_at: string; info: boolean };
 export type DeviceDetail = Device & { risky_ports: PortFinding[]; last_ping_test: PingTest | null };
 
 type CommandStatus = 'pending' | 'running' | 'done' | 'failed' | 'expired';
@@ -130,4 +131,44 @@ export function useCommand(commandId: string | null) {
       return s === 'done' || s === 'failed' || s === 'expired' ? false : 1_000;
     },
   });
+}
+
+/** What the agent's port check returns (agent portcheck.py, PortCheck.to_dict). */
+export type PortCheckResult = {
+  ports: number[];
+  macs: string[];
+  open: { mac: string; port: number; service: string }[];
+  duration_ms: number;
+};
+const INFO_PORTS = new Set([80, 8080]);
+export const isRiskyPort = (port: number) => !INFO_PORTS.has(port);
+
+/**
+ * Run the agent's risky-port check on one device, or on every device (no `deviceId`), and wait
+ * for the result; when it's in, the devices, the device and the site summary refresh.
+ */
+export function usePortCheck(siteId: string, deviceId?: string) {
+  const client = useQueryClient();
+  const start = useMutation({
+    mutationFn: () =>
+      api<Command>(`/sites/${siteId}/commands`, {
+        method: 'POST',
+        body: { type: 'port_check', params: deviceId ? { device_id: deviceId } : {} },
+      }),
+  });
+  const command = useCommand(start.data?.id ?? null);
+  const status = command.data?.status ?? start.data?.status;
+  const finished = status === 'done' || status === 'failed' || status === 'expired';
+  return {
+    run: () => start.mutate(undefined),
+    running: start.isPending || (start.isSuccess && !finished),
+    status,
+    result: status === 'done' ? (command.data?.result as PortCheckResult | null) : null,
+    error: start.error?.message ?? (finished && status !== 'done' ? String(command.data?.result?.error ?? 'The agent didn’t finish the check.') : null),
+    refresh: () => {
+      void client.invalidateQueries({ queryKey: keys.devices(siteId) });
+      void client.invalidateQueries({ queryKey: keys.summary(siteId) });
+      if (deviceId) void client.invalidateQueries({ queryKey: keys.device(deviceId) });
+    },
+  };
 }

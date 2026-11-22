@@ -9,6 +9,7 @@ import { Button, Card, Chips, ErrorCard, Loader, Screen, SectionLabel, Segmented
 import { DeviceMap } from '@/features/devices/device-map';
 import { DeviceActions } from '@/features/devices/device-actions';
 import { DeviceSheet } from '@/features/devices/device-sheet';
+import { PortCheck } from '@/features/devices/port-check';
 import { DeviceIcon } from '@/features/devices/icons';
 import { chip, facts, FILTERS, matches, type Filter } from '@/features/devices/model';
 import { isStale } from '@/features/overview/model';
@@ -228,6 +229,16 @@ function Live({ circle, site, sites, canManage }: { circle: Circle; site: Site; 
       <Segmented label="Group devices by" options={VIEWS} value={view} onChange={setView} />
       <Chips label="Filter devices" variant="filter" options={FILTERS} value={filter} onChange={setFilter} />
       {body}
+      {canManage ? (
+        <>
+          <SectionLabel>Risky ports</SectionLabel>
+          <Text role="bodySmall" color="text2">
+            Checks every device for open file sharing, remote access and unencrypted logins. It runs
+            by itself every night at 3:00.
+          </Text>
+          <PortCheck siteId={site.id} disabled={stale} why={stale ? 'Port checks run from the agent, which is offline right now.' : undefined} />
+        </>
+      ) : null}
       <DeviceSheet
         deviceId={selected}
         siteId={site.id}

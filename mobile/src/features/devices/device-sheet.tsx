@@ -18,18 +18,10 @@ import { colors, radius, size, space } from '@/theme';
 
 import { ICON_PATHS, TYPE_LABEL } from './icons';
 import { chip, isPrivateAddress } from './model';
+import { PortCheck, portAdvice } from './port-check';
 
 const TYPES = (Object.keys(TYPE_LABEL) as DeviceType[]).map((key) => ({ key, label: TYPE_LABEL[key] }));
 const SHARED = '__shared';
-
-/** Plain advice for the ports the agent flags (PRODUCT.md: plain first, details on tap). */
-const PORT_ADVICE: Record<number, string> = {
-  21: 'FTP sends passwords unencrypted. Turn it off on this device, or use SFTP instead.',
-  23: 'Telnet sends passwords unencrypted. Turn it off on this device.',
-  445: 'File sharing (SMB) is open. Keep it off unless you share folders on purpose.',
-  3389: 'Remote Desktop is open. Turn it off if nobody connects to this PC remotely.',
-  5900: 'Screen sharing (VNC) is open. Turn it off if you don’t use it.',
-};
 
 /**
  * Device detail as a bottom sheet (briefs.md section 2): identity, whose it is, and for owners
@@ -200,22 +192,31 @@ function Body({
 
       <PingResult d={d} ping={ping} />
 
+      {canManage || d.risky_ports.length ? (
+        <Text role="silk" color="text2">
+          Open ports
+        </Text>
+      ) : null}
       {partial && d.open_risky_ports > 0 ? (
         <Loader label="Loading open ports" />
-      ) : d.risky_ports.length ? (
-        <>
-          <Text role="silk" color="text2">
-            Open ports to check
-          </Text>
-          {d.risky_ports.map((p) => (
-            <View key={p.port} style={styles.port}>
-              <StatusChip tone="new" label={`${p.service} · port ${p.port}`} />
-              <Text role="body" color="text2">
-                {PORT_ADVICE[p.port] ?? `${p.service} is open on this device. Turn it off if you don’t use it.`}
-              </Text>
-            </View>
-          ))}
-        </>
+      ) : (
+        d.risky_ports.map((p) => (
+          <View key={p.port} style={styles.port}>
+            {/* A web admin page is information, not a warning (server app/ports.py). */}
+            <StatusChip tone={p.info ? 'neutral' : 'new'} label={p.info ? `Web admin page · port ${p.port}` : `${p.service} · port ${p.port}`} />
+            <Text role="body" color="text2">
+              {portAdvice(p.port, p.service)}
+            </Text>
+          </View>
+        ))
+      )}
+      {canManage ? (
+        <PortCheck
+          siteId={siteId}
+          deviceId={d.id}
+          disabled={!d.ip || stale}
+          why={stale ? 'Port checks run from the agent, which is offline right now.' : !d.ip ? 'This device has no known address yet.' : undefined}
+        />
       ) : null}
 
       {canManage ? (
