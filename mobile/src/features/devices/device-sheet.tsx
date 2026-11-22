@@ -192,7 +192,7 @@ function Body({
       ) : null}
 
       <PingResult d={d} ping={ping} />
-      <PingHistory deviceId={d.id} latestId={d.last_ping_test?.id} running={ping.running} />
+      <PingHistory deviceId={d.id} running={ping.running} />
 
       {canManage || d.risky_ports.length ? (
         <Text role="silk" color="text2">
@@ -329,7 +329,7 @@ function verdict(name: string, t: Partial<PingTest>): string {
  * Earlier ping tests (plan, Section 6.2: ping history): the tests before the one shown above,
  * one line each with when, how many replies came back, the average and the loss.
  */
-function PingHistory({ deviceId, latestId, running }: { deviceId: string; latestId?: string; running: boolean }) {
+function PingHistory({ deviceId, running }: { deviceId: string; running: boolean }) {
   const tests = usePingTests(deviceId);
   const { refetch } = tests;
   // A finished test becomes history: refresh once the running one is done.
@@ -339,7 +339,10 @@ function PingHistory({ deviceId, latestId, running }: { deviceId: string; latest
     wasRunning.current = running;
   }, [running, refetch]);
 
-  const earlier = (tests.data?.pages.flatMap((p) => p.items) ?? []).filter((t) => t.id !== latestId);
+  // The newest test is the one shown above (a test just run, or the last one), so history starts
+  // with the one before it. (Matching by id missed a test just run: the device's own record of
+  // its last test only refreshes later.)
+  const earlier = (tests.data?.pages.flatMap((p) => p.items) ?? []).slice(1);
   if (!earlier.length) return null;
   return (
     <View style={styles.history}>
