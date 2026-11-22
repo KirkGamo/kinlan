@@ -7,23 +7,45 @@ import type { Latency, LatencyPoint } from '@/api/overview';
 import { Card, Loader, Text } from '@/components/ui';
 import { colors, space } from '@/theme';
 
-import { clock, ms } from './model';
+import { clock, day, ms } from './model';
 
 const H = 132; // plot height
 const PAD_TOP = 8;
 
 type Pt = { x: number; t: number; v: number | null };
 
+export type ChartRange = '1h' | '24h' | '7d' | '30d';
+const RANGE_WORDS: Record<ChartRange, string> = { '1h': 'hour', '24h': '24 hours', '7d': '7 days', '30d': '30 days' };
+/** Longer ranges cross days, so their times carry the date ("Nov 16, 9:41"). */
+const when = (iso: string, range: ChartRange) => (range === '1h' || range === '24h' ? clock(iso) : day(iso, ''));
+/** The left end of the axis: a clock time within a day, a date beyond. */
+const start = (iso: string, range: ChartRange) => {
+  if (range === '1h' || range === '24h') return clock(iso);
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
 /**
- * Connection over 24 hours (briefs.md section 1): internet (yellow, solid, with a fade) and
- * router (grey, dashed) told apart by line style and labels, outages shaded red. Drag across it
- * (or hover on web) for a crosshair and that time's readout.
+ * Connection over time (briefs.md section 1): internet (yellow, solid, with a fade) and router
+ * (grey, dashed) told apart by line style and labels, outages shaded red. Drag across it (or
+ * hover on web) for a crosshair and that time's readout. Overview shows 24 hours; Site detail
+ * any range.
  */
-export function LatencyChart({ data, loading, error }: { data?: Latency; loading: boolean; error?: string }) {
+export function LatencyChart({
+  data,
+  loading,
+  error,
+  range = '24h',
+}: {
+  data?: Latency;
+  loading: boolean;
+  error?: string;
+  range?: ChartRange;
+}) {
   const [width, setWidth] = useState(0);
   const [at, setAt] = useState<number | null>(null);
 
-  const model = useMemo(() => (data && width ? build(data, width) : null), [data, width]);
+  const model = useMemo(() => (data && width ? build(data, width, range) : null), [data, width, range]);
 
   const pick = useCallback(
     (x: number) => {
@@ -55,7 +77,7 @@ export function LatencyChart({ data, loading, error }: { data?: Latency; loading
     body = (
       <View style={styles.center}>
         <Text role="bodySmall" color="text2" align="center">
-          No measurements in the last 24 hours yet. The chart fills in as the agent reports.
+          {`No measurements in the last ${RANGE_WORDS[range]} yet. The chart fills in as the agent reports.`}
         </Text>
       </View>
     );
@@ -89,7 +111,7 @@ export function LatencyChart({ data, loading, error }: { data?: Latency; loading
           ) : null}
         </Svg>
         <View style={styles.axis}>
-          <Text role="labelSmall" color="text2" tabular>{clock(data!.since)}</Text>
+          <Text role="labelSmall" color="text2" tabular>{start(data!.since, range)}</Text>
           <Text role="labelSmall" color="text2" tabular>{`max ${Math.round(model.max)} ms`}</Text>
           <Text role="labelSmall" color="text2">now</Text>
         </View>
@@ -109,7 +131,7 @@ export function LatencyChart({ data, loading, error }: { data?: Latency; loading
       <View onLayout={onLayout}>{body}</View>
       {data && model && !model.empty ? (
         <Text role="bodySmall" color="text2" tabular accessibilityLiveRegion="polite">
-          {cursor ? readoutAt(cursor) : readoutAll(data)}
+          {cursor ? readoutAt(cursor, range) : readoutAll(data)}
         </Text>
       ) : null}
     </Card>
@@ -146,8 +168,8 @@ function readoutAll(data: Latency): string {
   return `Average internet ${ms(i?.avg_ms)} · router ${ms(g?.avg_ms)}${loss}`;
 }
 
-function readoutAt(c: Cursor): string {
-  const time = clock(new Date(c.t).toISOString());
+function readoutAt(c: Cursor, range: ChartRange): string {
+  const time = when(new Date(c.t).toISOString(), range);
   const inet = c.internet == null ? 'no data' : c.internet.v == null ? 'no reply' : ms(c.internet.v);
   const router = c.router == null ? 'no data' : c.router.v == null ? 'no reply' : ms(c.router.v);
   return `${time} · internet ${inet} · router ${router}`;
@@ -170,7 +192,7 @@ function nearest(model: Model, x: number): Cursor {
 
 type Model = ReturnType<typeof build>;
 
-function build(data: Latency, width: number) {
+function build(data: Latency, width: number, range: ChartRange) {
   const t0 = Date.parse(data.since);
   const t1 = Date.parse(data.until);
   const span = Math.max(1, t1 - t0);
@@ -230,7 +252,7 @@ function build(data: Latency, width: number) {
 
   const avg = data.summary.internet?.avg_ms;
   const label =
-    `Latency over 24 hours: internet ${avg != null ? `about ${ms(avg)}` : 'no data'}, ` +
+    `Latency over the last ${RANGE_WORDS[range]}: internet ${avg != null ? `about ${ms(avg)}` : 'no data'}, ` +
     `router ${ms(data.summary.gateway?.avg_ms)}` +
     (measured ? `, ${measured} ${measured === 1 ? 'outage' : 'outages'}` : ', no outages') +
     (silent ? `, agent offline ${silent} ${silent === 1 ? 'time' : 'times'}` : '');

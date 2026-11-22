@@ -185,6 +185,18 @@ function Routes({
             animation: 'slide_from_right',
           }}
         />
+        <Stack.Screen
+          name="site"
+          options={{
+            headerShown: true,
+            title: 'Connection',
+            headerStyle: { backgroundColor: colors.bg },
+            headerTintColor: colors.text,
+            headerTitleStyle: { fontFamily: FONT_FAMILY, fontWeight: '800' },
+            headerShadowVisible: false,
+            animation: 'slide_from_right',
+          }}
+        />
       </Stack.Protected>
       <Stack.Protected guard={signedIn} redirectTo="/welcome">
         <Stack.Screen name="onboarding" />

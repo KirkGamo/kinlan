@@ -72,14 +72,15 @@ export function Card({ children, style }: { children: ReactNode; style?: ViewSty
 }
 
 /** Silkscreen section label: more space above a heading than below it. */
-export function SectionLabel({ children, end }: { children: string; end?: string }) {
+export function SectionLabel({ children, end, endLink }: { children: string; end?: string; endLink?: boolean }) {
   return (
     <View style={styles.label}>
       <Text role="silk" color="text2">
         {children}
       </Text>
       {end ? (
-        <Text role="silk" color="text2">
+        // endLink: the label's end is the visible cue that the row opens something (yellow = act).
+        <Text role="silk" color={endLink ? 'yellow' : 'text2'}>
           {end}
         </Text>
       ) : null}

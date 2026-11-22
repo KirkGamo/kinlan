@@ -374,6 +374,14 @@ The system's way of saying state.
 ### The network map (signature)
 - The router in the middle (52-dp node), the internet above it, devices on a ring, the agent's PC at the bottom; nodes are circles with a type icon and a status ring, plus an orange badge and the word "New" for new devices. Links carry live numbers; a provider outage breaks the internet link in red dashes. The selected node gets a yellow ring and its link turns yellow while the others dim. A caption says it shows who shares the network, not wiring.
 
+### Connection history (Site detail)
+- Opened from the Overview's "Connection · 24 h" heading, whose end reads "See history" in yellow (`SectionLabel` with `endLink`): the only yellow label text, so it reads as the way in. A pushed screen titled "Connection", for any member.
+- Top to bottom: the site name with "Agent offline · last data 40 h ago" when stale; a 1 h / 24 h / 7 d / 30 d segmented switch (24 h first, matching the Overview); the latency chart (the Overview's chart, with clock times within a day and dates beyond); lost pings; the outage log.
+- Switching ranges keeps the previous chart on screen at 60% opacity until the new one arrives, with "loading…" in the section label; nothing jumps to a spinner.
+- **Lost pings:** one bar per time slot of the chart above, Raised Graphite grey at 55% (a faint 1-dp stub for slots with no loss); bars above the site's loss alert line (Settings → Alerts, 5% by default) turn status orange, under a dashed orange line at that threshold. The legend names both ("Lost pings", "Above your 5% alert line") and a sentence under the bars says how many slots crossed it.
+- **Outage log:** newest first, 20 at a time with "Show older". Each row: the start ("Nov 20, 15:43"), "Lasted 14 min" (or "Still down"), and the cause in words ("Internet provider", "Inside the network"); a red "Down" chip for outages the agent measured, a neutral "Agent off" chip when only the server saw the agent go quiet.
+- Device detail adds "Earlier ping tests" under the latest result: one line per test (when · replies · average · lost), 5 at a time with "Show more".
+
 ### Avatars
 - Initials on a 40-dp circle (32 in group headers): yellow with black initials for you, raised graphite with white initials for everyone else. Never a status colour.
 

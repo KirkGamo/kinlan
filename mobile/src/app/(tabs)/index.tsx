@@ -15,7 +15,7 @@ import { People } from '@/features/overview/people';
 import { SiteHeader, SiteHeaderSkeleton } from '@/features/overview/site-header';
 import { useNow } from '@/hooks/use-now';
 import { haptics } from '@/haptics';
-import { colors, radius, size, space } from '@/theme';
+import { colors, radius, size, space, touch } from '@/theme';
 
 const UNLIT: Light[] = Array.from({ length: 5 }, () => ({ state: 'unlit', value: '—' }));
 
@@ -172,7 +172,15 @@ function Live({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
       <SectionLabel>Health</SectionLabel>
       <HealthCard score={s.score} grade={s.grade} summary={s.grade_summary} deductions={s.deductions} sweepKey={`${site.id}-${ignite}`} />
 
-      <SectionLabel end="drag to read">Connection · 24 h</SectionLabel>
+      {/* The heading opens the full history (Site detail); the chart itself is for dragging. */}
+      <Pressable
+        onPress={() => router.push({ pathname: '/site', params: { site: site.id } })}
+        accessibilityRole="button"
+        accessibilityLabel="Connection history"
+        accessibilityHint="Latency from 1 hour to 30 days, lost pings and every outage"
+        style={({ pressed }) => [styles.historyLink, pressed && styles.pressed]}>
+        <SectionLabel end="See history" endLink>Connection · 24 h</SectionLabel>
+      </Pressable>
       <LatencyChart data={latency.data} loading={latency.isPending} error={latency.isError ? latency.error.message : undefined} />
 
       <SectionLabel>Devices</SectionLabel>
@@ -305,6 +313,7 @@ function Skeleton() {
 }
 
 const styles = StyleSheet.create({
+  historyLink: { minHeight: touch.min, justifyContent: 'flex-end' },
   verdict: { paddingTop: space.s6, gap: space.s2, overflow: 'hidden' }, // clips the perforation
   meta: { flexDirection: 'row', alignItems: 'center', gap: space.s3, flexWrap: 'wrap' },
   loading: { alignItems: 'center', justifyContent: 'center', minHeight: size.loading },
