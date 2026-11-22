@@ -134,7 +134,7 @@ For the final zip, `/SourceCode` = a clean copy of the repository. Make it with 
 | Install Python 3.12 | Download from python.org (keep 3.10 alongside), then use `py -3.12 -m venv .venv` in `agent/` and `server/` |
 | Agent dependencies | `pip install scapy icmplib dnspython httpx psutil pywin32 pydantic-settings rich pyinstaller pytest ruff` |
 | Server dependencies | `pip install "fastapi[standard]" "sqlalchemy>=2" alembic "psycopg[binary]" pyjwt "pwdlib[argon2]" pydantic-settings slowapi apscheduler reportlab matplotlib httpx pytest ruff` |
-| Mobile app | `npx create-expo-app@latest mobile`, then `npx expo install expo-router react-native-svg expo-secure-store expo-notifications expo-device expo-dev-client expo-sharing expo-file-system` and `npm i @tanstack/react-query` (the stack that shipped is in Section 6.1) |
+| Mobile app | `npx create-expo-app@latest mobile`, then `npx expo install expo-router react-native-svg expo-secure-store expo-notifications expo-device expo-dev-client` and `npm i @tanstack/react-query` (the stack that shipped is in Section 6.1) |
 | Pin versions | After installing, run `pip freeze > requirements.txt` in `agent/` and `server/`, and move pytest, ruff and pyinstaller into `requirements-dev.txt`. The mobile app is pinned by `package-lock.json`. Commit all of them. |
 | Local database | Your PostgreSQL 15 is already running, on port **5433** (port 5432 is a separate EDB Postgres 17 install). Run `createdb -U postgres -h localhost -p 5433 kinlan_dev` and the same for `kinlan_test`. Done on Nov 7. |
 | Accounts | GitHub (repo), Neon (database), Render (API + static web), Expo (EAS builds + push), Firebase (FCM for Android push, free) |
@@ -412,7 +412,7 @@ Use Neon's **pooled** connection string (the host containing `-pooler`) with SQL
 - **Types and validation:** typed API calls written by hand in `src/api/` against the server's OpenAPI schema; forms validate inline. *Changed: `openapi-typescript` and `zod` weren't needed at this size.*
 - **Charts:** drawn directly with `react-native-svg` (works on web too). *Changed from `react-native-gifted-charts` so the chart could carry the crosshair, outage gaps and line styles in DESIGN.md.*
 - **API address:** read from `EXPO_PUBLIC_API_URL` (`.env` locally, set per build profile in `eas.json`), so the same code points at the local server or production.
-- **Device features:** `expo-secure-store` for tokens on the phone, `expo-notifications` + `expo-device` for push, `expo-sharing` + `expo-file-system` for PDFs.
+- **Device features:** `expo-secure-store` for tokens on the phone, `expo-notifications` + `expo-device` for push. *PDF reports open through a signed, 10-minute download link handed to the browser (the phone downloads it into its PDF viewer, where it can be shared or printed), so `expo-sharing` and `expo-file-system` weren't needed.*
 
 ### 6.2 Navigation and screens
 ```
