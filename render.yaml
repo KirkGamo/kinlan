@@ -10,7 +10,9 @@ services:
     rootDir: server
     branch: main
     autoDeployTrigger: checksPass # deploy main only after CI is green
-    buildCommand: pip install -r requirements.txt
+    # The warm-up fills Matplotlib's font cache inside the app folder (app/reports.py), so the
+    # running server never spends seconds scanning fonts; a failure here never blocks a deploy.
+    buildCommand: pip install -r requirements.txt && (python -m app.reports || echo "report warm-up skipped")
     # Free instances have no pre-deploy step, so migrations run before the server starts.
     # One process only: the scheduled jobs (heartbeats, rollups, retention) run inside it.
     startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips "*"

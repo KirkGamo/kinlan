@@ -56,3 +56,6 @@ Thumbs.db
 # Firebase credentials (never committed)
 mobile/google-services.json
 *firebase-adminsdk*.json
+
+# Matplotlib font cache for PDF reports (built on the server)
+server/.mplcache/

@@ -19,8 +19,11 @@ ReportLab draws the PDF and Matplotlib the chart, both in Manrope (OFL, bundled 
 from __future__ import annotations
 
 import io
+import logging
+import os
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from functools import cache
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -33,6 +36,9 @@ from app.routers.metrics import LatencyOut, latency_data
 from app.routers.sites import health_inputs
 
 ASSETS = Path(__file__).with_name("report_assets")
+# Matplotlib's font cache lives next to the app, so the Render build makes it once (render.yaml)
+# and the running server never pays the ~5 s font scan. Set before matplotlib is imported.
+os.environ.setdefault("MPLCONFIGDIR", str(Path(__file__).parent.parent / ".mplcache"))
 SPANS: dict[str, timedelta] = {
     "24h": timedelta(hours=24),
     "7d": timedelta(days=7),
@@ -238,17 +244,58 @@ def recommendations(data: ReportData) -> list[tuple[str, str]]:
 # ---------------------------------------------------------------- chart
 
 
-def chart_png(data: ReportData) -> bytes:
-    """The connection chart as a PNG, drawn like the app's."""
+@cache
+def _matplotlib():
+    """Matplotlib, loaded and set up once per process (Agg, Manrope, quiet about weights)."""
     import matplotlib
 
     matplotlib.use("Agg")
     from matplotlib import font_manager, patheffects
     from matplotlib import pyplot as plt
 
-    for ttf in ASSETS.glob("Manrope_*.ttf"):
+    for ttf in sorted(ASSETS.glob("Manrope_*.ttf")):
         font_manager.fontManager.addfont(str(ttf))
+    # Manrope ships 500, 700 and 800 here; "normal" (400) quietly falls back to 500.
+    logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
     plt.rcParams.update({"font.family": "Manrope", "font.weight": "medium", "font.size": 8})
+    return plt, patheffects
+
+
+@cache
+def _reportlab_fonts() -> None:
+    """Manrope for ReportLab, registered once per process; <b> maps to Manrope Bold."""
+    from reportlab.lib.fonts import addMapping
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    faces = (
+        ("Manrope", "Manrope_500Medium.ttf"),
+        ("Manrope-Bold", "Manrope_700Bold.ttf"),
+        ("Manrope-ExtraBold", "Manrope_800ExtraBold.ttf"),
+    )
+    for name, file in faces:
+        pdfmetrics.registerFont(TTFont(name, str(ASSETS / file)))
+    addMapping("Manrope", 0, 0, "Manrope")
+    addMapping("Manrope", 1, 0, "Manrope-Bold")
+    addMapping("Manrope", 0, 1, "Manrope")
+    addMapping("Manrope", 1, 1, "Manrope-Bold")
+
+
+def warm_up() -> None:
+    """Load everything a report needs, so the first report after a deploy or restart is as quick
+    as the rest. Run at build time (it fills the font cache) and in the background at startup."""
+    plt, _ = _matplotlib()
+    fig, ax = plt.subplots(figsize=(1, 1), dpi=50)
+    ax.plot([0, 1], [0, 1])
+    fig.savefig(io.BytesIO(), format="png")
+    plt.close(fig)
+    _reportlab_fonts()
+    import reportlab.platypus  # noqa: F401  (the layout engine, the slowest import)
+
+
+def chart_png(data: ReportData) -> bytes:
+    """The connection chart as a PNG, drawn like the app's."""
+    plt, patheffects = _matplotlib()
 
     fig, ax = plt.subplots(figsize=(7.0, 2.4), dpi=200)
     zone = data.zone
@@ -296,12 +343,9 @@ def render(data: ReportData) -> bytes:
     """The report as PDF bytes (A4)."""
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_LEFT
-    from reportlab.lib.fonts import addMapping
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.units import mm
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
     from reportlab.platypus import (
         Image,
         KeepTogether,
@@ -312,19 +356,7 @@ def render(data: ReportData) -> bytes:
         TableStyle,
     )
 
-    faces = (
-        ("Manrope", "Manrope_500Medium.ttf"),
-        ("Manrope-Bold", "Manrope_700Bold.ttf"),
-        ("Manrope-ExtraBold", "Manrope_800ExtraBold.ttf"),
-    )
-    for name, file in faces:
-        if name not in pdfmetrics.getRegisteredFontNames():
-            pdfmetrics.registerFont(TTFont(name, str(ASSETS / file)))
-    # So <b> inside a paragraph switches to Manrope Bold.
-    addMapping("Manrope", 0, 0, "Manrope")
-    addMapping("Manrope", 1, 0, "Manrope-Bold")
-    addMapping("Manrope", 0, 1, "Manrope")
-    addMapping("Manrope", 1, 1, "Manrope-Bold")
+    _reportlab_fonts()
 
     def style(name, **kw) -> ParagraphStyle:
         base = {"fontName": "Manrope", "fontSize": 9.5, "leading": 13.5, "textColor": INK,
@@ -483,3 +515,7 @@ def render(data: ReportData) -> bytes:
     doc.build(story, onFirstPage=footer, onLaterPages=footer)
     return out.getvalue()
 
+
+
+if __name__ == "__main__":  # python -m app.reports: warm the caches (the Render build runs this)
+    warm_up()
