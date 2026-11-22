@@ -66,6 +66,7 @@ def build_payload(
         "outages": [],
         "port_findings": [],
         "diagnoses": [],
+        "port_checks": [],
     }
     if scan_interval_s:
         payload["scan_interval_s"] = scan_interval_s  # the server's offline rule follows it
@@ -84,6 +85,8 @@ def build_payload(
             payload["port_findings"].append(item.payload)
         elif item.kind == "diagnose":
             payload["diagnoses"].append(item.payload)
+        elif item.kind == "port_check":
+            payload["port_checks"].append(item.payload)
         else:
             log.warning("skipping unknown outbox item kind %r", item.kind)
     return payload

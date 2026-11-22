@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 import httpx
 import pytest
 
-from kinlan_agent import diagnose, discovery, netinfo, pingtest
+from kinlan_agent import diagnose, discovery, netinfo, pingtest, portcheck
 from kinlan_agent.buffer import Buffer
 from kinlan_agent.config import AgentConfig
 from kinlan_agent.icmp import EchoReply
@@ -34,6 +34,11 @@ class Net:
         return EchoReply(ok=self.internet_up, rtt_ms=20.0 if self.internet_up else None)
 
 
+async def router_admin_page_only(ip: str, port: int, timeout: float) -> bool:
+    """A fake network where only the router's web admin page answers."""
+    return (ip, port) == ("192.168.1.1", 80)
+
+
 def deps(net: Net, diagnoses: list | None = None) -> CloudDeps:
     def fake_diagnose(**_):
         result = diagnose.Diagnosis(steps=[], root_cause_step=4, summary="Provider down")
@@ -52,6 +57,9 @@ def deps(net: Net, diagnoses: list | None = None) -> CloudDeps:
         choose_targets=lambda candidates, send: ["8.8.8.8", "9.9.9.9"],
         run_diagnose=fake_diagnose,
         ping_test=lambda ip, count, send: pingtest.summarize(ip, [send(ip, 1000)] * count),
+        port_check=lambda targets, skip_ip: portcheck.check(
+            targets, skip_ip=skip_ip, opener=router_admin_page_only
+        ),
         send=net.send,
     )
 
@@ -136,7 +144,18 @@ def test_scan_queues_devices_with_the_netinfo(buffer):
         ),
         ({"type": "diagnose"}, True, lambda r: r["root_cause_step"] == 4),
         ({"type": "ping_test", "params": {}}, False, None),
-        ({"type": "port_check"}, False, None),
+        (  # the server names the targets
+            {"type": "port_check", "params": {"targets": [{"mac": "64:f8:8a:00:00:01",
+                                                           "ip": "192.168.1.1"}]}},
+            True,
+            lambda r: r["open"] == [{"mac": "64:f8:8a:00:00:01", "port": 80, "service": "http"}]
+            and r["macs"] == ["64:f8:8a:00:00:01"],
+        ),
+        (  # an older server sends none: every device from the latest scan
+            {"type": "port_check"},
+            True,
+            lambda r: r["macs"] == ["64:f8:8a:00:00:01"] and len(r["open"]) == 1,
+        ),
         ({"type": "reboot"}, False, None),
     ],
 )
