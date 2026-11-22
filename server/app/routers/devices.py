@@ -36,6 +36,7 @@ from app.models import (
     Site,
     User,
 )
+from app.ports import INFO_PORTS, is_risky
 from app.schemas import ErrorOut
 
 router = APIRouter(
@@ -53,7 +54,11 @@ def _risky_counts(db: DB, device_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
         return {}
     rows = db.execute(
         select(PortFinding.device_id, func.count())
-        .where(PortFinding.device_id.in_(device_ids), PortFinding.resolved_at.is_(None))
+        .where(
+            PortFinding.device_id.in_(device_ids),
+            PortFinding.resolved_at.is_(None),
+            PortFinding.port.not_in(INFO_PORTS),  # web admin pages are information, not risk
+        )
         .group_by(PortFinding.device_id)
     ).all()
     return dict(rows)
@@ -142,11 +147,12 @@ def _detail(db: DB, d: Device) -> DeviceDetail:
         select(PingTest).where(PingTest.device_id == d.id).order_by(PingTest.ts.desc()).limit(1)
     ).first()
     return DeviceDetail(
-        **_out(d, owner, len(ports), _agent_names(db, d.site_id)),
+        **_out(d, owner, sum(is_risky(p.port) for p in ports), _agent_names(db, d.site_id)),
         risky_ports=[
             PortFindingOut(
                 port=p.port,
                 service=p.service,
+                info=not is_risky(p.port),
                 first_seen_at=p.first_seen_at,
                 last_seen_at=p.last_seen_at,
             )

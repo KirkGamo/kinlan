@@ -28,6 +28,7 @@ from app.models import (
     Site,
     Target,
 )
+from app.ports import INFO_PORTS
 from app.schemas import (
     DeductionOut,
     DiagnoseStepState,
@@ -136,7 +137,11 @@ def health_inputs(db: DB, site_id: uuid.UUID, now: datetime) -> tuple[HealthInpu
         select(func.count())
         .select_from(PortFinding)
         .join(Device, Device.id == PortFinding.device_id)
-        .where(Device.site_id == site_id, PortFinding.resolved_at.is_(None))
+        .where(
+            Device.site_id == site_id,
+            PortFinding.resolved_at.is_(None),
+            PortFinding.port.not_in(INFO_PORTS),
+        )
     )
     inputs = HealthInputs(
         internet_avg_ms=float(avg_ms) if avg_ms is not None else None,

@@ -11,10 +11,11 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Query, Request
+from pydantic import ValidationError
 from sqlalchemy import insert, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from app import alerts
+from app import alerts, ports
 from app.agent_auth import CurrentAgent, GzipRoute, check_version
 from app.agent_schemas import (
     CommandBatch,
@@ -24,6 +25,7 @@ from app.agent_schemas import (
     IngestOut,
     PairIn,
     PairOut,
+    PortCheckIn,
 )
 from app.commands import expire_stale, to_out
 from app.deps import DB
@@ -40,7 +42,6 @@ from app.models import (
     PairingCode,
     PingSample,
     PingTest,
-    PortFinding,
     Site,
     SiteStatus,
 )
@@ -204,54 +205,26 @@ def _store_diagnoses(db: DB, site: Site, body: IngestIn) -> int:
 def _store_ports(
     db: DB, site: Site, body: IngestIn, now: datetime
 ) -> tuple[int, list[tuple[Device, int, str]]]:
-    """Upsert port findings; returns those that are newly open (first seen, or back after being
-    resolved), for the risky-port alert."""
-    if not body.port_findings:
-        return 0, []
-    devices = {
-        d.mac: d
-        for d in db.scalars(
-            select(Device).where(
-                Device.site_id == site.id, Device.mac.in_({f.mac for f in body.port_findings})
-            )
-        )
-    }
-    known = [f for f in body.port_findings if f.mac in devices]
-    if not known:
-        return 0, []
-    already_open = set(
-        db.execute(
-            select(PortFinding.device_id, PortFinding.port).where(
-                PortFinding.device_id.in_({devices[f.mac].id for f in known}),
-                PortFinding.resolved_at.is_(None),
-            )
-        ).all()
+    """Port findings from older agents (open ports only), then full port checks, which also
+    resolve the ports that no longer answer. Returns the count and the risky newly open ports."""
+    stored, newly_open = ports.apply(
+        db, site, [ports.Open(f.mac, f.port, f.service) for f in body.port_findings], now
     )
-    stmt = pg_insert(PortFinding).values(
-        [
-            {
-                "id": uuid.uuid4(),
-                "device_id": devices[f.mac].id,
-                "port": f.port,
-                "service": f.service,
-                "first_seen_at": now,
-                "last_seen_at": now,
-            }
-            for f in known
-        ]
+    for check in body.port_checks:
+        n, opened = port_check(db, site, check.macs, check.ports, check.open, now)
+        stored, newly_open = stored + n, newly_open + opened
+    return stored, newly_open
+
+
+def port_check(db: DB, site: Site, macs, tried, found, now: datetime):
+    """Apply one port check (from the outbox or a command result)."""
+    return ports.apply(
+        db,
+        site,
+        [ports.Open(f.mac, f.port, f.service) for f in found],
+        now,
+        checked={mac: set(tried) for mac in macs},
     )
-    db.execute(
-        stmt.on_conflict_do_update(
-            constraint="uq_port_findings_device_id_port",
-            set_={"last_seen_at": now, "resolved_at": None, "service": stmt.excluded.service},
-        )
-    )
-    newly_open = [
-        (devices[f.mac], f.port, f.service)
-        for f in known
-        if (devices[f.mac].id, f.port) not in already_open
-    ]
-    return len(known), newly_open
 
 
 @router.post("/ingest", response_model=IngestOut, responses={400: {"model": ErrorOut}})
@@ -389,5 +362,15 @@ def command_result(
                 jitter_ms=r.get("jitter_ms"),
             )
         )
+    if cmd.type == "port_check" and body.ok and body.result:
+        # Stored now, so the app shows the result at once instead of after the next upload.
+        try:
+            check = PortCheckIn.model_validate({"checked_at": now, **body.result})
+        except ValidationError as exc:
+            raise ApiError(400, "validation_error", "That port check result isn't valid.") from exc
+        site = db.get(Site, cmd.site_id)
+        _, newly_open = port_check(db, site, check.macs, check.ports, check.open, now)
+        db.flush()
+        alerts.risky_ports(db, site, newly_open, now)
     db.commit()
     return to_out(cmd)

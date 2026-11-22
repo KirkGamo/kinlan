@@ -45,6 +45,7 @@ class DeviceList(BaseModel):
 class PortFindingOut(BaseModel):
     port: int
     service: str
+    info: bool = False  # a web admin page (80, 8080): shown, but not counted as a risk
     first_seen_at: datetime
     last_seen_at: datetime
 

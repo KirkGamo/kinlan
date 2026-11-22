@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session
 
 from app.health import HealthScore, compute
 from app.models import Circle, Device, PingTest, PortFinding, Site
+from app.ports import INFO_PORTS
 from app.routers.metrics import LatencyOut, latency_data
 from app.routers.sites import health_inputs
 
@@ -163,7 +164,11 @@ def gather(db: Session, site: Site, span: str, now: datetime | None = None) -> R
         db.execute(
             select(Device, PortFinding)
             .join(PortFinding, PortFinding.device_id == Device.id)
-            .where(Device.site_id == site.id, PortFinding.resolved_at.is_(None))
+            .where(
+                Device.site_id == site.id,
+                PortFinding.resolved_at.is_(None),
+                PortFinding.port.not_in(INFO_PORTS),
+            )
             .order_by(PortFinding.port)
         ).all()
     )

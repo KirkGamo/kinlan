@@ -72,6 +72,15 @@ class PortFindingIn(BaseModel):
     service: str = Field(max_length=40)
 
 
+class PortCheckIn(BaseModel):
+    """One port check: which devices and ports were tried, and which answered."""
+
+    checked_at: datetime
+    ports: list[int] = Field(max_length=20)
+    macs: list[Mac] = Field(max_length=2_000, description="Every device that was tried")
+    open: list[PortFindingIn] = Field(default_factory=list, max_length=2_000)
+
+
 class DiagnoseIn(BaseModel):
     """A diagnose the agent ran on its own at the start of an outage (plan, Section 3.4)."""
 
@@ -88,6 +97,7 @@ class IngestIn(BaseModel):
     devices: list[DeviceIn] = Field(default_factory=list, max_length=2_000)
     outages: list[OutageIn] = Field(default_factory=list, max_length=500)
     port_findings: list[PortFindingIn] = Field(default_factory=list, max_length=2_000)
+    port_checks: list[PortCheckIn] = Field(default_factory=list, max_length=20)
     diagnoses: list[DiagnoseIn] = Field(default_factory=list, max_length=50)
     scan_interval_s: float | None = Field(
         default=None, ge=30, le=86_400, description="How often the agent scans for devices"
