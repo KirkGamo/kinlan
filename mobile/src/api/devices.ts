@@ -1,5 +1,5 @@
 /** One device: detail, edits and ping tests (plan, Section 4.3, Devices and Commands). */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from './client';
 import type { Device, DeviceType, Member } from './overview';
@@ -171,4 +171,17 @@ export function usePortCheck(siteId: string, deviceId?: string) {
       if (deviceId) void client.invalidateQueries({ queryKey: keys.device(deviceId) });
     },
   };
+}
+
+/** A device's ping tests, newest first, 5 at a time (server GET /devices/{id}/ping-tests). */
+export function usePingTests(deviceId: string) {
+  return useInfiniteQuery({
+    queryKey: keys.pingTests(deviceId),
+    queryFn: ({ pageParam }) =>
+      api<{ items: PingTest[]; next_cursor: string | null }>(
+        `/devices/${deviceId}/ping-tests?limit=5${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`,
+      ),
+    initialPageParam: '',
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
+  });
 }

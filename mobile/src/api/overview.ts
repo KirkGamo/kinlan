@@ -1,5 +1,5 @@
 /** The Overview's other reads: the 24-hour latency chart, devices and members (plan, Section 4.3). */
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import { api } from './client';
 import type { Role } from './circles';
@@ -60,12 +60,39 @@ export type Device = {
 export type Member = { user_id: string; display_name: string; email: string; role: Role };
 type List<T> = { items: T[]; next_cursor: string | null };
 
-export function useLatency(siteId: string | undefined, enabled = true) {
+/** How often each range refreshes: about one bucket's worth, and never faster than 30 s. */
+const LATENCY_REFRESH: Record<LatencyRange, number> = { '1h': 30_000, '24h': 60_000, '7d': 300_000, '30d': 600_000 };
+export type LatencyRange = '1h' | '24h' | '7d' | '30d';
+
+export function useLatency(siteId: string | undefined, enabled = true, range: LatencyRange = '24h') {
   return useQuery({
-    queryKey: keys.latency(siteId, '24h'),
-    queryFn: () => api<Latency>(`/sites/${siteId}/latency?range=24h`),
+    queryKey: keys.latency(siteId, range),
+    queryFn: () => api<Latency>(`/sites/${siteId}/latency?range=${range}`),
     enabled: enabled && !!siteId,
-    refetchInterval: 60_000, // one 15-minute bucket fills slowly; a minute is plenty
+    refetchInterval: LATENCY_REFRESH[range],
+    placeholderData: (previous) => previous, // switching ranges keeps the old chart until the new one lands
+  });
+}
+
+export type OutageEntry = {
+  id: string;
+  started_at: string;
+  ended_at: string | null;
+  duration_s: number | null;
+  ongoing: boolean;
+  cause: 'isp' | 'lan' | 'unknown';
+  detected_by: 'agent' | 'server';
+};
+
+/** The outage log, newest first, 20 at a time (server GET /sites/{id}/outages). */
+export function useOutages(siteId: string | undefined) {
+  return useInfiniteQuery({
+    queryKey: keys.outages(siteId),
+    queryFn: ({ pageParam }) =>
+      api<List<OutageEntry>>(`/sites/${siteId}/outages?limit=20${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`),
+    initialPageParam: '',
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
+    enabled: !!siteId,
   });
 }
 
