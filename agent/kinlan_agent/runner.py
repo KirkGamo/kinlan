@@ -18,11 +18,11 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import httpx
 
-from kinlan_agent import __version__, diagnose, discovery, monitor, netinfo, pingtest
+from kinlan_agent import __version__, diagnose, discovery, monitor, netinfo, pingtest, portcheck
 from kinlan_agent.buffer import Buffer
 from kinlan_agent.config import AgentConfig
 from kinlan_agent.icmp import EchoReply, echo
@@ -40,6 +40,7 @@ class CloudDeps:
     choose_targets: Callable[..., list[str]] = monitor.choose_internet_targets
     run_diagnose: Callable[..., diagnose.Diagnosis] = diagnose.run
     ping_test: Callable[..., pingtest.PingStats] = pingtest.ping_test
+    port_check: Callable[..., portcheck.PortCheck] = portcheck.check
     send: Callable[[str, int], EchoReply] = echo
 
 
@@ -83,7 +84,11 @@ def execute(command: dict, runtime: Runtime) -> tuple[bool, dict | None, str | N
             )
             return True, result.to_dict(), None
         if kind == "port_check":
-            return False, None, "Port checks arrive in a later agent version."
+            # The server names the targets (one device, or the whole site); older servers don't,
+            # so then every device from the latest scan is checked.
+            given = [portcheck.Target(t["mac"], t["ip"]) for t in params.get("targets") or []]
+            result = runtime.port_check_now(given or None)
+            return True, result.to_dict(), None
         return False, None, f"This agent doesn't know the command {kind!r}."
     except Exception as exc:  # report, never crash the poller
         log.exception("command %s failed", kind)
@@ -153,6 +158,7 @@ class Runtime:
     targets: list[str] = field(default_factory=list)
     monitor: monitor.Monitor | None = None
     open_outage_id: int | None = None
+    last_devices: list[portcheck.Target] = field(default_factory=list)
     _scan_lock: threading.Lock = field(default_factory=threading.Lock)
 
     def start(self) -> None:
@@ -218,7 +224,47 @@ class Runtime:
                 log.info("gateway changed to %s", info.gateway)
                 self.monitor.gateway = info.gateway
             self.info = info
+            self.last_devices = [portcheck.Target(d.mac, d.ip) for d in result.devices]
             return info, result
+
+    def port_check_now(self, targets: list[portcheck.Target] | None = None) -> portcheck.PortCheck:
+        """Check risky ports on `targets`, or on every device from the latest scan."""
+        if targets is None:
+            if not self.last_devices:
+                self.scan_now()
+            targets = self.last_devices
+        skip = self.info.local_ip if self.info else None
+        result = self.deps.port_check(targets, skip_ip=skip)
+        log.info(
+            "port check: %d devices, %d open ports, %d ms",
+            len(result.macs), len(result.open), result.duration_ms,
+        )
+        return result
+
+    def daily_port_check(self) -> None:
+        """The scheduled check; its result goes out through the outbox like everything else."""
+        self.buffer.add("port_check", self.port_check_now().to_dict())
+
+
+def seconds_until(at: str, now: datetime | None = None) -> float:
+    """Seconds from now until the next local time `at` ("03:00"); 03:00 if `at` is malformed."""
+    now = now or datetime.now().astimezone()
+    try:
+        hour, minute = (int(x) for x in at.split(":"))
+        target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    except ValueError:
+        target = now.replace(hour=3, minute=0, second=0, microsecond=0)
+    if target <= now:
+        target += timedelta(days=1)
+    return (target - now).total_seconds()
+
+
+def _daily(stop: threading.Event, at: str, work: Callable[[], None], name: str) -> None:
+    while not stop.wait(seconds_until(at)):
+        try:
+            work()
+        except Exception:
+            log.exception("%s failed; trying again tomorrow", name)
 
 
 def _loop(stop: threading.Event, every_s: float, work: Callable[[], None], name: str) -> None:
@@ -276,6 +322,12 @@ def run(
             target=uploader.run, name="uploader", daemon=True, args=(stop, config.upload_interval_s)
         ),
         threading.Thread(target=poller.run, name="commands", daemon=True, args=(stop,)),
+        threading.Thread(
+            target=_daily,
+            name="ports",
+            daemon=True,
+            args=(stop, config.port_check_time, runtime.daily_port_check, "port check"),
+        ),
     ]
     for t in threads:
         t.start()

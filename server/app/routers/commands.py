@@ -17,6 +17,8 @@ from app.errors import ApiError
 from app.models import Command, Device, Role
 from app.schemas import ErrorOut
 
+MAX_PORT_TARGETS = 1_024  # a /22, the largest network the agent scans
+
 router = APIRouter(
     tags=["commands"],
     responses={401: {"model": ErrorOut}, 403: {"model": ErrorOut}, 404: {"model": ErrorOut}},
@@ -60,8 +62,22 @@ def send_command(site_id: uuid.UUID, body: CommandIn, user: CurrentUser, db: DB)
             "count": count,
         }
     elif body.type == "port_check":
+        # The agent checks by address and reports by MAC, so it gets both for every target:
+        # one device, or every device on the site with a known address.
         device = _device_param(db, site.id, body.params, required=False)
-        params = {"device_id": str(device.id), "ip": str(device.ip)} if device else {}
+        if device is not None and device.ip is None:
+            raise ApiError(409, "device_has_no_address", "That device has no known IP address yet.")
+        targets = [device] if device else list(
+            db.scalars(
+                select(Device)
+                .where(Device.site_id == site.id, Device.ip.is_not(None))
+                .order_by(Device.ip)
+                .limit(MAX_PORT_TARGETS)
+            )
+        )
+        params = {"targets": [{"mac": d.mac, "ip": str(d.ip)} for d in targets]}
+        if device is not None:
+            params["device_id"] = str(device.id)
     else:
         params = {}
     cmd = Command(site_id=site.id, type=body.type, params=params, requested_by=user.id)
