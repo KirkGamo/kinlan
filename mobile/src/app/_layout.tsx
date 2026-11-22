@@ -12,7 +12,7 @@ import { useCircles } from '@/api/circles';
 import { prefetchFirstScreen } from '@/api/selection';
 import { pushSupported } from '@/api/push';
 import { SessionProvider, useSession } from '@/api/session';
-import { Button, FormScreen, Mark, Text } from '@/components/ui';
+import { Button, FormScreen, Loader, Mark, Text } from '@/components/ui';
 import { BootSplash } from '@/features/boot/boot-splash';
 import { PushBridge } from '@/features/push/push-bridge';
 import { loadHapticsPref } from '@/haptics';
@@ -120,11 +120,18 @@ function RootNavigator() {
     requestAnimationFrame(() => requestAnimationFrame(() => setDrawn(true)));
   }, []);
 
+  // The screens decide where you belong from the Circles list, so they never render while it's
+  // loading: after signing in they'd send someone with a Circle to onboarding (seen Nov 22).
+  // After the cold start that wait shows the loader on Night Ground, never a blank screen.
   return (
     <View style={styles.root}>
-      {mountApp ? (
+      {mountApp && !deciding ? (
         <View style={styles.root} onLayout={onAppLayout}>
           <Routes signedIn={signedIn} status={status} circles={circles} />
+        </View>
+      ) : booted ? (
+        <View style={styles.waiting}>
+          <Loader label="Loading your Circles" />
         </View>
       ) : null}
       {booted ? null : (
@@ -208,4 +215,7 @@ function StartupError({ message, onRetry }: { message: string; onRetry: () => vo
 /** The longest the splash waits for the first screen's data before showing it loading. */
 const WARM_CAP_MS = 4_000;
 
-const styles = StyleSheet.create({ root: { flex: 1 } });
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  waiting: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+});
