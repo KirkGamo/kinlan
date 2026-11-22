@@ -125,3 +125,25 @@ def test_a_bad_port_check_result_is_refused(client, ana, agent, home):
     r = client.post(f"{API}/agent/commands/{picked['id']}/result", headers=agent["h"],
                     json={"ok": True, "result": {"ports": "all of them"}})
     assert r.status_code == 400
+
+
+def test_a_whole_site_check_skips_offline_devices_and_reused_addresses(client, ana, agent, home):
+    """An old record that still holds the router's address isn't checked as the router."""
+    old_box = ("aa:bb:cc:00:00:09", ROUTER[1], None, "zte corporation")
+    ingest(client, agent, devices=scan(old_box, PC))
+    with get_session_factory()() as db:
+        from app.models import Device
+
+        box = db.scalar(select(Device).where(Device.mac == old_box[0]))
+        box.online = False  # gone for a while; the router now has its address
+        box.last_seen_at = datetime(2026, 11, 1, tzinfo=UTC)
+        db.commit()
+    ingest(client, agent, devices=scan(ROUTER, PC))
+    with get_session_factory()() as db:
+        db.scalar(select(Device).where(Device.mac == old_box[0])).online = True  # stale flag
+        db.commit()
+    cmd = client.post(
+        f"{API}/sites/{home['id']}/commands", json={"type": "port_check"}, headers=ana.h
+    ).json()
+    by_ip = {t["ip"]: t["mac"] for t in cmd["params"]["targets"]}
+    assert by_ip[ROUTER[1]] == ROUTER[0] and len(cmd["params"]["targets"]) == 2

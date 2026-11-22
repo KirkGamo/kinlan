@@ -43,6 +43,23 @@ def _device_param(
     return device
 
 
+def _port_targets(db: DB, site_id: uuid.UUID) -> list[Device]:
+    """Every device online now, one per address. An offline device's last address may since
+    belong to another device; checking it would pin that device's ports on both (seen Nov 23,
+    when an old record still held the router's address)."""
+    seen: set[str] = set()
+    targets = []
+    for d in db.scalars(
+        select(Device)
+        .where(Device.site_id == site_id, Device.ip.is_not(None), Device.online.is_(True))
+        .order_by(Device.last_seen_at.desc())
+    ):
+        if str(d.ip) not in seen:  # the most recently seen device keeps a shared address
+            seen.add(str(d.ip))
+            targets.append(d)
+    return sorted(targets, key=lambda d: d.ip)[:MAX_PORT_TARGETS]
+
+
 @router.post("/sites/{site_id}/commands", status_code=201, response_model=CommandOut)
 def send_command(site_id: uuid.UUID, body: CommandIn, user: CurrentUser, db: DB) -> CommandOut:
     """Queue a command; the agent picks it up within about a second if it's online."""
@@ -67,14 +84,7 @@ def send_command(site_id: uuid.UUID, body: CommandIn, user: CurrentUser, db: DB)
         device = _device_param(db, site.id, body.params, required=False)
         if device is not None and device.ip is None:
             raise ApiError(409, "device_has_no_address", "That device has no known IP address yet.")
-        targets = [device] if device else list(
-            db.scalars(
-                select(Device)
-                .where(Device.site_id == site.id, Device.ip.is_not(None))
-                .order_by(Device.ip)
-                .limit(MAX_PORT_TARGETS)
-            )
-        )
+        targets = [device] if device else _port_targets(db, site.id)
         params = {"targets": [{"mac": d.mac, "ip": str(d.ip)} for d in targets]}
         if device is not None:
             params["device_id"] = str(device.id)
