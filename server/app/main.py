@@ -10,7 +10,18 @@ from app import __version__
 from app.config import get_settings
 from app.errors import install_error_handlers
 from app.ratelimit import install_rate_limiting
-from app.routers import agent, alerts, auth, circles, commands, devices, metrics, push, sites
+from app.routers import (
+    agent,
+    alerts,
+    auth,
+    circles,
+    commands,
+    devices,
+    metrics,
+    push,
+    reports,
+    sites,
+)
 
 API_PREFIX = "/api/v1"
 
@@ -55,6 +66,7 @@ def create_app() -> FastAPI:
     app.include_router(commands.router, prefix=API_PREFIX)
     app.include_router(alerts.router, prefix=API_PREFIX)
     app.include_router(push.router, prefix=API_PREFIX)
+    app.include_router(reports.router, prefix=API_PREFIX)
     app.include_router(agent.router, prefix=API_PREFIX)
 
     @app.get("/healthz", tags=["system"])

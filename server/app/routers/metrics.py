@@ -214,8 +214,14 @@ def latency(
 ) -> LatencyOut:
     """Latency and loss over time for the chart, with a summary and the outages in the range."""
     site = require_site(db, user, site_id, Role.viewer)
-    now = datetime.now(UTC)
-    since, step, found = _buckets(db, site.id, range, now)
+    return latency_data(db, site.id, range, target, datetime.now(UTC))
+
+
+def latency_data(
+    db: DB, site_id: uuid.UUID, range: Range, target: TargetChoice, now: datetime  # noqa: A002
+) -> LatencyOut:
+    """The chart's series, summary and outages for one site (also used by the PDF report)."""
+    since, step, found = _buckets(db, site_id, range, now)
     targets = ["internet", "gateway"] if target == "both" else [target]
     series: dict[str, list[Point]] = {}
     summary: dict[str, Summary] = {}
@@ -234,7 +240,7 @@ def latency(
             samples=p.samples,
         )
     outages = db.scalars(
-        _outage_query(site.id)
+        _outage_query(site_id)
         .where(Outage.started_at < now, func.coalesce(Outage.ended_at, now) > since)
         .order_by(Outage.started_at)
     )
