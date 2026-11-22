@@ -88,12 +88,21 @@ def status(say: Callable[[str], None] = print) -> int:
         say("Not paired. Run: kinlan-agent pair")
         return 1
     has_token = tokenstore.load_token() is not None
+    from kinlan_agent import installer
+
+    task = installer.task_state()
     with Buffer() as buffer:
         waiting, last = buffer.count(), buffer.get_meta("last_upload_at")
     say(f"Site:         {settings.site_name} ({settings.site_id})")
     say(f"Server:       {settings.api_url}")
-    token_state = "saved" if has_token else "MISSING: pair again"
+    if has_token:
+        token_state = "saved"
+    elif tokenstore.token_path().exists() and not tokenstore.is_admin():
+        token_state = "saved, readable from an administrator terminal"
+    else:
+        token_state = "MISSING: pair again"
     say(f"Agent:        {settings.agent_id} (token {token_state})")
+    say(f"At startup:   {task or 'not installed (kinlan-agent install)'}")
     say(f"Last upload:  {last or 'never'}")
     say(f"Waiting:      {waiting} items in the buffer")
-    return 0 if has_token else 1
+    return 0 if has_token or tokenstore.token_path().exists() else 1

@@ -5,7 +5,10 @@ Subcommands (see docs/KinLAN_Technical_Plan.md, Section 3):
     run        Start monitoring and uploading (``--local`` prints results without the cloud).
     install    Register the agent to start at boot (Windows Task Scheduler).
     uninstall  Remove the startup task.
-    status     Show pairing state, last upload and buffer size.
+    status     Show pairing state, the startup task, last upload and buffer size.
+
+Run with no subcommand (double-clicking KinLAN-Agent.exe does this) for guided setup: pair if
+needed, then install the startup task.
 """
 
 from __future__ import annotations
@@ -15,12 +18,6 @@ import sys
 
 from kinlan_agent import __version__
 
-# Sprint in which each subcommand gets implemented, shown until it exists.
-_PLANNED_IN = {
-    "install": "Sprint 4",
-    "uninstall": "Sprint 4",
-}
-
 
 def build_parser() -> argparse.ArgumentParser:
     """Create the argument parser with all subcommands."""
@@ -29,7 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="KinLAN Agent: watches your network and reports to your Circle.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
-    sub = parser.add_subparsers(dest="command", required=True)
+    sub = parser.add_subparsers(dest="command")
 
     pair = sub.add_parser("pair", help="pair this PC with a KinLAN site")
     pair.add_argument("--code", help="the 6-digit code from the app (asked if omitted)")
@@ -61,6 +58,16 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch to the chosen subcommand. Returns an exit code."""
     args = build_parser().parse_args(argv)
+    if args.command is None:
+        return _setup()
+    if args.command == "install":
+        from kinlan_agent import installer
+
+        return installer.install()
+    if args.command == "uninstall":
+        from kinlan_agent import installer
+
+        return installer.uninstall()
     if args.command == "run" and args.local:
         from kinlan_agent.local import run_local  # imported here: it loads Rich and Scapy
 
@@ -74,14 +81,27 @@ def main(argv: list[str] | None = None) -> int:
         from kinlan_agent import pairing
 
         return pairing.status()
-    if args.command == "run":
-        return _run_cloud()
-    print(
-        f"kinlan-agent {args.command}: not implemented yet "
-        f"(planned for {_PLANNED_IN[args.command]}).",
-        file=sys.stderr,
-    )
-    return 2
+    return _run_cloud()
+
+
+def _setup(ask=input) -> int:
+    """Guided setup for a double-clicked KinLAN-Agent.exe: pair, then start at boot. The window
+    stays open at the end, so its messages can be read."""
+    from kinlan_agent import config, installer, pairing
+
+    print("KinLAN Agent setup", end="\n\n")
+    code = 0
+    if not config.load().paired:
+        code = pairing.pair(config.load().api_url, None)
+    if code == 0 and installer.task_state() is None:
+        code = installer.install()
+    elif code == 0:
+        print("This PC is paired and the agent starts at boot. Status:", end="\n\n")
+        pairing.status()
+    if installer.frozen():
+        print()
+        ask("Press Enter to close this window.")
+    return code
 
 
 def _run_cloud() -> int:
@@ -97,10 +117,19 @@ def _run_cloud() -> int:
     if not settings.paired or token is None:
         print("This PC isn't paired yet. Run: kinlan-agent pair", file=sys.stderr)
         return 1
+    from kinlan_agent import installer
+
+    try:
+        guard = installer.single_instance()
+    except installer.AlreadyRunning:
+        print("The KinLAN Agent is already running on this PC (the startup task, or another "
+              "window). Check it with: kinlan-agent status", file=sys.stderr)
+        return 1
     setup_logging(settings.log_level)
     from kinlan_agent.runner import run  # imported here: it loads Scapy
 
     run(settings, token)
+    del guard
     return 0
 
 
