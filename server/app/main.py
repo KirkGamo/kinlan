@@ -35,6 +35,14 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         from app.jobs import start_scheduler
 
         scheduler = start_scheduler()
+    if settings.env != "test":
+        # Load the PDF report's libraries and fonts in the background, so the first report after
+        # a deploy or restart doesn't wait for them (they take seconds on a small instance).
+        import threading
+
+        from app.reports import warm_up
+
+        threading.Thread(target=warm_up, name="report-warm-up", daemon=True).start()
     yield
     if scheduler is not None:
         scheduler.shutdown(wait=False)
