@@ -26,6 +26,7 @@ htmlcov/
 # Builds and releases
 agent/build/*
 !agent/build/kinlan-agent.spec
+!agent/build/kinlan.ico
 agent/dist/
 *.exe
 *.apk

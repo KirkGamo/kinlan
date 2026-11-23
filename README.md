@@ -15,6 +15,22 @@ Final project for CCS 234 – Communications and Networking, West Visayas State 
 | `mobile/` | Expo (React Native, TypeScript) app, created in Sprint 3 |
 | `docs/` | Technical plan, diagrams, screenshots, test results |
 
+## Install the agent on a PC (Windows 10 or 11)
+
+The agent runs on one PC that stays on inside the network you want to watch. Only monitor networks you own or are allowed to monitor.
+
+1. In the app, add a site and choose **Pair the agent**; it shows a 6-digit code (valid for 10 minutes).
+2. Download **[KinLAN-Agent.exe](https://github.com/KirkGamo/kinlan/releases/latest/download/KinLAN-Agent.exe)** and run it.
+   - **SmartScreen:** the exe isn't code-signed, so Windows may say it "protected your PC". Choose **More info → Run anyway**.
+   - Approve the **administrator** prompt: the agent sends ARP and ping packets and starts at boot, which need it.
+3. Enter the code and accept the consent prompt. The agent then installs itself to start when the PC starts (as a Task Scheduler task running as SYSTEM, so nobody has to sign in) and starts monitoring. The app shows "Connected" within a minute.
+
+**Npcap** (optional, recommended): with [Npcap](https://npcap.com/#download) installed (it also comes with Wireshark), a device scan takes about 7 s; without it the agent falls back to Windows' own ARP lookup, about 14 s per /24. Npcap's licence doesn't allow bundling it.
+
+From an administrator terminal: `KinLAN-Agent.exe status` shows the pairing, the startup task and the last upload; `KinLAN-Agent.exe uninstall` removes the startup task (the pairing and history stay). Everything the agent keeps is in `%ProgramData%\KinLAN` (settings, the encrypted token, the offline buffer and `logs\`).
+
+**Build the exe yourself:** `cd agent`, then `pyinstaller build/kinlan-agent.spec --noconfirm` (it lands in `agent/dist/`). A tag like `agent-v1.0.0` builds and publishes it as a GitHub Release automatically.
+
 ## Development setup (Windows 11)
 
 Requirements: Python 3.12, PostgreSQL 15, Git, Node.js 22 (for the mobile app), and Npcap (installed with Wireshark) for ARP scanning.
@@ -64,4 +80,4 @@ git config core.hooksPath .githooks
 
 ## Status
 
-Sprint 1 (agent core). See [CHANGELOG.md](CHANGELOG.md).
+Sprint 4 (finish, test, document): every required feature works end to end. See [CHANGELOG.md](CHANGELOG.md).

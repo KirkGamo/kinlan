@@ -8,6 +8,11 @@ import { Button, Card, FormScreen, Loader, SectionLabel, StatusChip, Text } from
 import { haptics } from '@/haptics';
 import { colors, radius, space } from '@/theme';
 
+/** The agent's newest release (agent-release.yml marks agent releases "latest"). */
+const AGENT_URL = 'https://github.com/KirkGamo/kinlan/releases/latest/download/KinLAN-Agent.exe';
+/** Short enough to type on the PC. */
+const AGENT_PAGE = 'github.com/KirkGamo/kinlan/releases';
+
 /**
  * Pair the agent (briefs.md section 4): a 6-digit code with a 10-minute countdown and a copy
  * button, the PC steps with the consent wording, and a live wait that turns into "Connected".
@@ -76,6 +81,14 @@ function Waiting({ siteId, siteName }: { siteId: string; siteName: string }) {
     setTimeout(() => setCopied(false), 2_000);
   }
 
+  const [linkCopied, setLinkCopied] = useState(false);
+  async function copyLink() {
+    await Clipboard.setStringAsync(AGENT_URL);
+    haptics.confirm();
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2_000);
+  }
+
   return (
     <FormScreen>
       <Card style={styles.codeCard}>
@@ -127,12 +140,22 @@ function Waiting({ siteId, siteName }: { siteId: string; siteName: string }) {
 
       <SectionLabel>On a PC on that network</SectionLabel>
       <Card>
-        <Step n={1}>Open PowerShell as Administrator in the KinLAN agent folder.</Step>
-        <Step n={2}>{'Run  kinlan-agent pair  and type the code above.'}</Step>
-        <Step n={3}>
-          Agree to the prompt: “Only monitor networks you own or are authorized to monitor.”
+        <Step n={1}>{`Download KinLAN-Agent.exe from ${AGENT_PAGE}.`}</Step>
+        <Step n={2}>
+          Run it and approve the administrator prompt. If Windows says it protected your PC, choose
+          More info, then Run anyway.
         </Step>
-        <Step n={4}>{'Start monitoring with  kinlan-agent run  and keep it open.'}</Step>
+        <Step n={3}>
+          Type the code above and agree to: “Only monitor networks you own or are authorized to
+          monitor.”
+        </Step>
+        <Step n={4}>That’s all: the agent starts with the PC from now on, with nobody signed in.</Step>
+        <Button
+          label={linkCopied ? 'Link copied' : 'Copy the download link'}
+          variant="ghost"
+          onPress={copyLink}
+          accessibilityHint="Copies the agent's download address, to send to the PC"
+        />
       </Card>
     </FormScreen>
   );

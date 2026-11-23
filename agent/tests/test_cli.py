@@ -23,6 +23,12 @@ def test_run_accepts_local_flag():
     assert args.local is True
 
 
-def test_unimplemented_command_exits_with_code_2(capsys):
-    assert main(["install"]) == 2
-    assert "not implemented yet" in capsys.readouterr().err
+def test_install_and_uninstall_reach_the_installer(monkeypatch):
+    """The real commands are covered in test_installer.py with a fake Task Scheduler."""
+    from kinlan_agent import installer
+
+    calls = []
+    monkeypatch.setattr(installer, "install", lambda: calls.append("install") or 0)
+    monkeypatch.setattr(installer, "uninstall", lambda: calls.append("uninstall") or 0)
+    assert main(["install"]) == 0 and main(["uninstall"]) == 0
+    assert calls == ["install", "uninstall"]

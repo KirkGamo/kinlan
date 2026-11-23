@@ -191,7 +191,7 @@ export function problems(summary: SiteSummary, now: number, v: Verdict = verdict
     out.push({
       key: 'agent',
       title: 'The agent isn’t reporting',
-      next: 'Turn on the PC with the agent and keep kinlan-agent run open.',
+      next: 'Turn on the PC with the agent: it starts by itself. If it still doesn’t report, run KinLAN-Agent.exe there.',
       tone: 'neutral',
       chip: 'Offline',
       to: '/alerts',
