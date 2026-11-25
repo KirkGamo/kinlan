@@ -22,6 +22,14 @@ INFO = netinfo.NetInfo(
 )
 
 
+ROUTER = "64:f8:8a:00:00:01"
+
+
+def at_home() -> AgentConfig:
+    """An agent whose site's network (its router) is the fake network's."""
+    return AgentConfig(site_name="Home", home_gateway_mac=ROUTER, home_network="192.168.1.0/24")
+
+
 class Net:
     """A fake network whose internet can be switched off."""
 
@@ -61,6 +69,8 @@ def deps(net: Net, diagnoses: list | None = None) -> CloudDeps:
             targets, skip_ip=skip_ip, opener=router_admin_page_only
         ),
         send=net.send,
+        gateway_mac=lambda ip: ROUTER if ip == "192.168.1.1" else None,
+        load_config=AgentConfig,
     )
 
 
@@ -71,7 +81,7 @@ def buffer():
 
 
 def test_ticks_queue_samples(buffer):
-    rt = Runtime(AgentConfig(), buffer, deps(Net()))
+    rt = Runtime(at_home(), buffer, deps(Net()))
     rt.start()
     rt.tick()
     kinds = [i.kind for i in buffer.peek()]
@@ -80,7 +90,7 @@ def test_ticks_queue_samples(buffer):
 
 def test_an_outage_is_recorded_diagnosed_and_queued_when_it_ends(buffer):
     net, diagnoses = Net(), []
-    rt = Runtime(AgentConfig(), buffer, deps(net, diagnoses))
+    rt = Runtime(at_home(), buffer, deps(net, diagnoses))
     rt.start()
     net.internet_up = False
     for _ in range(3):
@@ -100,7 +110,7 @@ def test_an_outage_is_recorded_diagnosed_and_queued_when_it_ends(buffer):
 def test_internet_targets_are_picked_again_but_not_mid_outage(buffer):
     net = Net()
     d = deps(net)
-    rt = Runtime(AgentConfig(), buffer, d)
+    rt = Runtime(at_home(), buffer, d)
     rt.start()
     d.choose_targets = lambda candidates, send: ["9.9.9.9", "208.67.222.222"]
     assert rt.recheck_targets() is True
@@ -116,7 +126,7 @@ def test_internet_targets_are_picked_again_but_not_mid_outage(buffer):
 def test_an_outage_open_before_a_restart_keeps_its_start_time(buffer):
     started = datetime(2026, 11, 20, 9, 41, tzinfo=UTC)
     buffer.open_outage(started, "isp")
-    rt = Runtime(AgentConfig(), buffer, deps(Net()))
+    rt = Runtime(at_home(), buffer, deps(Net()))
     rt.start()
     for _ in range(2):
         rt.tick()
@@ -125,7 +135,7 @@ def test_an_outage_open_before_a_restart_keeps_its_start_time(buffer):
 
 
 def test_scan_queues_devices_with_the_netinfo(buffer):
-    rt = Runtime(AgentConfig(), buffer, deps(Net()))
+    rt = Runtime(at_home(), buffer, deps(Net()))
     rt.start()
     rt.scan_now()
     item = buffer.peek()[0]
@@ -160,7 +170,7 @@ def test_scan_queues_devices_with_the_netinfo(buffer):
     ],
 )
 def test_commands(buffer, command, ok, check):
-    rt = Runtime(AgentConfig(), buffer, deps(Net()))
+    rt = Runtime(at_home(), buffer, deps(Net()))
     rt.start()
     got_ok, result, error = execute(command, rt)
     assert got_ok is ok
@@ -171,7 +181,7 @@ def test_commands(buffer, command, ok, check):
 
 
 def test_poller_runs_commands_and_reports_results(buffer):
-    rt = Runtime(AgentConfig(), buffer, deps(Net()))
+    rt = Runtime(at_home(), buffer, deps(Net()))
     rt.start()
     reported = {}
 

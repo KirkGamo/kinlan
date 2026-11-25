@@ -61,8 +61,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command is None:
         return _setup()
     if args.command == "install":
-        from kinlan_agent import installer
+        from kinlan_agent import homenet, installer
 
+        homenet.confirm()  # a PC paired before 1.0.1: is this the site's network?
         return installer.install()
     if args.command == "uninstall":
         from kinlan_agent import installer
@@ -87,12 +88,14 @@ def main(argv: list[str] | None = None) -> int:
 def _setup(ask=input) -> int:
     """Guided setup for a double-clicked KinLAN-Agent.exe: pair, then start at boot. The window
     stays open at the end, so its messages can be read."""
-    from kinlan_agent import config, installer, pairing
+    from kinlan_agent import config, homenet, installer, pairing
 
     print("KinLAN Agent setup", end="\n\n")
     code = 0
     if not config.load().paired:
         code = pairing.pair(config.load().api_url, None)
+    if code == 0:
+        homenet.confirm(ask)  # pairing records it; a PC paired before 1.0.1 is asked once
     if code == 0 and installer.task_state() is None:
         code = installer.install()
     elif code == 0:

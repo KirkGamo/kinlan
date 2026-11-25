@@ -25,6 +25,8 @@ The agent runs on one PC that stays on inside the network you want to watch. Onl
    - Approve the **administrator** prompt: the agent sends ARP and ping packets and starts at boot, which need it.
 3. Enter the code and accept the consent prompt. The agent then installs itself to start when the PC starts (as a Task Scheduler task running as SYSTEM, so nobody has to sign in) and starts monitoring. The app shows "Connected" within a minute.
 
+**A laptop as the agent's PC:** the agent remembers the network it was paired on (by its router's MAC address) and only monitors while the PC is on it. Anywhere else it waits, so another network's devices never reach your site, and the app says the PC isn't on the site's network. An agent paired with version 1.0.0 asks once, the next time you run `KinLAN-Agent.exe`: "Is this Home's network?". Answer it while the PC is on that network.
+
 **Npcap** (optional, recommended): with [Npcap](https://npcap.com/#download) installed (it also comes with Wireshark), a device scan takes about 7 s; without it the agent falls back to Windows' own ARP lookup, about 14 s per /24. Npcap's licence doesn't allow bundling it.
 
 From an administrator terminal: `KinLAN-Agent.exe status` shows the pairing, the startup task and the last upload; `KinLAN-Agent.exe uninstall` removes the startup task (the pairing and history stay). Everything the agent keeps is in `%ProgramData%\KinLAN` (settings, the encrypted token, the offline buffer and `logs\`).

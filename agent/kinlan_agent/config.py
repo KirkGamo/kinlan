@@ -34,6 +34,9 @@ class AgentConfig(BaseModel):
     agent_id: str | None = None
     site_id: str | None = None
     site_name: str | None = None
+    # The site's network (homenet.py): its router's MAC, and the subnet for messages.
+    home_gateway_mac: str | None = None
+    home_network: str | None = None
     monitor_interval_s: float = Field(10, ge=1)
     upload_interval_s: float = Field(30, ge=1)
     scan_interval_s: float = Field(300, ge=30)
