@@ -25,9 +25,10 @@ def test_run_accepts_local_flag():
 
 def test_install_and_uninstall_reach_the_installer(monkeypatch):
     """The real commands are covered in test_installer.py with a fake Task Scheduler."""
-    from kinlan_agent import installer
+    from kinlan_agent import homenet, installer
 
     calls = []
+    monkeypatch.setattr(homenet, "confirm", lambda *a, **k: True)
     monkeypatch.setattr(installer, "install", lambda: calls.append("install") or 0)
     monkeypatch.setattr(installer, "uninstall", lambda: calls.append("uninstall") or 0)
     assert main(["install"]) == 0 and main(["uninstall"]) == 0

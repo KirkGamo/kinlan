@@ -91,6 +91,11 @@ def fake_server(status=200, body=None):
 
 class FakeInfo:
     network = "192.168.1.0/24"
+    gateway = "192.168.1.1"
+
+
+def router_mac(ip):
+    return "64-F8-8A-00-00-01" if ip == "192.168.1.1" else None
 
 
 def answers(*replies):
@@ -107,6 +112,7 @@ def test_pair_asks_consent_then_saves_token_and_settings():
         say=said.append,
         client=client,
         get_netinfo=lambda: FakeInfo(),
+        resolve=router_mac,
     )
     assert code == 0
     assert seen["url"] == "http://127.0.0.1:8000/api/v1/agent/pair"
@@ -119,6 +125,11 @@ def test_pair_asks_consent_then_saves_token_and_settings():
         "http://127.0.0.1:8000",
     )
     assert "Only monitor networks you own" in said[0] and 'Paired with "Home"' in said[-1]
+    # pairing happens on the site's network, so it's recorded as the one to monitor
+    assert (settings.home_gateway_mac, settings.home_network) == (
+        "64:f8:8a:00:00:01",
+        "192.168.1.0/24",
+    )
 
 
 def test_without_consent_nothing_is_sent():
@@ -142,6 +153,7 @@ def test_a_wrong_code_shows_the_servers_message():
             say=said.append,
             client=client,
             get_netinfo=lambda: FakeInfo(),
+            resolve=router_mac,
         )
         == 1
     )

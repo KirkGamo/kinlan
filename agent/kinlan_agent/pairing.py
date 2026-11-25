@@ -12,7 +12,7 @@ from collections.abc import Callable
 
 import httpx
 
-from kinlan_agent import __version__, config, tokenstore
+from kinlan_agent import __version__, config, homenet, tokenstore
 from kinlan_agent.buffer import Buffer
 
 CONSENT = (
@@ -21,11 +21,6 @@ CONSENT = (
 )
 
 
-def _network_cidr(get_netinfo: Callable) -> str | None:
-    try:
-        return str(get_netinfo().network)
-    except Exception:
-        return None
 
 
 def pair(
@@ -36,6 +31,7 @@ def pair(
     say: Callable[[str], None] = print,
     client: httpx.Client | None = None,
     get_netinfo: Callable | None = None,
+    resolve: Callable[[str], str | None] = homenet.resolve_mac,
 ) -> int:
     """Pair this PC with a site. Returns a process exit code."""
     say(CONSENT)
@@ -48,12 +44,14 @@ def pair(
         return 1
     if get_netinfo is None:
         from kinlan_agent.netinfo import get_netinfo
+    # Pairing happens on the network being added, so this is the site's network (homenet.py).
+    network = homenet.current(get_netinfo, resolve)
     body = {
         "code": code,
         "hostname": socket.gethostname(),
         "os": f"{platform.system()} {platform.release()}",
         "agent_version": __version__,
-        "network_cidr": _network_cidr(get_netinfo),
+        "network_cidr": network.cidr,
     }
     client = client or httpx.Client(timeout=20)
     try:
@@ -73,9 +71,18 @@ def pair(
     settings = config.load()
     settings.api_url, settings.agent_id = api_url, data["agent_id"]
     settings.site_id, settings.site_name = data["site_id"], data["site_name"]
+    settings.home_gateway_mac, settings.home_network = network.gateway_mac, network.cidr
     config.save(settings)
     say(f'Paired with "{data["site_name"]}". Start monitoring with: kinlan-agent run')
     return 0
+
+
+_HERE = {
+    homenet.Where.HOME: "on the site's network",
+    homenet.Where.AWAY: "on another network, so the agent waits",
+    homenet.Where.UNKNOWN: "can't identify this network's router",
+    homenet.Where.UNSET: "the agent waits until its network is recorded (run KinLAN-Agent.exe)",
+}
 
 
 def status(say: Callable[[str], None] = print) -> int:
@@ -103,6 +110,9 @@ def status(say: Callable[[str], None] = print) -> int:
         token_state = "MISSING: pair again"
     say(f"Agent:        {settings.agent_id} (token {token_state})")
     say(f"At startup:   {task or 'not installed (kinlan-agent install)'}")
+    say(f"Its network:  {homenet.home_description(settings)}")
+    here = homenet.where(settings, homenet.current())
+    say(f"This PC:      {_HERE[here]}")
     say(f"Last upload:  {last or 'never'}")
     say(f"Waiting:      {waiting} items in the buffer")
     return 0 if has_token or tokenstore.token_path().exists() else 1

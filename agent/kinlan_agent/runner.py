@@ -1,12 +1,14 @@
 """``kinlan-agent run``: monitor, scan, upload and answer commands until stopped (plan, 3.1, 3.5).
 
-Four background threads share one SQLite buffer:
+Background threads share one SQLite buffer:
 
 * **monitor**: pings the gateway and the internet every 10 s; samples and outages go to the
   outbox, and a diagnose runs automatically when an outage starts;
 * **scanner**: a device scan every 5 minutes (plus hourly buffer cleanup);
 * **uploader**: sends the outbox every 30 s, draining any backlog oldest first;
-* **commands**: long-polls the server and runs scan, ping test and diagnose on request.
+* **commands**: long-polls the server and runs scan, ping test and diagnose on request;
+* **network**: every minute, checks that this PC is still on its site's network
+  (homenet.py). Elsewhere the agent stays quiet: no samples, scans or commands.
 
 Every network operation comes through :class:`CloudDeps`, so tests run it against fakes.
 """
@@ -22,15 +24,27 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 
-from kinlan_agent import __version__, diagnose, discovery, monitor, netinfo, pingtest, portcheck
+from kinlan_agent import (
+    __version__,
+    config,
+    diagnose,
+    discovery,
+    homenet,
+    monitor,
+    netinfo,
+    pingtest,
+    portcheck,
+)
 from kinlan_agent.buffer import Buffer
 from kinlan_agent.config import AgentConfig
+from kinlan_agent.homenet import Where
 from kinlan_agent.icmp import EchoReply, echo
 from kinlan_agent.uploader import Uploader
 
 log = logging.getLogger("kinlan.runner")
 PRUNE_EVERY_S = 3600
 RECHECK_TARGETS_EVERY_S = 3600  # some networks block a resolver for a while (plan 3.2)
+CHECK_NETWORK_EVERY_S = 60
 
 
 @dataclass
@@ -42,6 +56,8 @@ class CloudDeps:
     ping_test: Callable[..., pingtest.PingStats] = pingtest.ping_test
     port_check: Callable[..., portcheck.PortCheck] = portcheck.check
     send: Callable[[str, int], EchoReply] = echo
+    gateway_mac: Callable[[str], str | None] = homenet.resolve_mac
+    load_config: Callable[[], AgentConfig] = config.load  # setup may record the network later
 
 
 def scan_item(info: netinfo.NetInfo, result: discovery.ScanResult) -> dict:
@@ -54,6 +70,8 @@ def scan_item(info: netinfo.NetInfo, result: discovery.ScanResult) -> dict:
 def execute(command: dict, runtime: Runtime) -> tuple[bool, dict | None, str | None]:
     """Run one command; returns (ok, result, error) for POST /agent/commands/{id}/result."""
     kind, params = command.get("type"), command.get("params") or {}
+    if kind in ("scan", "ping_test", "diagnose", "port_check") and not runtime.active:
+        return False, None, runtime.not_here()
     try:
         if kind == "scan":
             started = time.monotonic()
@@ -159,6 +177,8 @@ class Runtime:
     monitor: monitor.Monitor | None = None
     open_outage_id: int | None = None
     last_devices: list[portcheck.Target] = field(default_factory=list)
+    where: Where = Where.UNKNOWN  # until the first check_network()
+    network: homenet.Network | None = None
     _scan_lock: threading.Lock = field(default_factory=threading.Lock)
 
     def start(self) -> None:
@@ -170,14 +190,79 @@ class Runtime:
         if still_open:  # the PC restarted mid-outage: keep the true start time
             self.monitor.detector.current = monitor.Outage(still_open.started_at, still_open.cause)
             self.open_outage_id = still_open.id
-        log.info(
-            "monitoring %s via gateway %s; internet targets %s",
-            self.info.network,
-            self.info.gateway,
-            ", ".join(self.targets),
-        )
+        log.info("internet targets %s", ", ".join(self.targets))
+        self.check_network()
+
+    # --- which network ------------------------------------------------------------------
+
+    @property
+    def active(self) -> bool:
+        """True while this PC is on its site's network, so measuring it is measuring the site."""
+        return self.where is Where.HOME
+
+    def _site(self) -> str:
+        return self.config.site_name or "this site"
+
+    def not_here(self) -> str:
+        if self.where is Where.UNSET:
+            return (
+                f"This agent doesn't know {self._site()}'s network yet. Run KinLAN-Agent.exe once "
+                "on the PC while it's on that network."
+            )
+        now_on = (self.network.cidr if self.network else None) or "another network"
+        return f"The agent's PC isn't on {self._site()}'s network right now (it's on {now_on})."
+
+    def check_network(self) -> Where:
+        """Find out whether this PC is on its site's network; start or pause monitoring."""
+        try:
+            info = self.deps.get_netinfo(max_prefix=self.config.max_scan_prefix)
+        except Exception:
+            info = None
+        net = homenet.identify(info, self.deps.gateway_mac)
+        try:
+            saved = self.deps.load_config()
+        except Exception:
+            saved = self.config
+        if saved.home_gateway_mac and not self.config.home_gateway_mac:
+            self.config.home_gateway_mac = saved.home_gateway_mac
+            self.config.home_network = saved.home_network
+        state = homenet.where(self.config, net)
+        if state is Where.UNKNOWN:
+            state = self.where  # router off or no network: keep the last answer
+        was, self.where, self.network = self.where, state, net
+        if state is was:
+            return state
+        if state is Where.HOME:
+            if info is not None and self.monitor is not None:
+                self.info, self.monitor.gateway = info, info.gateway
+            log.info("on %s's network, %s: monitoring it", self._site(), net.describe())
+        elif state is Where.UNSET:
+            log.warning("%s", self.not_here())
+        else:
+            log.warning(
+                "%s %s's is %s. Waiting.",
+                self.not_here(),
+                self._site(),
+                homenet.home_description(self.config),
+            )
+        if was is Where.HOME:
+            self._forget_open_outage()
+        return state
+
+    def _forget_open_outage(self) -> None:
+        """Leaving the site's network looks like an outage from inside (the router stops
+        answering); it was the PC that left, so the outage isn't kept."""
+        if self.monitor is not None:
+            self.monitor.detector = monitor.OutageDetector()
+        if self.open_outage_id is not None:
+            self.buffer.drop_outage(self.open_outage_id)
+            self.open_outage_id = None
+
+    # --- measuring ----------------------------------------------------------------------
 
     def tick(self) -> None:
+        if not self.active:
+            return
         tick, event = self.monitor.tick()
         self.buffer.add_many("sample", [s.to_dict() for s in tick.samples], now=tick.ts)
         if event and event.kind == "started":
@@ -243,6 +328,9 @@ class Runtime:
 
     def daily_port_check(self) -> None:
         """The scheduled check; its result goes out through the outbox like everything else."""
+        if not self.active:
+            log.info("port check skipped: %s", self.not_here())
+            return
         self.buffer.add("port_check", self.port_check_now().to_dict())
 
 
@@ -295,7 +383,8 @@ def run(
     last_targets = [time.monotonic()]
 
     def scan_and_prune() -> None:
-        runtime.scan_now()
+        if runtime.active:
+            runtime.scan_now()
         if time.monotonic() - last_targets[0] > RECHECK_TARGETS_EVERY_S:
             last_targets[0] = time.monotonic()
             runtime.recheck_targets()
@@ -322,6 +411,12 @@ def run(
             target=uploader.run, name="uploader", daemon=True, args=(stop, config.upload_interval_s)
         ),
         threading.Thread(target=poller.run, name="commands", daemon=True, args=(stop,)),
+        threading.Thread(
+            target=_loop,
+            name="network",
+            daemon=True,
+            args=(stop, CHECK_NETWORK_EVERY_S, runtime.check_network, "network check"),
+        ),
         threading.Thread(
             target=_daily,
             name="ports",

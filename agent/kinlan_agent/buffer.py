@@ -224,6 +224,11 @@ class Buffer:
             ).fetchone()
         return OpenOutage(row[0], _parse(row[1]), row[2]) if row else None
 
+    def drop_outage(self, outage_id: int) -> None:
+        """Forget an open outage that wasn't one (the PC had left the site's network)."""
+        with self._lock:
+            self._db.execute("DELETE FROM outages WHERE id = ? AND ended_at IS NULL", (outage_id,))
+
     def close_outage(self, outage_id: int, ended_at: datetime) -> dict:
         """Mark an outage as over and queue it for upload. Returns the uploaded payload."""
         with self._lock:
