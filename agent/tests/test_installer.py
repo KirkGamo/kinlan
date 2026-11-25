@@ -2,10 +2,14 @@
 
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
+from pathlib import Path
 
 import pytest
 
 from kinlan_agent import config, installer
+
+NS = {"t": "http://schemas.microsoft.com/windows/2004/02/mit/task"}
 
 
 class FakeScheduler:
@@ -15,11 +19,13 @@ class FakeScheduler:
         self.calls = []
         self.state = installed_state
         self.refuse_create = refuse_create
+        self.task = None  # the XML definition given to /Create
 
     def __call__(self, args):
         self.calls.append(args)
         verb = args[0]
         if verb == "/Create":
+            self.task = ET.fromstring(Path(args[args.index("/XML") + 1]).read_text("utf-16"))
             if self.refuse_create:
                 return subprocess.CompletedProcess(args, 1, "", "ERROR: Access is denied.")
             self.state = "Ready"
@@ -44,24 +50,41 @@ def paired(tmp_path, monkeypatch):
     return tmp_path
 
 
+def find(task, path):
+    return task.findtext(path, namespaces=NS)
+
+
 def test_install_registers_a_system_task_at_startup_and_starts_it(paired):
     tasks, said = FakeScheduler(), []
     assert installer.install(said.append, tasks, is_admin=lambda: True, home=paired) == 0
-    create = tasks.calls[0]
-    assert create[:3] == ["/Create", "/TN", "KinLAN Agent"]
-    assert create[create.index("/SC") + 1] == "ONSTARTUP"
-    assert create[create.index("/RU") + 1] == "SYSTEM"
-    assert create[create.index("/RL") + 1] == "HIGHEST"
+    assert tasks.calls[0][:3] == ["/Create", "/TN", "KinLAN Agent"]
+    # An XML definition, not /SC ONSTARTUP, which some Windows 11 builds reject.
+    assert "/SC" not in tasks.calls[0]
+    task = tasks.task
+    assert task.find("t:Triggers/t:BootTrigger", NS) is not None
+    assert find(task, "t:Principals/t:Principal/t:UserId") == "S-1-5-18"  # SYSTEM
+    assert find(task, "t:Principals/t:Principal/t:RunLevel") == "HighestAvailable"
     assert tasks.calls[1] == ["/Run", "/TN", "KinLAN Agent"]
     assert "running now" in said[0]
+
+
+def test_the_task_keeps_running_on_a_laptop(paired):
+    tasks = FakeScheduler()
+    installer.install(lambda _: None, tasks, is_admin=lambda: True, home=paired)
+    settings = "t:Settings/t:"
+    assert find(tasks.task, settings + "DisallowStartIfOnBatteries") == "false"
+    assert find(tasks.task, settings + "StopIfGoingOnBatteries") == "false"
+    assert find(tasks.task, settings + "ExecutionTimeLimit") == "PT0S"  # the default is 72 h
+    assert find(tasks.task, settings + "MultipleInstancesPolicy") == "IgnoreNew"
+    assert find(tasks.task, settings + "RestartOnFailure/t:Interval") == "PT1M"
 
 
 def test_from_source_the_task_runs_a_small_launcher(paired):
     tasks = FakeScheduler()
     installer.install(lambda _: None, tasks, is_admin=lambda: True, home=paired)
-    command = tasks.calls[0][tasks.calls[0].index("/TR") + 1]
     script = paired / "run-agent.cmd"
-    assert command == f'"{script}"'
+    assert find(tasks.task, "t:Actions/t:Exec/t:Command") == str(script)
+    assert find(tasks.task, "t:Actions/t:Exec/t:Arguments") is None
     text = script.read_text(encoding="utf-8")
     assert "-m kinlan_agent run" in text and sys.executable in text
 
@@ -75,7 +98,14 @@ def test_the_packaged_exe_copies_itself_next_to_its_data(paired, tmp_path_factor
     installer.install(lambda _: None, tasks, is_admin=lambda: True, home=paired)
     installed = paired / "KinLAN-Agent.exe"
     assert installed.read_bytes() == b"MZ fake exe"  # the download can be deleted afterwards
-    assert tasks.calls[0][tasks.calls[0].index("/TR") + 1] == f'"{installed}" run'
+    assert find(tasks.task, "t:Actions/t:Exec/t:Command") == str(installed)
+    assert find(tasks.task, "t:Actions/t:Exec/t:Arguments") == "run"
+
+
+def test_paths_are_escaped_in_the_task(tmp_path):
+    odd = tmp_path / "Tom & Jerry's <PC>" / "KinLAN-Agent.exe"
+    task = ET.fromstring(installer.task_xml(odd, "run").split("?>", 1)[1])
+    assert find(task, "t:Actions/t:Exec/t:Command") == str(odd)
 
 
 def test_install_needs_an_administrator_and_a_pairing(paired, tmp_path, monkeypatch):

@@ -6,6 +6,10 @@ ARP and ping need them, and SYSTEM can read the machine-scope DPAPI token). It a
 task at once, so monitoring begins without a reboot. ``uninstall`` stops and removes the task;
 the pairing, buffer and logs stay, so installing again resumes where it left off.
 
+The task is registered from an XML definition rather than ``/SC ONSTARTUP``: some Windows 11
+builds reject that schedule type ("Invalid Schedule Type specified"), and its defaults would stop
+the agent after 72 hours and never start it on battery, which matters on a laptop.
+
 Only one agent runs at a time (a machine-wide mutex), so ``run`` by hand while the task is
 running exits instead of uploading everything twice.
 """
@@ -17,8 +21,10 @@ import io
 import shutil
 import subprocess
 import sys
+import tempfile
 from collections.abc import Callable
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 from kinlan_agent.config import home_dir
 
@@ -38,9 +44,10 @@ def frozen() -> bool:
     return bool(getattr(sys, "frozen", False))
 
 
-def launcher(home: Path | None = None) -> str:
-    """The command the startup task runs. The packaged exe is copied into the data folder (so
-    the download can be deleted); a source checkout gets a small .cmd that runs the package."""
+def launcher(home: Path | None = None) -> tuple[Path, str]:
+    """The program the startup task runs, and its arguments. The packaged exe is copied into
+    the data folder (so the download can be deleted); a source checkout gets a small .cmd that
+    runs the package."""
     home = home or home_dir()
     if frozen():
         target = home / EXE_NAME
@@ -48,7 +55,7 @@ def launcher(home: Path | None = None) -> str:
         if source.resolve() != target.resolve():
             home.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
-        return f'"{target}" run'
+        return target, "run"
     package_dir = Path(__file__).resolve().parent.parent
     script = home / "run-agent.cmd"
     home.mkdir(parents=True, exist_ok=True)
@@ -56,7 +63,42 @@ def launcher(home: Path | None = None) -> str:
         f'@echo off\r\ncd /d "{package_dir}"\r\n"{sys.executable}" -m kinlan_agent run\r\n',
         encoding="utf-8",
     )
-    return f'"{script}"'
+    return script, ""
+
+
+def task_xml(program: Path, arguments: str) -> str:
+    """The startup task: at boot, as SYSTEM with the highest privileges, on battery too, with
+    no time limit, restarted every minute if it stops (it exits only on errors), one copy."""
+    args = f"<Arguments>{escape(arguments)}</Arguments>" if arguments else ""
+    return f"""<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>KinLAN Agent: monitors this network for the KinLAN app.</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <BootTrigger><Enabled>true</Enabled></BootTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Agent">
+      <UserId>S-1-5-18</UserId>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <RestartOnFailure><Interval>PT1M</Interval><Count>999</Count></RestartOnFailure>
+    <Enabled>true</Enabled>
+  </Settings>
+  <Actions Context="Agent">
+    <Exec><Command>{escape(str(program))}</Command>{args}</Exec>
+  </Actions>
+</Task>
+"""
 
 
 def install(
@@ -75,9 +117,11 @@ def install(
     if not config.load().paired:
         say("Pair this PC first: kinlan-agent pair")
         return 1
-    command = launcher(home)
-    created = run(["/Create", "/TN", TASK, "/TR", command, "/SC", "ONSTARTUP",
-                   "/RU", "SYSTEM", "/RL", "HIGHEST", "/F"])
+    program, arguments = launcher(home)
+    with tempfile.TemporaryDirectory() as tmp:
+        definition = Path(tmp) / "kinlan-agent-task.xml"
+        definition.write_text(task_xml(program, arguments), encoding="utf-16")
+        created = run(["/Create", "/TN", TASK, "/XML", str(definition), "/F"])
     if created.returncode != 0:
         say(f"Windows refused the startup task: {(created.stderr or created.stdout).strip()}")
         return 1
