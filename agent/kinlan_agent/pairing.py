@@ -109,7 +109,13 @@ def status(say: Callable[[str], None] = print) -> int:
     else:
         token_state = "MISSING: pair again"
     say(f"Agent:        {settings.agent_id} (token {token_state})")
-    say(f"At startup:   {task or 'not installed (kinlan-agent install)'}")
+    if task:
+        startup = task
+    elif tokenstore.is_admin():
+        startup = "not installed (kinlan-agent install)"
+    else:  # Windows hides SYSTEM tasks from terminals that aren't administrator
+        startup = "can't be seen from this terminal; run status as administrator"
+    say(f"At startup:   {startup}")
     say(f"Its network:  {homenet.home_description(settings)}")
     here = homenet.where(settings, homenet.current())
     say(f"This PC:      {_HERE[here]}")
