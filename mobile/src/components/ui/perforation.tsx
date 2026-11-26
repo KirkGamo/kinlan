@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import { StyleSheet } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Mask, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { decorative } from './svg-a11y';
 
 import { colors } from '@/theme';
 
@@ -13,7 +14,7 @@ import { colors } from '@/theme';
 export function Perforation({ from = 'corner' }: { from?: 'corner' | 'center' }) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
   return (
-    <Svg style={StyleSheet.absoluteFill} pointerEvents="none" accessible={false}>
+    <Svg style={StyleSheet.absoluteFill} pointerEvents="none" {...decorative}>
       <Defs>
         <Pattern id={`dots${id}`} width={9} height={9} patternUnits="userSpaceOnUse">
           <Circle cx={4.5} cy={4.5} r={1.1} fill={colors.text} fillOpacity={0.08} />

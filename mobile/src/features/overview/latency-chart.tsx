@@ -4,7 +4,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import type { Latency, LatencyPoint } from '@/api/overview';
-import { Card, Loader, Text } from '@/components/ui';
+import { Card, decorative, described, Loader, Text } from '@/components/ui';
 import { colors, space } from '@/theme';
 
 import { clock, day, ms } from './model';
@@ -87,7 +87,7 @@ export function LatencyChart({
       <Animated.View entering={FadeIn.duration(600)} {...responder.panHandlers} style={styles.plot}
         // Hover reads the chart on web; touch uses the drag above.
         {...({ onPointerMove: (e: { nativeEvent: { offsetX?: number } }) => e.nativeEvent.offsetX != null && pick(e.nativeEvent.offsetX), onPointerLeave: () => setAt(null) } as object)}>
-        <Svg width={width} height={H + PAD_TOP} accessible accessibilityLabel={model.label}>
+        <Svg width={width} height={H + PAD_TOP} {...described(model.label)}>
           <Defs>
             <LinearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0" stopColor={colors.yellow} stopOpacity={0.3} />
@@ -153,7 +153,7 @@ function Swatch({ color, opacity, label }: { color: string; opacity: number; lab
 function Legend({ dashed, label }: { dashed: boolean; label: string }) {
   return (
     <View style={styles.legendItem}>
-      <Svg width={18} height={6}>
+      <Svg width={18} height={6} {...decorative}>
         <Line x1={0} x2={18} y1={3} y2={3} stroke={dashed ? colors.text2 : colors.yellow} strokeWidth={dashed ? 2 : 3} strokeDasharray={dashed ? '4 3' : undefined} />
       </Svg>
       <Text role="labelSmall" color="text2">{label}</Text>

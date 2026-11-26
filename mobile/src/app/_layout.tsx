@@ -24,6 +24,7 @@ void loadHapticsPref();
 // Web: paint the page dark before React renders, so a dark app never flashes white.
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   document.documentElement.style.backgroundColor = colors.bg;
+  document.documentElement.style.colorScheme = 'dark'; // the browser's scrollbars and controls too
   document.body.style.backgroundColor = colors.bg;
 }
 

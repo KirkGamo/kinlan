@@ -10,3 +10,4 @@ export { Chips, Segmented } from './choice';
 export { Facts } from './facts';
 export { Perforation } from './perforation';
 export { ErrorCard } from './error-card';
+export { decorative, described } from './svg-a11y';

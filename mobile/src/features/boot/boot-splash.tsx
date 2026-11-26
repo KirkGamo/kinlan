@@ -13,7 +13,7 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets';
 import Svg, { Circle } from 'react-native-svg';
 
-import { Loader, Perforation, Text, Wordmark } from '@/components/ui';
+import { decorative, Loader, Perforation, Text, Wordmark } from '@/components/ui';
 import { colors, motion, space } from '@/theme';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -137,7 +137,7 @@ export function BootSplash({
         <Perforation from="center" />
       </Animated.View>
       <View style={styles.mark}>
-        <Svg width={MARK_W} height={MARK_H} viewBox="0 16 120 50">
+        <Svg width={MARK_W} height={MARK_H} viewBox="0 16 120 50" {...decorative}>
           {ARC.map(([cx, cy], i) => (
             <Light key={cx} cx={cx} cy={cy} lit={lights[i]} pop={pops[i]} />
           ))}

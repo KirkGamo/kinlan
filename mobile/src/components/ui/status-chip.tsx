@@ -1,5 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { decorative } from './svg-a11y';
 
 import { colors, radius, space, tints } from '@/theme';
 
@@ -29,7 +30,7 @@ export function StatusChip({ tone, label }: { tone: ChipTone; label: string }) {
   const t = TONE[tone];
   return (
     <View style={[styles.chip, { backgroundColor: t.bg }]} accessible accessibilityLabel={label}>
-      <Svg width={14} height={14} viewBox="0 0 24 24">
+      <Svg width={14} height={14} viewBox="0 0 24 24" {...decorative}>
         <Path d={t.icon} fill={t.fg} />
       </Svg>
       <Text role="labelSmall" color={tone === 'ok' ? 'green' : tone === 'new' ? 'orange' : tone === 'down' ? 'red' : 'text2'}>

@@ -12,6 +12,7 @@ import Animated, {
 import Svg, { Circle } from 'react-native-svg';
 
 import { colors, FONT_FAMILY, motion, space } from '@/theme';
+import { decorative } from './svg-a11y';
 
 /** The KinLAN mark: five status lights bent into an arc (docs/design/brand.md). */
 const ARC: [number, number][] = [
@@ -24,7 +25,7 @@ const ARC: [number, number][] = [
 
 export function Mark({ width = 120 }: { width?: number }) {
   return (
-    <Svg width={width} height={(width * 50) / 120} viewBox="0 16 120 50" accessibilityElementsHidden>
+    <Svg width={width} height={(width * 50) / 120} viewBox="0 16 120 50" {...decorative}>
       {ARC.map(([cx, cy]) => (
         <Circle key={cx} cx={cx} cy={cy} r={9} fill={colors.yellow} />
       ))}
