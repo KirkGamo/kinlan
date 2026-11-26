@@ -15,6 +15,11 @@ Final project for CCS 234 – Communications and Networking, West Visayas State 
 | `mobile/` | Expo (React Native, TypeScript) app, created in Sprint 3 |
 | `docs/` | Technical plan, diagrams, screenshots, test results |
 
+## Get the app
+
+- **Android:** download **[KinLAN.apk](https://github.com/KirkGamo/kinlan/releases/download/app-v1.0.0/KinLAN.apk)** on the phone and open it. Android asks once to allow installs from your browser or Files app. Alerts arrive as notifications.
+- **Web:** **[kinlan-web.onrender.com](https://kinlan-web.onrender.com)** works in any browser with the same account. It has no push notifications; the Alerts tab shows the same alerts. The first visit after a quiet spell can take up to a minute while the free API wakes up.
+
 ## Install the agent on a PC (Windows 10 or 11)
 
 The agent runs on one PC that stays on inside the network you want to watch. Only monitor networks you own or are allowed to monitor.
