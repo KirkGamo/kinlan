@@ -34,6 +34,9 @@ class Laptop:
     def get_netinfo(self, **_):
         return self.info
 
+    def route(self):
+        return self.info.local_ip, self.info.gateway
+
     def gateway_mac(self, ip):
         if not self.router_answers:
             return None
@@ -48,7 +51,7 @@ def buffer():
 
 def runtime(buffer, laptop, net=None, settings=None):
     d = deps(net or Net())
-    d.get_netinfo, d.gateway_mac = laptop.get_netinfo, laptop.gateway_mac
+    d.get_netinfo, d.gateway_mac, d.route = laptop.get_netinfo, laptop.gateway_mac, laptop.route
     settings = settings or at_home()
     d.load_config = lambda: settings
     return Runtime(settings, buffer, d)
@@ -106,6 +109,23 @@ def test_it_starts_when_the_pc_comes_home_and_stops_when_it_leaves(buffer):
     # (seen Nov 26: "Router not responding" stuck in the app after switching to a hotspot).
     assert [i.kind for i in buffer.peek(100)] == ["sample", "sample"]
     assert all(i.payload["ok"] for i in buffer.peek(100))
+
+
+def test_a_network_switch_is_noticed_before_the_next_measurement(buffer):
+    """On the new network 192.168.1.1 may answer too (a carrier's device, 192 ms through a phone
+    hotspot on Nov 26). The changed route is noticed at the next tick, before any ping."""
+    laptop = Laptop()
+    rt = runtime(buffer, laptop)
+    rt.start()
+    rt.tick()
+    assert buffer.count() == 2
+    laptop.go(SCHOOL)  # between the minute checks
+    rt.tick()
+    assert rt.where is Where.AWAY and buffer.count() == 2  # nothing measured on the hotspot
+    laptop.go(INFO)
+    rt.check_network()
+    rt.tick()
+    assert buffer.count() == 4
 
 
 def test_a_dead_router_at_home_is_still_an_outage(buffer):

@@ -61,6 +61,7 @@ class CloudDeps:
     send: Callable[[str, int], EchoReply] = echo
     gateway_mac: Callable[[str], str | None] = homenet.resolve_mac
     load_config: Callable[[], AgentConfig] = config.load  # setup may record the network later
+    route: Callable[[], tuple[str | None, str | None]] = netinfo.route_now
 
 
 def scan_item(info: netinfo.NetInfo, result: discovery.ScanResult) -> dict:
@@ -182,6 +183,7 @@ class Runtime:
     last_devices: list[portcheck.Target] = field(default_factory=list)
     where: Where = Where.UNKNOWN  # until the first check_network()
     network: homenet.Network | None = None
+    route: tuple[str | None, str | None] | None = None  # (local IP, gateway) at the last check
     held: list[tuple[str, dict, datetime]] = field(default_factory=list)
     held_since: datetime | None = None
     _scan_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -224,6 +226,7 @@ class Runtime:
         except Exception:
             info = None
         net = homenet.identify(info, self.deps.gateway_mac)
+        self.route = (info.local_ip, info.gateway) if info else (None, None)
         try:
             saved = self.deps.load_config()
         except Exception:
@@ -268,6 +271,12 @@ class Runtime:
 
     # --- measurements that might not be the site's -------------------------------------
 
+    def _route_changed(self) -> bool:
+        try:
+            return self.deps.route() != self.route
+        except Exception:
+            return False
+
     def _router_seen(self) -> bool:
         """True if the site's router answered the last network check."""
         net = self.network
@@ -309,6 +318,12 @@ class Runtime:
     def tick(self) -> None:
         if not self.active:
             return
+        if self._route_changed():
+            # A new route can mean another network whose 192.168.1.1 also answers (seen Nov 26:
+            # 192 ms through a phone hotspot), so find out before measuring anything.
+            self.check_network()
+            if not self.active:
+                return
         tick, event = self.monitor.tick()
         if not self._sort_out(tick):
             return

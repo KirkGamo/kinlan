@@ -108,6 +108,17 @@ def default_gateway() -> str | None:
     return scapy_gateway
 
 
+def route_now() -> tuple[str | None, str | None]:
+    """``(local IP, default gateway)`` right now. Cheap enough for every monitor tick: it only
+    asks the routing table, and no packet leaves the machine."""
+    try:
+        ip = outbound_ip()
+    except OSError:
+        ip = None
+    gateway = winapi.best_route_next_hop(_ROUTE_PROBE[0]) if winapi.AVAILABLE else None
+    return ip, gateway or None
+
+
 def pcap_interface() -> str | None:
     """The Npcap device name for the default route, used by Scapy ARP scans.
 
