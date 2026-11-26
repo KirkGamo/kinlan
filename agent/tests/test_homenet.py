@@ -2,6 +2,7 @@
 
 import ipaddress
 from dataclasses import replace
+from datetime import timedelta
 
 import pytest
 
@@ -9,7 +10,7 @@ from kinlan_agent import config, homenet
 from kinlan_agent.buffer import Buffer
 from kinlan_agent.config import AgentConfig
 from kinlan_agent.homenet import Network, Where
-from kinlan_agent.runner import Runtime, execute
+from kinlan_agent.runner import HOLD_DOUBTFUL_S, Runtime, execute
 from tests.test_runner import INFO, ROUTER, Net, at_home, deps
 
 SCHOOL = replace(
@@ -101,7 +102,10 @@ def test_it_starts_when_the_pc_comes_home_and_stops_when_it_leaves(buffer):
     laptop.go(SCHOOL)
     assert rt.check_network() is Where.AWAY
     assert buffer.current_outage() is None
-    assert [i.kind for i in buffer.peek(100) if i.kind == "outage"] == []
+    # Nothing measured while leaving reaches the site: no failed pings, outage or diagnose
+    # (seen Nov 26: "Router not responding" stuck in the app after switching to a hotspot).
+    assert [i.kind for i in buffer.peek(100)] == ["sample", "sample"]
+    assert all(i.payload["ok"] for i in buffer.peek(100))
 
 
 def test_a_dead_router_at_home_is_still_an_outage(buffer):
@@ -112,6 +116,21 @@ def test_a_dead_router_at_home_is_still_an_outage(buffer):
     for _ in range(3):
         rt.tick()
     assert rt.check_network() is Where.HOME and buffer.current_outage() is not None
+    assert buffer.count() == 0  # held: it could still be the PC leaving
+    # Two minutes on, with still no router, it's the network: everything held is sent.
+    rt.held_since -= timedelta(seconds=HOLD_DOUBTFUL_S + 1)
+    rt.tick()
+    kinds = [i.kind for i in buffer.peek(100)]
+    assert kinds.count("sample") == 12 and kinds.count("diagnose") == 1  # 4 ticks x 3 pings
+
+
+def test_a_provider_outage_isnt_held_because_the_router_answers(buffer):
+    laptop, net = Laptop(), Net()
+    rt = runtime(buffer, laptop, net)
+    rt.start()
+    net.internet_up = False
+    rt.tick()
+    assert buffer.count() == 3 and rt.held_since is None  # router, main, backup target
 
 
 def test_a_network_recorded_later_by_setup_is_picked_up(buffer):
