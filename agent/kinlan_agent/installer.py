@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from collections.abc import Callable
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -54,7 +55,7 @@ def launcher(home: Path | None = None) -> tuple[Path, str]:
         source = Path(sys.executable)
         if source.resolve() != target.resolve():
             home.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, target)
+            _copy(source, target)
         return target, "run"
     package_dir = Path(__file__).resolve().parent.parent
     script = home / "run-agent.cmd"
@@ -64,6 +65,18 @@ def launcher(home: Path | None = None) -> tuple[Path, str]:
         encoding="utf-8",
     )
     return script, ""
+
+
+def _copy(source: Path, target: Path, tries: int = 20, wait_s: float = 0.5) -> None:
+    """Copy the exe, waiting for a stopped agent to let go of the old one (an update)."""
+    for attempt in range(tries):
+        try:
+            shutil.copy2(source, target)
+            return
+        except PermissionError:
+            if attempt == tries - 1:
+                raise
+            time.sleep(wait_s)
 
 
 def task_xml(program: Path, arguments: str) -> str:
@@ -117,6 +130,8 @@ def install(
     if not config.load().paired:
         say("Pair this PC first: kinlan-agent pair")
         return 1
+    if task_state(run) == "Running":  # an update: stop the old agent so its exe can be replaced
+        run(["/End", "/TN", TASK])
     program, arguments = launcher(home)
     with tempfile.TemporaryDirectory() as tmp:
         definition = Path(tmp) / "kinlan-agent-task.xml"

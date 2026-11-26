@@ -57,15 +57,39 @@ def find(task, path):
 def test_install_registers_a_system_task_at_startup_and_starts_it(paired):
     tasks, said = FakeScheduler(), []
     assert installer.install(said.append, tasks, is_admin=lambda: True, home=paired) == 0
-    assert tasks.calls[0][:3] == ["/Create", "/TN", "KinLAN Agent"]
+    assert [c[0] for c in tasks.calls] == ["/Query", "/Create", "/Run"]
+    create = tasks.calls[1]
+    assert create[:3] == ["/Create", "/TN", "KinLAN Agent"]
     # An XML definition, not /SC ONSTARTUP, which some Windows 11 builds reject.
-    assert "/SC" not in tasks.calls[0]
+    assert "/SC" not in create
     task = tasks.task
     assert task.find("t:Triggers/t:BootTrigger", NS) is not None
     assert find(task, "t:Principals/t:Principal/t:UserId") == "S-1-5-18"  # SYSTEM
     assert find(task, "t:Principals/t:Principal/t:RunLevel") == "HighestAvailable"
-    assert tasks.calls[1] == ["/Run", "/TN", "KinLAN Agent"]
+    assert tasks.calls[2] == ["/Run", "/TN", "KinLAN Agent"]
     assert "running now" in said[0]
+
+
+def test_installing_over_a_running_agent_stops_it_first(paired):
+    tasks = FakeScheduler(installed_state="Running")
+    assert installer.install(lambda _: None, tasks, is_admin=lambda: True, home=paired) == 0
+    assert [c[0] for c in tasks.calls] == ["/Query", "/End", "/Create", "/Run"]
+
+
+def test_the_exe_copy_waits_for_the_old_agent_to_exit(tmp_path, monkeypatch):
+    source, target = tmp_path / "new.exe", tmp_path / "KinLAN-Agent.exe"
+    source.write_bytes(b"MZ new")
+    busy = [2]  # Windows refuses twice while the stopped agent exits
+
+    def copy2(src, dst):
+        if busy[0]:
+            busy[0] -= 1
+            raise PermissionError("in use")
+        Path(dst).write_bytes(Path(src).read_bytes())
+
+    monkeypatch.setattr(installer.shutil, "copy2", copy2)
+    installer._copy(source, target, wait_s=0)
+    assert target.read_bytes() == b"MZ new"
 
 
 def test_the_task_keeps_running_on_a_laptop(paired):

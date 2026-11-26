@@ -45,6 +45,9 @@ log = logging.getLogger("kinlan.runner")
 PRUNE_EVERY_S = 3600
 RECHECK_TARGETS_EVERY_S = 3600  # some networks block a resolver for a while (plan 3.2)
 CHECK_NETWORK_EVERY_S = 60
+# Failures while the router can't be identified are held this long: a laptop changing
+# networks reconnects within it, while a dead router at home outlasts it.
+HOLD_DOUBTFUL_S = 120
 
 
 @dataclass
@@ -179,6 +182,8 @@ class Runtime:
     last_devices: list[portcheck.Target] = field(default_factory=list)
     where: Where = Where.UNKNOWN  # until the first check_network()
     network: homenet.Network | None = None
+    held: list[tuple[str, dict, datetime]] = field(default_factory=list)
+    held_since: datetime | None = None
     _scan_lock: threading.Lock = field(default_factory=threading.Lock)
 
     def start(self) -> None:
@@ -257,6 +262,47 @@ class Runtime:
         if self.open_outage_id is not None:
             self.buffer.drop_outage(self.open_outage_id)
             self.open_outage_id = None
+        if self.held:
+            log.info("dropped %d measurements taken while leaving the network", len(self.held))
+        self.held, self.held_since = [], None
+
+    # --- measurements that might not be the site's -------------------------------------
+
+    def _router_seen(self) -> bool:
+        """True if the site's router answered the last network check."""
+        net = self.network
+        return bool(net and net.gateway_mac) and homenet.where(self.config, net) is Where.HOME
+
+    def _queue(self, kind: str, payload: dict, ts: datetime) -> None:
+        if self.held_since is not None:
+            self.held.append((kind, payload, ts))
+        else:
+            self.buffer.add(kind, payload, now=ts)
+
+    def _release(self) -> None:
+        for kind, payload, ts in self.held:
+            self.buffer.add(kind, payload, now=ts)
+        self.held, self.held_since = [], None
+
+    def _sort_out(self, tick: monitor.Tick) -> bool:
+        """Before queueing a tick: a failing ping while the router can't be identified may be
+        this PC leaving the network rather than the network failing, so hold its measurements
+        until that's clear. Returns False if the PC has left (drop the tick)."""
+        if tick.gateway_ok is not False and tick.internet_ok:
+            self._release()
+            return True
+        self.check_network()
+        if not self.active:
+            return False
+        if self._router_seen():
+            self._release()  # the router answers: a real problem, e.g. the provider
+        elif self.held_since is None:
+            self.held_since = tick.ts
+            log.info("router not identified; holding measurements until it's clear why")
+        elif (tick.ts - self.held_since).total_seconds() > HOLD_DOUBTFUL_S:
+            log.info("still no router after %d s: sending what was held", HOLD_DOUBTFUL_S)
+            self._release()
+        return True
 
     # --- measuring ----------------------------------------------------------------------
 
@@ -264,7 +310,10 @@ class Runtime:
         if not self.active:
             return
         tick, event = self.monitor.tick()
-        self.buffer.add_many("sample", [s.to_dict() for s in tick.samples], now=tick.ts)
+        if not self._sort_out(tick):
+            return
+        for sample in tick.samples:
+            self._queue("sample", sample.to_dict(), tick.ts)
         if event and event.kind == "started":
             self.open_outage_id = self.buffer.open_outage(
                 event.outage.started_at, event.outage.cause
@@ -278,8 +327,9 @@ class Runtime:
                 result = self.deps.run_diagnose(internet_targets=tuple(self.targets[:2]))
                 log.warning("diagnose: %s", result.summary)
                 # Kept for the app's diagnose history; it uploads once the internet is back.
-                finished = datetime.now(UTC).isoformat().replace("+00:00", "Z")
-                self.buffer.add("diagnose", {"finished_at": finished, "result": result.to_dict()})
+                now = datetime.now(UTC)
+                finished = now.isoformat().replace("+00:00", "Z")
+                self._queue("diagnose", {"finished_at": finished, "result": result.to_dict()}, now)
             except Exception:
                 log.exception("automatic diagnose failed")
         elif event and event.kind == "ended" and self.open_outage_id is not None:
