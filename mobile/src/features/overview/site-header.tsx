@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import type { Site, SiteStatus } from '@/api/circles';
-import { Sheet, StatusChip, Text, type ChipTone } from '@/components/ui';
+import { decorative, Sheet, StatusChip, Text, type ChipTone } from '@/components/ui';
 import { AccountButton } from '@/features/account/account-sheet';
 import { colors, radius, size, space, touch, type } from '@/theme';
 
@@ -36,7 +36,7 @@ export function SiteHeader({
   const [open, setOpen] = useState(false);
   const many = sites.length > 1;
   const chevron = (size: number, color: string) => (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Svg width={size} height={size} viewBox="0 0 24 24" {...decorative}>
       <Path d="M7 10l5 5 5-5z" fill={color} />
     </Svg>
   );

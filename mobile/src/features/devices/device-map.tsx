@@ -4,7 +4,7 @@ import Svg, { Circle, G, Line, Path, Text as SvgText } from 'react-native-svg';
 
 import type { SiteSummary } from '@/api/circles';
 import type { Device, DeviceType } from '@/api/overview';
-import { Card, Text } from '@/components/ui';
+import { Card, described, Text } from '@/components/ui';
 import { ms } from '@/features/overview/model';
 import { colors, FONT_FAMILY } from '@/theme';
 
@@ -144,7 +144,7 @@ export function DeviceMap({
     <Card style={styles.card}>
       <View onLayout={onLayout}>
         {width ? (
-          <Svg width={width} height={H} accessible accessibilityLabel={summaryLabel}>
+          <Svg width={width} height={H} {...described(summaryLabel)}>
             {/* Links first, so nodes sit on top. */}
             <Link x1={cx} y1={cy} x2={cx} y2={internetY} broken={providerDown} label={internetLabel} />
             <Link x1={cx} y1={cy} x2={pc.x} y2={pc.y} broken={routerDown} label={pcLabel} />

@@ -20,6 +20,7 @@ import { haptics } from '@/haptics';
 import { colors, motion, radius, scrim, space } from '@/theme';
 
 import { Text } from './text';
+import { decorative } from './svg-a11y';
 
 /**
  * A bottom sheet over a fading scrim (direction.md motion: 350 ms decelerate). Closes with the
@@ -74,7 +75,7 @@ export function Sheet({
                 <View style={styles.head}>
                   {icon ? (
                     <View style={styles.iconTile}>
-                      <Svg width={26} height={26} viewBox="0 0 24 24">
+                      <Svg width={26} height={26} viewBox="0 0 24 24" {...decorative}>
                         <Path d={icon} fill={colors.text} />
                       </Svg>
                     </View>
@@ -86,7 +87,7 @@ export function Sheet({
                     {meta ? <View style={styles.meta}>{meta}</View> : null}
                   </View>
                   <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8} style={({ pressed }) => [styles.close, pressed && styles.pressed]}>
-                    <Svg width={20} height={20} viewBox="0 0 24 24">
+                    <Svg width={20} height={20} viewBox="0 0 24 24" {...decorative}>
                       <Path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill={colors.text} />
                     </Svg>
                   </Pressable>

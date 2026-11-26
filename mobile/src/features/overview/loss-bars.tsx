@@ -3,7 +3,7 @@ import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Line, Rect } from 'react-native-svg';
 
 import type { Latency } from '@/api/overview';
-import { Card, Loader, Text } from '@/components/ui';
+import { Card, described, Loader, Text } from '@/components/ui';
 import { colors, radius, space } from '@/theme';
 
 const H = 72; // bar height at the top of the scale
@@ -39,7 +39,7 @@ export function LossBars({
     );
   else
     body = (
-      <Svg width={width} height={H + 2} accessible accessibilityLabel={model.label}>
+      <Svg width={width} height={H + 2} {...described(model.label)}>
         {model.bars.map((b) => (
           <Rect key={b.key} x={b.x} y={H - b.h} width={b.w} height={Math.max(b.h, 1)} rx={Math.min(2, b.w / 2)}
             fill={b.over ? colors.orange : colors.text2} fillOpacity={b.over ? 1 : b.h ? 0.55 : 0.18} />

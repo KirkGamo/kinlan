@@ -10,7 +10,7 @@ import Animated, {
 import Svg, { Path } from 'react-native-svg';
 
 import type { Deduction } from '@/api/circles';
-import { Card, Text } from '@/components/ui';
+import { Card, decorative, Text } from '@/components/ui';
 import { colors, radius, space, touch } from '@/theme';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -50,7 +50,7 @@ export function HealthCard({
   return (
     <Card>
       <View style={styles.top}>
-        <Svg width={112} height={70} viewBox="0 0 112 70" accessible={false}>
+        <Svg width={112} height={70} viewBox="0 0 112 70" {...decorative}>
           <Path d={ARC} fill="none" stroke={colors.unlit} strokeWidth={10} strokeLinecap="round" />
           <AnimatedPath
             d={ARC}

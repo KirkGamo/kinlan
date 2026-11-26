@@ -2,6 +2,7 @@ import Svg, { Path } from 'react-native-svg';
 
 import type { DeviceType } from '@/api/overview';
 import { colors } from '@/theme';
+import { decorative } from '@/components/ui';
 
 /** Material Symbols outlines (24-unit grid), one per device type, plus the internet. */
 export const ICON_PATHS: Record<DeviceType | 'internet', string> = {
@@ -33,7 +34,7 @@ export const TYPE_LABEL: Record<DeviceType, string> = {
 
 export function DeviceIcon({ type, size = 22, color = colors.text }: { type: DeviceType | 'internet'; size?: number; color?: string }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" accessible={false}>
+    <Svg width={size} height={size} viewBox="0 0 24 24" {...decorative}>
       <Path d={ICON_PATHS[type]} fill={color} />
     </Svg>
   );

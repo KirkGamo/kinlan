@@ -6,12 +6,8 @@ import { StyleSheet, View } from 'react-native';
 import { usePairingCode, useSite, useSiteSummary } from '@/api/circles';
 import { Button, Card, FormScreen, Loader, SectionLabel, StatusChip, Text } from '@/components/ui';
 import { haptics } from '@/haptics';
+import { AGENT_PAGE, AGENT_URL } from '@/links';
 import { colors, radius, space } from '@/theme';
-
-/** The agent's newest release (agent-release.yml marks agent releases "latest"). */
-const AGENT_URL = 'https://github.com/KirkGamo/kinlan/releases/latest/download/KinLAN-Agent.exe';
-/** Short enough to type on the PC. */
-const AGENT_PAGE = 'github.com/KirkGamo/kinlan/releases';
 
 /**
  * Pair the agent (briefs.md section 4): a 6-digit code with a 10-minute countdown and a copy

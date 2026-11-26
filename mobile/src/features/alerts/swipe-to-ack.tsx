@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSprin
 import Svg, { Path } from 'react-native-svg';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import { Text } from '@/components/ui';
+import { decorative, Text } from '@/components/ui';
 import { haptics } from '@/haptics';
 import { colors, motion, radius, space } from '@/theme';
 
@@ -62,7 +62,7 @@ export function SwipeToAck({ onAck, failed, children }: { onAck: () => void; fai
         width.set(e.nativeEvent.layout.width);
       }}>
       <Animated.View style={[styles.under, under]} importantForAccessibility="no-hide-descendants">
-        <Svg width={20} height={20} viewBox="0 0 24 24">
+        <Svg width={20} height={20} viewBox="0 0 24 24" {...decorative}>
           <Path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill={colors.text} />
         </Svg>
         <Text role="labelSmall">Acknowledge</Text>
