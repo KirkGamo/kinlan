@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import csv
 import io
+import os
 import shutil
 import subprocess
 import sys
@@ -79,6 +80,33 @@ def _copy(source: Path, target: Path, tries: int = 20, wait_s: float = 0.5) -> N
             time.sleep(wait_s)
 
 
+def stop_agents(exe: Path, procs=None, me: int | None = None) -> int:
+    """Stop every process running from ``exe`` except this one and its launcher. Ending the
+    task stops only PyInstaller's launcher; the agent it started from the same exe keeps
+    running and keeps the file open (seen Nov 26 updating 1.0.2). Returns how many stopped."""
+    import psutil
+
+    me = os.getpid() if me is None else me
+    try:
+        mine = {me} | {p.pid for p in psutil.Process(me).parents()}
+    except psutil.Error:
+        mine = {me}
+    target = os.path.normcase(str(exe.resolve()))
+    stopped = []
+    for proc in psutil.process_iter(["name"]) if procs is None else procs:
+        try:
+            if proc.pid in mine or (proc.info.get("name") or "").lower() != EXE_NAME.lower():
+                continue
+            if os.path.normcase(str(Path(proc.exe()).resolve())) == target:
+                proc.kill()
+                stopped.append(proc)
+        except (psutil.Error, OSError):
+            continue
+    if stopped and procs is None:
+        psutil.wait_procs(stopped, timeout=5)
+    return len(stopped)
+
+
 def task_xml(program: Path, arguments: str) -> str:
     """The startup task: at boot, as SYSTEM with the highest privileges, on battery too, with
     no time limit, restarted every minute if it stops (it exits only on errors), one copy."""
@@ -132,6 +160,8 @@ def install(
         return 1
     if task_state(run) == "Running":  # an update: stop the old agent so its exe can be replaced
         run(["/End", "/TN", TASK])
+    if frozen():
+        stop_agents((home or home_dir()) / EXE_NAME)
     program, arguments = launcher(home)
     with tempfile.TemporaryDirectory() as tmp:
         definition = Path(tmp) / "kinlan-agent-task.xml"
@@ -161,6 +191,8 @@ def uninstall(
         say("The KinLAN Agent isn't installed as a startup task.")
         return 0
     run(["/End", "/TN", TASK])
+    if frozen():
+        stop_agents(home_dir() / EXE_NAME)
     deleted = run(["/Delete", "/TN", TASK, "/F"])
     if deleted.returncode != 0:
         say(f"Windows refused to remove the task: {(deleted.stderr or deleted.stdout).strip()}")

@@ -76,6 +76,32 @@ def test_installing_over_a_running_agent_stops_it_first(paired):
     assert [c[0] for c in tasks.calls] == ["/Query", "/End", "/Create", "/Run"]
 
 
+class FakeProcess:
+    def __init__(self, pid, name, exe):
+        self.pid, self.info, self._exe, self.killed = pid, {"name": name}, exe, False
+
+    def exe(self):
+        return self._exe
+
+    def kill(self):
+        self.killed = True
+
+
+def test_the_agent_left_behind_by_ending_the_task_is_stopped(tmp_path):
+    """Ending the task stops PyInstaller's launcher, not the agent it started."""
+    installed = tmp_path / "KinLAN-Agent.exe"
+    installed.write_bytes(b"MZ")
+    download = tmp_path / "Downloads" / "KinLAN-Agent.exe"
+    left_behind = FakeProcess(18520, "KinLAN-Agent.exe", str(installed))
+    this_installer = FakeProcess(42, "KinLAN-Agent.exe", str(download))
+    unrelated = FakeProcess(7, "python.exe", str(installed))
+    stopped = installer.stop_agents(
+        installed, procs=[left_behind, this_installer, unrelated], me=42
+    )
+    assert stopped == 1 and left_behind.killed
+    assert not this_installer.killed and not unrelated.killed
+
+
 def test_the_exe_copy_waits_for_the_old_agent_to_exit(tmp_path, monkeypatch):
     source, target = tmp_path / "new.exe", tmp_path / "KinLAN-Agent.exe"
     source.write_bytes(b"MZ new")
