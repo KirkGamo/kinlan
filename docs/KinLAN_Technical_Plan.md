@@ -475,9 +475,9 @@ Use Neon's **pooled** connection string (the host containing `-pooler`) with SQL
 | Eavesdropping | HTTPS everywhere (Render TLS, Neon TLS `sslmode=require`) |
 | Password theft from the database | Argon2id hashes; refresh tokens and agent tokens stored only as hashes |
 | Stolen tokens | 15-min access JWT; refresh tokens replaced on every use, with reuse detection; agents can be revoked |
-| Password guessing / abuse | slowapi limits: login 5/min per IP+email, ingest 30/min per agent, others 120/min per user |
+| Password guessing / abuse | slowapi limits (`server/app/ratelimit.py`): sign-up 5/min, sign-in 10/min and token refresh 30/min per IP; pairing 10/min per IP; ingest 30/min per agent (keyed on its token, so sites behind one NAT don't share a budget); every other route 120/min per signed-in user (phone and web share it) or per IP. A limit answers 429 with `Retry-After: 60`. *Changed from "login 5/min per IP+email": the key can't read the body, and 10/min per IP still makes guessing slow alongside Argon2id.* |
 | One customer reading another's data | Every query filtered by membership; isolation test suite |
-| Bad input | Pydantic schemas with max lengths; payload size limit of 1 MB on ingest |
+| Bad input | Pydantic schemas with max lengths; ingest bodies capped at 1 MB after decompression (413). Measured with the agent's own payload code: a normal upload is 9 KB, a 500-row backlog batch about 190 KB, one scan of a full /22 184 KB; a larger batch gets 413 and the agent resends it in halves. |
 | Leaked secrets | `.env` git-ignored; secrets only in Render environment settings and EAS secrets; GitHub secret scanning on |
 | Misuse of the scanner | Agent scans only its own subnet; consent prompt at pairing; port list limited to 7 well-known ports |
 | Cross-site web requests | CORS limited to the web app's own domain |

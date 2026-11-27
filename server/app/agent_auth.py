@@ -17,7 +17,10 @@ from app.models import Agent
 from app.security import sha256_hex
 
 MIN_AGENT_VERSION = (0, 1, 0)
-MAX_BODY_BYTES = 10 * 1024 * 1024  # after decompression
+# After decompression. The largest real batch is about 190 KB (500 backlog rows with scans
+# among the samples) and one scan of a full /22 is 184 KB, so 1 MB leaves room; anything bigger
+# gets 413 and the agent sends it again in halves (plan, Section 7; issue #93).
+MAX_BODY_BYTES = 1024 * 1024
 
 _bearer = HTTPBearer(auto_error=False, description="The agent token from POST /agent/pair")
 
@@ -69,7 +72,7 @@ class GzipRequest(Request):
                 except OSError as exc:
                     raise ApiError(400, "bad_gzip", "The request body isn't valid gzip.") from exc
             if len(raw) > MAX_BODY_BYTES:
-                raise ApiError(413, "body_too_large", "Send smaller batches (at most 10 MB).")
+                raise ApiError(413, "body_too_large", "Send smaller batches (at most 1 MB).")
             self._body = raw
         return self._body
 
@@ -79,6 +82,10 @@ class GzipRoute(APIRoute):
         handler = super().get_route_handler()
 
         async def gzip_handler(request: Request) -> Response:
-            return await handler(GzipRequest(request.scope, request.receive))
+            request = GzipRequest(request.scope, request.receive)
+            # Read (and size-check) the body here: an error raised while FastAPI parses it
+            # would reach the agent as a generic 400, and only a 413 makes it send halves.
+            await request.body()
+            return await handler(request)
 
         return gzip_handler
