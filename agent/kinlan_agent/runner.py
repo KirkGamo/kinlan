@@ -11,6 +11,11 @@ Background threads share one SQLite buffer:
   (homenet.py). Elsewhere the agent stays quiet: no samples, scans or commands.
 
 Every network operation comes through :class:`CloudDeps`, so tests run it against fakes.
+
+A PC paired with several sites (a laptop at home and in a lab, #94) runs one set of these
+threads per site, each with its own token and buffer (:func:`run_sites`). Each checks whether
+the PC is on its site's network, so at most one is measuring; the others keep uploading their
+backlog and answer the app's commands with "not on this site's network right now".
 """
 
 from __future__ import annotations
@@ -19,14 +24,13 @@ import logging
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 
 import httpx
 
 from kinlan_agent import (
     __version__,
-    config,
     diagnose,
     discovery,
     homenet,
@@ -35,6 +39,7 @@ from kinlan_agent import (
     pingtest,
     portcheck,
 )
+from kinlan_agent import config as config_module
 from kinlan_agent.buffer import Buffer
 from kinlan_agent.config import AgentConfig
 from kinlan_agent.homenet import Where
@@ -60,7 +65,8 @@ class CloudDeps:
     port_check: Callable[..., portcheck.PortCheck] = portcheck.check
     send: Callable[[str, int], EchoReply] = echo
     gateway_mac: Callable[[str], str | None] = homenet.resolve_mac
-    load_config: Callable[[], AgentConfig] = config.load  # setup may record the network later
+    # Setup may record the network later; run_sites rereads each site's own entry.
+    load_config: Callable[[], AgentConfig] = config_module.load
     route: Callable[[], tuple[str | None, str | None]] = netinfo.route_now
 
 
@@ -316,14 +322,13 @@ class Runtime:
     # --- measuring ----------------------------------------------------------------------
 
     def tick(self) -> None:
-        if not self.active:
-            return
         if self._route_changed():
             # A new route can mean another network whose 192.168.1.1 also answers (seen Nov 26:
-            # 192 ms through a phone hotspot), so find out before measuring anything.
+            # 192 ms through a phone hotspot), so find out before measuring anything. A waiting
+            # site checks too, so arriving on its network starts it within one tick.
             self.check_network()
-            if not self.active:
-                return
+        if not self.active:
+            return
         tick, event = self.monitor.tick()
         if not self._sort_out(tick):
             return
@@ -437,10 +442,63 @@ def run(
     deps: CloudDeps | None = None,
     stop: threading.Event | None = None,
 ) -> None:
-    """Run until Ctrl+C (or ``stop`` is set)."""
-    buffer = buffer or Buffer()
+    """Run one site until Ctrl+C (or ``stop`` is set)."""
+    run_sites([(config, token, buffer or Buffer())], deps, stop)
+
+
+def run_sites(
+    sites: list[tuple[AgentConfig, str, Buffer]],
+    deps: CloudDeps | None = None,
+    stop: threading.Event | None = None,
+) -> None:
+    """Run every paired site until Ctrl+C (or ``stop`` is set). A site whose token the server
+    refuses stops on its own; the agent stops when none is left."""
     stop = stop or threading.Event()
-    runtime = Runtime(config, buffer, deps or CloudDeps())
+    running = []
+    for config, token, buffer in sites:
+        site_stop = threading.Event()
+        site_deps = deps or CloudDeps()
+        if site_deps.load_config is config_module.load:  # reread this site's own pairing
+            site_deps = replace(site_deps, load_config=_site_loader(config))
+        threads, uploader = _start_site(config, token, buffer, site_deps, site_stop)
+        running.append((config, site_stop, threads, uploader))
+    try:
+        while not stop.is_set() and any(not s.is_set() for _, s, _, _ in running):
+            stop.wait(1)
+            for config, site_stop, _, uploader in running:
+                if uploader.stopped_reason and not site_stop.is_set():
+                    log.error("%s stopped: %s", _label(config), uploader.stopped_reason)
+                    site_stop.set()
+    except KeyboardInterrupt:
+        pass
+    stop.set()
+    for _, site_stop, threads, _ in running:
+        site_stop.set()
+        for t in threads:
+            t.join(timeout=5)
+    log.info("stopped at %s", datetime.now(UTC).isoformat())
+
+
+def _label(config: AgentConfig) -> str:
+    return config.site_name or config.site_id or "site"
+
+
+def _site_loader(site: AgentConfig) -> Callable[[], AgentConfig]:
+    def load() -> AgentConfig:
+        return config_module.load_site(site.site_id) or site
+
+    return load
+
+
+def _start_site(
+    config: AgentConfig,
+    token: str,
+    buffer: Buffer,
+    deps: CloudDeps,
+    stop: threading.Event,
+) -> tuple[list[threading.Thread], Uploader]:
+    """Start one site's threads; returns them and its uploader."""
+    runtime = Runtime(config, buffer, deps)
     runtime.start()
     uploader = Uploader(buffer, config.api_url, token, scan_interval_s=config.scan_interval_s)
     poller = CommandPoller(runtime, config.api_url, token)
@@ -490,16 +548,7 @@ def run(
         ),
     ]
     for t in threads:
+        t.name = f"{t.name}-{_label(config)}"
         t.start()
-    log.info("KinLAN Agent %s running for site %s", __version__, config.site_name or config.site_id)
-    try:
-        while not stop.is_set():
-            stop.wait(1)
-            if uploader.stopped_reason:
-                log.error("stopping: %s", uploader.stopped_reason)
-                stop.set()
-    except KeyboardInterrupt:
-        stop.set()
-    for t in threads:
-        t.join(timeout=5)
-    log.info("stopped at %s", datetime.now(UTC).isoformat())
+    log.info("KinLAN Agent %s running for site %s", __version__, _label(config))
+    return threads, uploader
