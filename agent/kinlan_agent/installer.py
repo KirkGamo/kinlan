@@ -201,6 +201,20 @@ def uninstall(
     return 0
 
 
+def restart(say: Callable[[str], None] = print, run: Runner = _schtasks) -> None:
+    """Restart the startup task, if it's installed, so the agent reads its sites again."""
+    if task_state(run) is None:
+        return
+    run(["/End", "/TN", TASK])
+    if frozen():
+        stop_agents(home_dir() / EXE_NAME)
+    started = run(["/Run", "/TN", TASK])
+    if started.returncode == 0:
+        say("The agent restarted with the new site.")
+    else:
+        say("Restart the PC (or run this as administrator) for the agent to pick up the new site.")
+
+
 def task_state(run: Runner = _schtasks) -> str | None:
     """The task's status ("Running", "Ready", "Disabled"), or None if it isn't installed."""
     result = run(["/Query", "/TN", TASK, "/FO", "CSV", "/NH"])

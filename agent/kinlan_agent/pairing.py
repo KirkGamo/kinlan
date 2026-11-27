@@ -2,6 +2,10 @@
 
 Pairing asks for consent **before** contacting the server, so nothing is linked to a
 Circle unless the person agreed to monitor only networks they may monitor.
+
+Pairing records the network the PC is on as the site's network. On a network one of its sites
+already uses, pairing replaces that site's pairing; on a new network it adds a site, so a
+laptop can monitor home and a lab, each while it's there (#94).
 """
 
 from __future__ import annotations
@@ -46,6 +50,11 @@ def pair(
         from kinlan_agent.netinfo import get_netinfo
     # Pairing happens on the network being added, so this is the site's network (homenet.py).
     network = homenet.current(get_netinfo, resolve)
+    settings = config.load()
+    if settings.paired and settings.home_gateway_mac and not network.gateway_mac:
+        say("Can't identify this network's router, so it can't be told apart from the sites")
+        say("this PC already monitors. Connect to the network you're adding and try again.")
+        return 1
     body = {
         "code": code,
         "hostname": socket.gethostname(),
@@ -67,19 +76,57 @@ def pair(
         say(f"Pairing failed: {message}")
         return 1
     data = r.json()
-    tokenstore.save_token(data["agent_token"])
-    settings = config.load()
-    settings.api_url, settings.agent_id = api_url, data["agent_id"]
-    settings.site_id, settings.site_name = data["site_id"], data["site_name"]
-    settings.home_gateway_mac, settings.home_network = network.gateway_mac, network.cidr
-    config.save(settings)
-    say(f'Paired with "{data["site_name"]}". Start monitoring with: kinlan-agent run')
+    settings = _record(config.load(), data, network, api_url)
+    names = [f"{s.site_name} ({s.home_network or 'network not recorded'})"
+             for s in config.site_configs(settings)]
+    say(f'Paired with "{data["site_name"]}". This PC monitors: ' + "; ".join(names) + ".")
+    say("Each site is monitored only while this PC is on its network.")
     return 0
 
 
+def _record(settings: config.AgentConfig, data: dict, network, api_url: str):
+    """Save a new pairing: in place of the site on this network (or of the same site), or as a
+    further site when this is a new network."""
+    entry = config.SiteEntry(
+        agent_id=data["agent_id"],
+        site_id=data["site_id"],
+        site_name=data["site_name"],
+        home_gateway_mac=network.gateway_mac,
+        home_network=network.cidr,
+    )
+
+    def same(site_id: str | None, mac: str | None) -> bool:
+        here = homenet.where(config.AgentConfig(home_gateway_mac=mac), network)
+        return site_id == entry.site_id or here is homenet.Where.HOME
+
+    settings.api_url = api_url
+    first = not settings.paired or not settings.home_gateway_mac
+    if first or same(settings.site_id, settings.home_gateway_mac):
+        for key in config.SITE_FIELDS:
+            setattr(settings, key, getattr(entry, key))
+        tokenstore.save_token(data["agent_token"])  # agent.token: the first site's
+    else:
+        index = next(
+            (i for i, s in enumerate(settings.sites) if same(s.site_id, s.home_gateway_mac)),
+            None,
+        )
+        if index is None:
+            settings.sites.append(entry)
+        else:
+            old = settings.sites[index]
+            if old.site_id != entry.site_id:
+                old_site = config.AgentConfig(slot=old.site_id)
+                tokenstore.delete_token(config.token_file(old_site))
+            settings.sites[index] = entry
+        extra = config.AgentConfig(slot=entry.site_id)
+        tokenstore.save_token(data["agent_token"], config.token_file(extra))
+    config.save(settings)
+    return settings
+
+
 _HERE = {
-    homenet.Where.HOME: "on the site's network",
-    homenet.Where.AWAY: "on another network, so the agent waits",
+    homenet.Where.HOME: "monitoring it: this PC is on its network",
+    homenet.Where.AWAY: "waiting: this PC is on another network",
     homenet.Where.UNKNOWN: "can't identify this network's router",
     homenet.Where.UNSET: "the agent waits until its network is recorded (run KinLAN-Agent.exe)",
 }
@@ -94,31 +141,37 @@ def status(say: Callable[[str], None] = print) -> int:
     if not settings.paired:
         say("Not paired. Run: kinlan-agent pair")
         return 1
-    has_token = tokenstore.load_token() is not None
     from kinlan_agent import installer
 
     task = installer.task_state()
-    with Buffer() as buffer:
-        waiting, last = buffer.count(), buffer.get_meta("last_upload_at")
-    say(f"Site:         {settings.site_name} ({settings.site_id})")
-    say(f"Server:       {settings.api_url}")
-    if has_token:
-        token_state = "saved"
-    elif tokenstore.token_path().exists() and not tokenstore.is_admin():
-        token_state = "saved, readable from an administrator terminal"
-    else:
-        token_state = "MISSING: pair again"
-    say(f"Agent:        {settings.agent_id} (token {token_state})")
     if task:
         startup = task
     elif tokenstore.is_admin():
         startup = "not installed (kinlan-agent install)"
     else:  # Windows hides SYSTEM tasks from terminals that aren't administrator
         startup = "can't be seen from this terminal; run status as administrator"
+    say(f"Server:       {settings.api_url}")
     say(f"At startup:   {startup}")
-    say(f"Its network:  {homenet.home_description(settings)}")
-    here = homenet.where(settings, homenet.current())
-    say(f"This PC:      {_HERE[here]}")
-    say(f"Last upload:  {last or 'never'}")
-    say(f"Waiting:      {waiting} items in the buffer")
-    return 0 if has_token or tokenstore.token_path().exists() else 1
+    network = homenet.current()
+    say(f"This PC:      on {network.describe()}")
+    healthy = True
+    for site in config.site_configs(settings):
+        path = config.token_file(site)
+        has_token = tokenstore.load_token(path) is not None
+        if has_token:
+            token_state = "saved"
+        elif path.exists() and not tokenstore.is_admin():
+            token_state = "saved, readable from an administrator terminal"
+        else:
+            token_state = "MISSING: pair again"
+        with Buffer(config.buffer_file(site)) as buffer:
+            waiting, last = buffer.count(), buffer.get_meta("last_upload_at")
+        say("")
+        say(f"Site:         {site.site_name} ({site.site_id})")
+        say(f"Agent:        {site.agent_id} (token {token_state})")
+        say(f"Its network:  {homenet.home_description(site)}")
+        say(f"Now:          {_HERE[homenet.where(site, network)]}")
+        say(f"Last upload:  {last or 'never'}")
+        say(f"Waiting:      {waiting} items in the buffer")
+        healthy = healthy and (has_token or path.exists())
+    return 0 if healthy else 1

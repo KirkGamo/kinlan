@@ -124,7 +124,7 @@ def test_pair_asks_consent_then_saves_token_and_settings():
         "Home",
         "http://127.0.0.1:8000",
     )
-    assert "Only monitor networks you own" in said[0] and 'Paired with "Home"' in said[-1]
+    assert "Only monitor networks you own" in said[0] and 'Paired with "Home"' in said[-2]
     # pairing happens on the site's network, so it's recorded as the one to monitor
     assert (settings.home_gateway_mac, settings.home_network) == (
         "64:f8:8a:00:00:01",

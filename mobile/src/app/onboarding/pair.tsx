@@ -146,6 +146,10 @@ function Waiting({ siteId, siteName }: { siteId: string; siteName: string }) {
           monitor.”
         </Step>
         <Step n={4}>That’s all: the agent starts with the PC from now on, with nobody signed in.</Step>
+        <Text role="bodySmall" color="text2">
+          Already running the agent on a laptop for another site? Run KinLAN-Agent.exe again while
+          the laptop is on this network, and choose to pair it here too.
+        </Text>
         <Button
           label={linkCopied ? 'Link copied' : 'Copy the download link'}
           variant="ghost"

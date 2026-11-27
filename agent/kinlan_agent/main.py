@@ -75,9 +75,12 @@ def main(argv: list[str] | None = None) -> int:
         run_local(ticks=args.ticks, interval_s=args.interval)
         return 0
     if args.command == "pair":
-        from kinlan_agent import config, pairing
+        from kinlan_agent import config, installer, pairing
 
-        return pairing.pair(args.api_url or config.load().api_url, args.code)
+        code = pairing.pair(args.api_url or config.load().api_url, args.code)
+        if code == 0:
+            installer.restart()  # a running agent reads its sites only when it starts
+        return code
     if args.command == "status":
         from kinlan_agent import pairing
 
@@ -94,8 +97,8 @@ def _setup(ask=input) -> int:
     code = 0
     if not config.load().paired:
         code = pairing.pair(config.load().api_url, None)
-    if code == 0:
-        homenet.confirm(ask)  # pairing records it; a PC paired before 1.0.1 is asked once
+    elif homenet.confirm(ask):  # pairing records it; a PC paired before 1.0.1 is asked once
+        code = _offer_another_site(ask)
     if code == 0 and installer.task_state() is None:
         code = installer.install()
     elif code == 0:
@@ -104,6 +107,30 @@ def _setup(ask=input) -> int:
     if installer.frozen():
         print()
         ask("Press Enter to close this window.")
+    return code
+
+
+def _offer_another_site(ask=input) -> int:
+    """On a network none of this PC's sites use (a laptop in a lab), offer to pair it too."""
+    from kinlan_agent import config, homenet, installer, pairing
+
+    settings = config.load()
+    network = homenet.current()
+    sites = config.site_configs(settings)
+    if not network.gateway_mac or any(
+        homenet.where(site, network) is homenet.Where.HOME for site in sites
+    ):
+        return 0
+    names = ", ".join(site.site_name or "a site" for site in sites)
+    print(f"This PC is on {network.describe()}, which isn't the network of {names}.")
+    print("To monitor this network too, add a site for it in the app and pair it here.")
+    if ask('Pair it now? Type "yes" or "no": ').strip().lower() != "yes":
+        print()
+        return 0
+    code = pairing.pair(settings.api_url, None)
+    if code == 0:
+        installer.restart()
+    print()
     return code
 
 
@@ -116,8 +143,15 @@ def _run_cloud() -> int:
         print(problem, "Fix the file (or delete it and pair again).", sep="\n", file=sys.stderr)
         return 1
     settings = config.load()
-    token = tokenstore.load_token()
-    if not settings.paired or token is None:
+    sites = []
+    for site in config.site_configs(settings):
+        token = tokenstore.load_token(config.token_file(site))
+        if token is None:
+            print(f"{site.site_name}: its token is missing or unreadable; pair again on its "
+                  "network.", file=sys.stderr)
+        else:
+            sites.append((site, token))
+    if not sites:
         print("This PC isn't paired yet. Run: kinlan-agent pair", file=sys.stderr)
         return 1
     from kinlan_agent import installer
@@ -129,9 +163,10 @@ def _run_cloud() -> int:
               "window). Check it with: kinlan-agent status", file=sys.stderr)
         return 1
     setup_logging(settings.log_level)
-    from kinlan_agent.runner import run  # imported here: it loads Scapy
+    from kinlan_agent.buffer import Buffer
+    from kinlan_agent.runner import run_sites  # imported here: it loads Scapy
 
-    run(settings, token)
+    run_sites([(site, token, Buffer(config.buffer_file(site))) for site, token in sites])
     del guard
     return 0
 
