@@ -32,6 +32,8 @@ The agent runs on one PC that stays on inside the network you want to watch. Onl
 
 **A laptop as the agent's PC:** the agent remembers the network it was paired on (by its router's MAC address) and only monitors while the PC is on it. Anywhere else it waits, so another network's devices never reach your site, and the app says the PC isn't on the site's network. An agent paired with version 1.0.0 asks once, the next time you run `KinLAN-Agent.exe`: "Is this Home's network?". Answer it while the PC is on that network.
 
+**One laptop, several sites:** a laptop can monitor more than one network, such as home and a lab you're allowed to monitor. Add the second site in the app, then run `KinLAN-Agent.exe` while the laptop is on that network and answer **yes** to pair it (or run `KinLAN-Agent.exe pair` there). Each site keeps its own pairing and is monitored only while the laptop is on its network; `status` lists them all. Pairing again on a network a site already uses replaces that site's pairing.
+
 **Npcap** (optional, recommended): with [Npcap](https://npcap.com/#download) installed (it also comes with Wireshark), a device scan takes about 7 s; without it the agent falls back to Windows' own ARP lookup, about 14 s per /24. Npcap's licence doesn't allow bundling it.
 
 From an administrator terminal: `KinLAN-Agent.exe status` shows the pairing, the startup task and the last upload; `KinLAN-Agent.exe uninstall` removes the startup task (the pairing and history stay). Everything the agent keeps is in `%ProgramData%\KinLAN` (settings, the encrypted token, the offline buffer and `logs\`).
