@@ -3,13 +3,13 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.config import get_settings
 from app.errors import install_error_handlers
-from app.ratelimit import install_rate_limiting
+from app.ratelimit import default_limit, install_rate_limiting
 from app.routers import (
     agent,
     alerts,
@@ -56,6 +56,7 @@ def create_app() -> FastAPI:
         version=__version__,
         description="Cloud API for KinLAN agents and the KinLAN app.",
         lifespan=lifespan,
+        dependencies=[Depends(default_limit)],  # 120 requests a minute per caller (ratelimit.py)
     )
     app.add_middleware(
         CORSMiddleware,

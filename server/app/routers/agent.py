@@ -45,7 +45,7 @@ from app.models import (
     Site,
     SiteStatus,
 )
-from app.ratelimit import limiter
+from app.ratelimit import INGEST_LIMIT, limiter
 from app.schemas import ErrorOut
 from app.security import keyed_hash, sha256_hex
 
@@ -228,7 +228,8 @@ def port_check(db: DB, site: Site, macs, tried, found, now: datetime):
 
 
 @router.post("/ingest", response_model=IngestOut, responses={400: {"model": ErrorOut}})
-def ingest(body: IngestIn, agent: CurrentAgent, db: DB) -> IngestOut:
+@limiter.limit(INGEST_LIMIT)  # per agent (its token), not per IP
+def ingest(request: Request, body: IngestIn, agent: CurrentAgent, db: DB) -> IngestOut:
     """One batch from the agent's outbox: ping samples, a device scan, closed outages and port
     findings. Also the heartbeat: the site becomes `online` and its last contact is updated."""
     check_version(body.agent_version)
