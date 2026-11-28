@@ -83,7 +83,34 @@ def where(settings: config.AgentConfig, net: Network) -> Where:
         return Where.UNSET
     if not net.gateway_mac:
         return Where.UNKNOWN
-    return Where.HOME if net.gateway_mac == home else Where.AWAY
+    if net.gateway_mac == home:
+        return Where.HOME
+    if randomised(home) and randomised(net.gateway_mac) and _same_subnet(settings, net):
+        return Where.HOME  # a phone hotspot that picked a new random MAC
+    return Where.AWAY
+
+
+def randomised(mac: str | None) -> bool:
+    """True for a locally administered MAC (bit 0x02 of the first byte), which is how a phone
+    marks the random MAC it gives its hotspot. Routers bought from a vendor don't have it.
+
+    Seen Nov 29: the Infinix's hotspot was paired as 06:b5:cb:3d:4b:83 and later answered as
+    62:4e:31:ef:e4:17 on the same 10.48.65.0/24, so the agent stopped recognising the site."""
+    try:
+        return bool(int(mac.split(":")[0], 16) & 0x02) if mac else False
+    except ValueError:
+        return False
+
+
+def _same_subnet(settings: config.AgentConfig, net: Network) -> bool:
+    if not settings.home_network or not net.cidr:
+        return False
+    try:
+        return ipaddress.ip_network(settings.home_network, strict=False) == ipaddress.ip_network(
+            net.cidr, strict=False
+        )
+    except ValueError:
+        return False
 
 
 def still_attached(settings: config.AgentConfig, routed_ip: str | None, ips: list[str]) -> bool:
