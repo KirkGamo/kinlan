@@ -381,3 +381,26 @@ def test_the_long_poll_waits_when_nothing_is_queued(client, agent):
     start = time.monotonic()
     r = client.get(f"{API}/agent/commands?wait=2", headers=agent["h"])
     assert r.json()["commands"] == [] and time.monotonic() - start >= 1.9
+
+
+def test_dns_and_web_samples_feed_the_summary_but_not_the_chart(client, agent, home):
+    """Agent 1.2.0 checks name lookup and HTTPS every few minutes (#96): the Overview's DNS and
+    Web lights read the newest of each; latency, loss and the grade stay internet-only."""
+    body = batch(
+        samples=[
+            sample(1, target="internet", rtt=20),
+            sample(0.5, target="dns", rtt=41, ip="8.8.8.8"),
+            sample(0.5, target="web", ok=False, ip="142.250.4.99"),
+            sample(0, target="dns", rtt=38, ip="8.8.8.8"),
+        ]
+    )
+    assert client.post(f"{API}/agent/ingest", json=body, headers=agent["h"]).status_code == 200
+    s = client.get(f"{API}/sites/{home['id']}/summary", headers=agent["owner_h"]).json()
+    assert s["dns"]["rtt_ms"] == 38 and s["dns"]["ok"] is True
+    assert s["web"] == {"ts": s["web"]["ts"], "rtt_ms": None, "ok": False}
+    assert s["grade"] == "A"  # the failed web check isn't internet loss
+    chart = client.get(
+        f"{API}/sites/{home['id']}/latency?range=1h", headers=agent["owner_h"]
+    ).json()
+    assert set(chart["series"]) == {"internet", "gateway"}
+    assert chart["summary"]["internet"]["loss_pct"] == 0

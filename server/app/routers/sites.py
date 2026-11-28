@@ -225,6 +225,8 @@ def _summary(db: DB, site: Site) -> SiteSummary:
         deductions=[DeductionOut(**d.to_dict()) for d in health.deductions],
         internet=_latest(db, site.id, Target.internet),
         gateway=_latest(db, site.id, Target.gateway),
+        dns=_latest(db, site.id, Target.dns),
+        web=_latest(db, site.id, Target.web),
         devices_total=devices_total,
         devices_online=devices_online,
         needs_review=needs_review,
