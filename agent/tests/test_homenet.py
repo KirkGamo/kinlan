@@ -20,6 +20,15 @@ SCHOOL = replace(
     gateway="10.124.36.1",
 )
 SCHOOL_ROUTER = "00:1a:2b:3c:4d:5e"
+# Radmin VPN's virtual adapter: Windows may route through it when the home router goes silent.
+VPN = replace(
+    INFO,
+    local_ip="26.79.195.89",
+    network=ipaddress.IPv4Network("26.0.0.0/8"),
+    gateway="26.0.0.1",
+    interface_name="Radmin VPN",
+)
+VPN_MAC = "02:50:f2:00:00:01"
 
 
 class Laptop:
@@ -27,6 +36,10 @@ class Laptop:
 
     def __init__(self):
         self.info, self.router_answers = INFO, True
+        self.other_ips: list[str] = []  # addresses on adapters other than the routed one
+
+    def local_ips(self):
+        return [self.info.local_ip, *self.other_ips]
 
     def go(self, info):
         self.info = info
@@ -38,6 +51,8 @@ class Laptop:
         return self.info.local_ip, self.info.gateway
 
     def gateway_mac(self, ip):
+        if ip == "26.0.0.1":
+            return VPN_MAC  # a virtual adapter always "answers"
         if not self.router_answers:
             return None
         return {"192.168.1.1": ROUTER, "10.124.36.1": SCHOOL_ROUTER}.get(ip)
@@ -52,6 +67,7 @@ def buffer():
 def runtime(buffer, laptop, net=None, settings=None):
     d = deps(net or Net())
     d.get_netinfo, d.gateway_mac, d.route = laptop.get_netinfo, laptop.gateway_mac, laptop.route
+    d.local_ips = laptop.local_ips
     settings = settings or at_home()
     d.load_config = lambda: settings
     return Runtime(settings, buffer, d)
@@ -204,3 +220,47 @@ def test_coming_back_to_the_network_wakes_the_uploader(buffer):
     assert rt.check_network() is Where.HOME and woken == [1]
     rt.check_network()
     assert woken == [1]  # only on the way back, not at every check
+
+
+def test_a_vpn_taking_the_route_in_an_outage_is_not_leaving(buffer):
+    """Nov 29 outage retest: the home router went silent, Windows routed through Radmin VPN,
+    and the agent paused Home as if the laptop had left. The Wi-Fi still had its home address."""
+    laptop, net = Laptop(), Net()
+    rt = runtime(buffer, laptop, net)
+    rt.start()
+    net.internet_up, laptop.router_answers = False, False
+    laptop.go(VPN)
+    laptop.other_ips = [INFO.local_ip]  # the Wi-Fi adapter is still on 192.168.1.0/24
+    rt.tick()  # the route changed: checked before measuring
+    assert rt.where is Where.HOME and rt.active
+    for _ in range(2):
+        rt.tick()
+    assert buffer.current_outage() is not None
+
+
+def test_leaving_with_a_vpn_up_is_still_leaving(buffer):
+    laptop = Laptop()
+    rt = runtime(buffer, laptop)
+    rt.start()
+    laptop.go(SCHOOL)
+    laptop.other_ips = ["26.79.195.89"]
+    assert rt.check_network() is Where.AWAY
+
+
+@pytest.mark.parametrize(
+    ("routed", "others", "attached"),
+    [
+        ("26.79.195.89", ["192.168.1.13"], True),  # a VPN took the route; Wi-Fi still home
+        ("192.168.1.40", [], False),  # same subnet elsewhere: the router's MAC decides
+        ("10.124.37.236", ["26.79.195.89"], False),  # away, VPN up
+        (None, ["192.168.1.13"], True),  # no route at all, still on the home subnet
+    ],
+)
+def test_still_attached(routed, others, attached):
+    ips = ([routed] if routed else []) + others
+    assert homenet.still_attached(at_home(), routed, ips) is attached
+
+
+def test_still_attached_needs_a_recorded_subnet():
+    settings = AgentConfig(site_name="Home", home_gateway_mac=ROUTER)
+    assert homenet.still_attached(settings, "26.79.195.89", ["192.168.1.13"]) is False

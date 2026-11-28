@@ -61,6 +61,21 @@ def outbound_ip(probe: tuple[str, int] = _ROUTE_PROBE) -> str:
         return sock.getsockname()[0]
 
 
+def local_ipv4s() -> list[str]:
+    """IPv4 addresses on every adapter that is up, not only the one with the default route."""
+    try:
+        stats, addrs = psutil.net_if_stats(), psutil.net_if_addrs()
+    except Exception:  # noqa: BLE001 - treat "can't tell" as "none"
+        return []
+    return [
+        e.address
+        for name, entries in addrs.items()
+        if name in stats and stats[name].isup
+        for e in entries
+        if e.family == socket.AF_INET
+    ]
+
+
 def is_apipa(ip: str) -> bool:
     """True for link-local 169.254.0.0/16 addresses (no DHCP lease)."""
     return ipaddress.ip_address(ip) in ipaddress.ip_network("169.254.0.0/16")
