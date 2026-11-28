@@ -92,6 +92,9 @@ export type SiteSummary = {
   deductions: Deduction[];
   internet: LatestSample | null;
   gateway: LatestSample | null;
+  /** The newest name lookup and HTTPS check (agent 1.2.0 checks every 5 minutes; older: absent). */
+  dns?: LatestSample | null;
+  web?: LatestSample | null;
   devices_total: number;
   devices_online: number;
   needs_review: number;
