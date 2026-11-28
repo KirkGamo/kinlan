@@ -13,7 +13,7 @@ elsewhere link to their own record. The scripts used are in [`scripts/`](scripts
 | Latency accuracy | Average difference ≤ 2 ms over 100 samples | **1.50 ms** (hotspot) | Pass |
 | Protocol validation | Every test step visible in Wireshark | Every step seen ([record](2026-11-07_wireshark_validation.md)) | Pass |
 | Scan performance | ARP ≤ 10 s, fallback ≤ 30 s | ARP **9.5 s** average (one run of 3 took 10.2 s), fallback **15.4 s** | Pass, ARP at the limit |
-| Outage handling | Detect ≤ 30 s, push ≤ 3 min, backlog ≤ 60 s, 0 lost samples | | Pending (WAN unplug at home) |
+| Outage handling | Detect ≤ 30 s, push ≤ 3 min, backlog ≤ 60 s, 0 lost samples | Detected in **26 s**, push **2 min 5 s**, backlog **18 s**, **0 lost** (third run, agent 1.1.2) | Pass, after three agent fixes |
 | Remote command delay | Diagnose result ≤ 15 s, 10 runs | 10 of 10 done: **1.53 s** average on the server (0.95–2.36 s), at most about 4 s on screen | Pass |
 | API performance | 50 concurrent `/summary`, p95 < 500 ms warm | With the summary cache (#126): locally p95 **442 ms**, on Render **3.8–4.1 s** (7.7 s before) | Pass locally, **fail on the free instance** (see below) |
 | Multi-user | Each role can do exactly what §4.2 allows | All checks pass ([record](2026-11-29_roles_and_two_sites.md)) | Pass |
@@ -162,11 +162,43 @@ result, once a second while a run is in progress. So a result is on screen at mo
 after the server has it: under 4 s for every run here. Most of the server time is the agent
 noticing the command and running the six checks.
 
+## Outage handling
+
+Nov 29, Home site, laptop agent on the home Wi-Fi extender, the Infinix on mobile data so the
+push could arrive. A cable was pulled for about 5 minutes, three times. A watcher on the laptop
+logged once a second whether 8.8.8.8 and the router (192.168.1.1) answered, and the size of the
+agent's outbox; the agent log, the Windows Wi-Fi log and the server's alerts, outages and
+per-minute sample counts give the rest.
+
+In every run the router stopped answering too, so from the laptop's side this was the link to
+the router going down, not only the provider's line; the agent records it as cause "lan".
+
+### Run 3 (agent 1.1.2): the result
+
+| Check | Measured | Target | |
+|---|---|---|---|
+| Agent detects the outage | Cut at 18:05:57 UTC (last answer 18:05:56); agent declared it at 18:06:23, start backdated to 18:06:00: **26 s** | ≤ 30 s | Pass |
+| "Home is unreachable" push | Alert at 18:08:02: **2 min 5 s** after the cut | ≤ 3 min | Pass |
+| Backlog uploaded | Network back 18:11:34; outbox (84 samples, a diagnose, 2 scans) empty by 18:11:52: **18 s** | ≤ 60 s | Pass |
+| Lost samples | Every minute of the cut on the server: 6 router samples and 12 internet samples (the backup target is pinged too while the main one fails) | 0 lost | **0 lost**, pass |
+
+Detection takes three failed 10-second ticks by design, so 20–30 s. The agent also ran a
+diagnose at once, which uploaded with the backlog.
+
+### Runs 1 and 2: what they found
+
+Each earlier run failed a row, and each failure was an agent bug, fixed and released before the
+next run:
+
+| Run | Agent | What happened | Fix |
+|---|---|---|---|
+| 1, 01:24–01:38 | 1.1.0 | The laptop dropped off the extender for 14 min. Back on Home at 01:37:57, it uploaded only at 01:39:18 (**81 s**): the uploader's backoff had grown to 5 min during the outage, and the command poller's to 1 min. Push: alert 2 min 2 s after the cut. | 1.1.1 (#127): the network or the internet coming back wakes the uploader and the command poller, and the backoff starts over |
+| 2, 01:50–01:55 | 1.1.1 | The laptop stayed on the extender ("No internet"). With the router silent, Windows routed through the **Radmin VPN** adapter, whose gateway has a MAC, so the agent decided the laptop had left Home and recorded nothing. Push: 2 min 13 s. Backlog after return: under 1 s (the 1.1.1 fix). | 1.1.2 (#128): if another adapter still holds an address in the site's recorded subnet, the PC hasn't left |
+| 3, 02:05–02:11 | 1.1.2 | All four rows pass (above). But the 5-minute scan ran while the VPN had the route: it scanned the VPN's network as Home's, added the laptop's VPN address as a new device, and pointed router pings at 26.0.0.1. | 1.1.3 (#129): scans run only through the site's own router, and a drifted gateway is put back at the next network check |
+
 ## Pending rows
 
 These need hands on the network or a phone:
 
 - **Discovery accuracy**: the router's DHCP client list (home router admin page) and the
   hotspot's connected-devices list, each against an agent scan at the same time.
-- **Outage handling**: unplug the home router's WAN cable for 5 minutes with the laptop on
-  home Wi-Fi.
