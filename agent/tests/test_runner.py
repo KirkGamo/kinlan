@@ -72,6 +72,7 @@ def deps(net: Net, diagnoses: list | None = None) -> CloudDeps:
         gateway_mac=lambda ip: ROUTER if ip == "192.168.1.1" else None,
         load_config=AgentConfig,
         route=lambda: (INFO.local_ip, INFO.gateway),
+        local_ips=lambda: [],  # never this machine's real adapters
     )
 
 

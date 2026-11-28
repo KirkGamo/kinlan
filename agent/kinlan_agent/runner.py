@@ -68,6 +68,7 @@ class CloudDeps:
     # Setup may record the network later; run_sites rereads each site's own entry.
     load_config: Callable[[], AgentConfig] = config_module.load
     route: Callable[[], tuple[str | None, str | None]] = netinfo.route_now
+    local_ips: Callable[[], list[str]] = netinfo.local_ipv4s
 
 
 def scan_item(info: netinfo.NetInfo, result: discovery.ScanResult) -> dict:
@@ -249,6 +250,10 @@ class Runtime:
             self.config.home_gateway_mac = saved.home_gateway_mac
             self.config.home_network = saved.home_network
         state = homenet.where(self.config, net)
+        if state is Where.AWAY and homenet.still_attached(
+            self.config, info.local_ip if info else None, self._local_ips()
+        ):
+            state = Where.UNKNOWN  # another adapter (a VPN) took the route; the PC is still here
         if state is Where.UNKNOWN:
             state = self.where  # router off or no network: keep the last answer
         was, self.where, self.network = self.where, state, net
@@ -367,6 +372,12 @@ class Runtime:
             log.warning("internet back after %.0f s", event.outage.duration_s or 0)
             self.open_outage_id = None
             self._reconnected()
+
+    def _local_ips(self) -> list[str]:
+        try:
+            return self.deps.local_ips()
+        except Exception:
+            return []
 
     def _reconnected(self) -> None:
         if self.on_reconnect is not None:

@@ -13,6 +13,7 @@ only monitors, scans and answers commands while its default gateway is that rout
 
 from __future__ import annotations
 
+import ipaddress
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
@@ -83,6 +84,25 @@ def where(settings: config.AgentConfig, net: Network) -> Where:
     if not net.gateway_mac:
         return Where.UNKNOWN
     return Where.HOME if net.gateway_mac == home else Where.AWAY
+
+
+def still_attached(settings: config.AgentConfig, routed_ip: str | None, ips: list[str]) -> bool:
+    """True when the default route left the site's subnet for another adapter while an adapter
+    still holds an address in that subnet: the PC hasn't left, something else took the route.
+
+    Seen Nov 29: with the home router cut off, Windows routed through the Radmin VPN adapter
+    (26.0.0.1, which has a MAC), so the router-MAC check said "away" in the middle of an outage.
+    When the routed adapter is itself in the subnet, its router's MAC decides as usual: another
+    network may use the same addresses (a guest house on 192.168.1.0/24, Nov 27)."""
+    if not settings.home_network:
+        return False
+    try:
+        subnet = ipaddress.ip_network(settings.home_network, strict=False)
+        if routed_ip and ipaddress.ip_address(routed_ip) in subnet:
+            return False
+        return any(ipaddress.ip_address(ip) in subnet for ip in ips if ip != routed_ip)
+    except ValueError:
+        return False
 
 
 def remember(net: Network) -> None:
