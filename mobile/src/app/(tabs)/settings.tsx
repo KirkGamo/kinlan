@@ -6,6 +6,7 @@ import { Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { useSites, type Circle, type Role, type Site } from '@/api/circles';
 import { useMembers, type Member } from '@/api/overview';
+import { useRefreshOnFocus } from '@/api/use-refresh-on-focus';
 import { canManage, selectCircle, selectSite, useCurrentCircle, useSelectedSite } from '@/api/selection';
 import { pushSupported, useNotificationSwitches, useUpdateNotificationSwitches, type NotificationSwitches } from '@/api/push';
 import { useMe, useSession } from '@/api/session';
@@ -93,6 +94,7 @@ export default function SettingsScreen() {
 
 function MembersSection({ circle }: { circle: Circle }) {
   const members = useMembers(circle.id);
+  useRefreshOnFocus(members.refetch); // someone may have joined since
   const me = useMe();
   const isOwner = circle.role === 'owner';
   const [picked, setPicked] = useState<Member | null>(null);
@@ -262,6 +264,7 @@ function InviteSheet({ circle, open, onClose }: { circle: Circle; open: boolean;
 
 function SitesSection({ circle }: { circle: Circle }) {
   const sites = useSites(circle.id);
+  useRefreshOnFocus(sites.refetch);
   const manage = canManage(circle);
   return (
     <>

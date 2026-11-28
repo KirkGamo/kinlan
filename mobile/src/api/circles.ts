@@ -1,5 +1,5 @@
 /** Circles, sites and pairing (server Sections 4.2-4.3; app flow in docs/design/briefs.md, 4). */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 import { api } from './client';
 import { keys } from './keys';
@@ -26,6 +26,19 @@ export type Site = {
   created_at: string;
 };
 type PairingCode = { code: string; expires_at: string };
+
+/** The summary is polled every few seconds; carry its status into the cached sites lists, so
+ * the switcher and Settings never show a site as online after the Overview says it's down. */
+function syncSiteStatus(client: QueryClient, summary: { site_id: string; status: SiteStatus }) {
+  client.setQueriesData<Site[]>({ queryKey: ['circles'] }, (sites) => {
+    if (!Array.isArray(sites)) return sites;
+    const stale = sites.find((s) => s.id === summary.site_id && s.status !== summary.status);
+    return stale ? sites.map((s) => (s === stale ? { ...s, status: summary.status } : s)) : sites;
+  });
+  client.setQueryData<Site>(keys.site(summary.site_id), (site) =>
+    site && site.status !== summary.status ? { ...site, status: summary.status } : site,
+  );
+}
 type List<T> = { items: T[]; next_cursor: string | null };
 
 export function useCircles(enabled = true) {
@@ -39,11 +52,14 @@ export function useCircles(enabled = true) {
 export const fetchSites = async (circleId: string) => (await api<List<Site>>(`/circles/${circleId}/sites`)).items;
 export const fetchSummary = (siteId: string) => api<SiteSummary>(`/sites/${siteId}/summary`);
 
+/** The Circle's sites. Polled, because their status (online, unreachable) feeds the site
+ * switcher and Settings; the site on screen is also kept current by its summary (below). */
 export function useSites(circleId: string | undefined) {
   return useQuery({
     queryKey: keys.sites(circleId ?? 'none'),
     queryFn: () => fetchSites(circleId!),
     enabled: !!circleId,
+    refetchInterval: 30_000,
   });
 }
 
@@ -86,9 +102,14 @@ export type SiteSummary = {
 
 /** The site's summary, refetched every `everyMs` (the agent reports about every 10 s). */
 export function useSiteSummary(siteId: string | undefined, enabled = true, everyMs = 5_000) {
+  const client = useQueryClient();
   return useQuery({
     queryKey: keys.summary(siteId ?? 'none'),
-    queryFn: () => fetchSummary(siteId!),
+    queryFn: async () => {
+      const summary = await fetchSummary(siteId!);
+      syncSiteStatus(client, summary);
+      return summary;
+    },
     enabled: enabled && !!siteId,
     refetchInterval: enabled ? everyMs : false,
   });

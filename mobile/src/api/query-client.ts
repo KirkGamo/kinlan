@@ -1,4 +1,5 @@
-import { QueryClient } from '@tanstack/react-query';
+import { focusManager, QueryClient } from '@tanstack/react-query';
+import { AppState, Platform } from 'react-native';
 
 import { ApiError } from './client';
 
@@ -16,3 +17,13 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+// Coming back to the app refetches what's stale, as a browser tab does on focus. On the phone
+// TanStack Query can't see that by itself: tell it from Android's app state (a member who
+// joined, or a site that went down while the app was in the background, shows at once).
+if (Platform.OS !== 'web') {
+  focusManager.setEventListener((setFocused) => {
+    const subscription = AppState.addEventListener('change', (state) => setFocused(state === 'active'));
+    return () => subscription.remove();
+  });
+}
