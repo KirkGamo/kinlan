@@ -15,7 +15,7 @@ elsewhere link to their own record. The scripts used are in [`scripts/`](scripts
 | Scan performance | ARP ≤ 10 s, fallback ≤ 30 s | ARP **9.5 s** average (one run of 3 took 10.2 s), fallback **15.4 s** | Pass, ARP at the limit |
 | Outage handling | Detect ≤ 30 s, push ≤ 3 min, backlog ≤ 60 s, 0 lost samples | | Pending (WAN unplug at home) |
 | Remote command delay | Diagnose result ≤ 15 s, 10 runs | | Pending (10 taps on a phone) |
-| API performance | 50 concurrent `/summary`, p95 < 500 ms warm | Render: p95 **7.7 s**. Same code locally: p95 **766 ms** | **Fail** (see below) |
+| API performance | 50 concurrent `/summary`, p95 < 500 ms warm | With the summary cache (#126): locally p95 **442 ms**, on Render **3.8–4.1 s** (7.7 s before) | Pass locally, **fail on the free instance** (see below) |
 | Multi-user | Each role can do exactly what §4.2 allows | All checks pass ([record](2026-11-29_roles_and_two_sites.md)) | Pass |
 | Usability (SUS) | SUS ≥ 68, task success ≥ 80 % | | Issue #96 |
 | Design quality | No critical findings at submission | | Issue #96 |
@@ -76,54 +76,63 @@ cost of missing devices that answer late, so it stays.
 
 Target: 50 concurrent `GET /sites/{id}/summary`, p95 under 500 ms with the server warm.
 
-### On Render (production)
+Render requests were sent from the web app's own page in the browser, signed in as the viewer
+account, to the Home site (three weeks of samples), after five warm-up requests. Local requests
+used `scripts/summary_load.py`: the dev database seeded to the Home site's size (120,960
+samples over 7 days) and one local uvicorn process, as Render runs it, with the rate limit off.
 
-Sent from the web app's own page in the browser, signed in as the viewer account, to the Home
-site (a site with three weeks of samples). Five requests first to warm the server.
+### First run, before any change
 
-| Requests at once | Requests | p50 | p95 | Max |
+| Requests at once | Render p50 | Render p95 | Local p50 | Local p95 |
 |---:|---:|---:|---:|---:|
-| 1 (one after another) | 20 | 275 ms | 367 ms | 398 ms |
-| 5 | 5 | 724 ms | 839 ms | 839 ms |
-| 10 | 10 | 1,633 ms | 1,765 ms | 1,765 ms |
-| 20 | 20 | 2,751 ms | 3,281 ms | 3,282 ms |
-| **50** | 50 | 5,704 ms | **7,687 ms** | 7,804 ms |
+| 1 (20 one after another) | 275 ms | 367 ms | 18 ms | 21 ms |
+| 5 | 724 ms | 839 ms | | |
+| 10 | 1,633 ms | 1,765 ms | 205 ms | 237 ms |
+| 20 | 2,751 ms | 3,281 ms | | |
+| **50** | 5,704 ms | **7,687 ms** | 442 ms | **766 ms** |
 
-All 200 OK. The time grows by about 160 ms for each request in flight: the server answers
-about **6 summaries a second**, one after another. Even the fastest of the 50 took 1.9 s, so
-requests aren't waiting in a queue, they are sharing a CPU that is too small. Render's free
-instance has 0.1 CPU.
+All 200 OK. On Render each request in flight added about 160 ms: the free instance (0.1 CPU)
+answered about 6 summaries a second. Even the fastest of the 50 took 1.9 s, so the requests
+were sharing a CPU that is too small, not waiting in a queue for the database.
 
-### The same code locally
-
-To separate the code from the hosting, `scripts/summary_load.py` seeded the local database to
-the Home site's size (120,960 samples, 7 days) and ran the same test against one local uvicorn
-process, the way Render runs it, with the rate limit off.
-
-| Requests at once | Requests | p50 | p95 | Max |
-|---:|---:|---:|---:|---:|
-| 1 (one after another) | 20 | 18 ms | 21 ms | 24 ms |
-| 10 | 10 | 205 ms | 237 ms | 237 ms |
-| 50 (3 rounds) | 150 | 442 ms | **766 ms** | 824 ms |
-
-A profile of 100 requests: about 15 ms each inside the handler, spent on 14 small queries
+A profile of 100 local requests: about 15 ms each inside the handler, spent on 14 small queries
 (authentication, the membership check, then the counts). The largest is the 24-hour ping
 aggregate, 3.4 ms over about 8,600 rows through the `(site_id, target, ts)` index. No single
-query is slow; one Python process can't overlap that many of them.
+query is slow; there were simply many of them for every poll.
 
-### What it means
+### The fix: a per-site summary cache (#126)
 
-The target fails, on Render by a factor of 15, and by 1.5 even on a full CPU. In use, the load
-is far below this: three people with the Overview open poll it once every 5 s, about 0.6
-requests a second, against a capacity of about 6 on the free instance. Single requests from the
-Philippines take 275 ms, which is what a person sees.
+The summary is the same for every member, so it is now computed once per site and kept for up
+to 10 s. Any committed write clears it (an ingest, an acknowledged alert, a trusted device), so
+it never shows something older than the database. The role check still runs on every request.
+A cached request runs 3 queries instead of 14.
 
-Ways to meet the target, for the report's Future Work:
+| Requests at once | Render p50 | Render p95 | Local p50 | Local p95 |
+|---:|---:|---:|---:|---:|
+| 1 (20 one after another) | 206 ms | 256 ms | 9 ms | 10 ms |
+| 10 | 987 ms | 1,082 ms | 157 ms | 186 ms |
+| **50** | 2,936–3,295 ms | **3,834–4,100 ms** (two runs) | 264 ms | **442 ms** |
 
-1. A short per-site cache of the summary (a few seconds; the agent uploads every 30 s), so 50
-   readers of one site cost one computation plus the role check each.
-2. One SQL statement for the counts instead of nine, which cuts per-request time.
-3. A paid instance (Render Starter has 0.5 CPU) or more than one worker process.
+The cache halves the time on Render and meets the target on a full CPU.
+
+### What's left is the instance
+
+Two more measurements at 50 concurrent on Render show where the floor is:
+
+| Request (50 at once) | Work on the server | p95 |
+|---|---|---:|
+| `GET /me` | token check, one query | 2,394 ms |
+| `/summary` with an expired token (401) | token check only, no database | 856 ms |
+
+Even a request that never reaches the database misses 500 ms when 50 arrive together on the
+free instance. No change to the endpoint can meet the target there; a bigger instance can.
+
+In use, the load is far below the test: three people with the Overview open poll it once every
+5 s, about 0.6 requests a second, and one request takes about 206 ms from the Philippines.
+
+For the report's Future Work: a paid instance (Render Starter, 0.5 CPU) or more worker
+processes, with the cache moved to a shared store (such as Redis) once there is more than one
+process.
 
 ## Pending rows
 
