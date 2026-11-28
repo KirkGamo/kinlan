@@ -78,6 +78,11 @@ def scan_item(info: netinfo.NetInfo, result: discovery.ScanResult) -> dict:
 # ---------------------------------------------------------------- commands
 
 
+class NotOnSiteNetwork(RuntimeError):
+    """The route doesn't go through the site's router right now, so a scan would scan another
+    network (seen Nov 29: Radmin VPN's, added to Home as a new device)."""
+
+
 def execute(command: dict, runtime: Runtime) -> tuple[bool, dict | None, str | None]:
     """Run one command; returns (ok, result, error) for POST /agent/commands/{id}/result."""
     kind, params = command.get("type"), command.get("params") or {}
@@ -119,6 +124,8 @@ def execute(command: dict, runtime: Runtime) -> tuple[bool, dict | None, str | N
             result = runtime.port_check_now(given or None)
             return True, result.to_dict(), None
         return False, None, f"This agent doesn't know the command {kind!r}."
+    except NotOnSiteNetwork as exc:
+        return False, None, str(exc)
     except Exception as exc:  # report, never crash the poller
         log.exception("command %s failed", kind)
         return False, None, f"{type(exc).__name__}: {exc}"
@@ -258,6 +265,15 @@ class Runtime:
             state = self.where  # router off or no network: keep the last answer
         was, self.where, self.network = self.where, state, net
         if state is was:
+            if (
+                state is Where.HOME
+                and homenet.where(self.config, net) is Where.HOME
+                and info is not None
+                and self.monitor is not None
+                and self.monitor.gateway != info.gateway
+            ):
+                log.info("gateway back to %s", info.gateway)
+                self.info, self.monitor.gateway = info, info.gateway
             return state
         if state is Where.HOME:
             if info is not None and self.monitor is not None:
@@ -402,6 +418,13 @@ class Runtime:
     def scan_now(self) -> tuple[netinfo.NetInfo, discovery.ScanResult]:
         with self._scan_lock:
             info = self.deps.get_netinfo(max_prefix=self.config.max_scan_prefix)
+            if self.config.home_gateway_mac:
+                net = homenet.identify(info, self.deps.gateway_mac)
+                if homenet.where(self.config, net) is not Where.HOME:
+                    raise NotOnSiteNetwork(
+                        f"The route goes through {info.interface_name} ({info.network}) right "
+                        f"now, not {self._site()}'s router, so the scan was skipped."
+                    )
             result = self.deps.scan(info)
             self.buffer.add("scan", scan_item(info, result))
             if self.monitor and info.gateway != self.monitor.gateway:
@@ -542,7 +565,10 @@ def _start_site(
 
     def scan_and_prune() -> None:
         if runtime.active:
-            runtime.scan_now()
+            try:
+                runtime.scan_now()
+            except NotOnSiteNetwork as exc:
+                log.info("%s", exc)
         if time.monotonic() - last_targets[0] > RECHECK_TARGETS_EVERY_S:
             last_targets[0] = time.monotonic()
             runtime.recheck_targets()
