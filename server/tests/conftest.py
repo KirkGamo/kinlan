@@ -53,11 +53,13 @@ def _schema() -> None:
 def _clean_tables():
     """Each test starts with empty tables."""
     yield
+    from app import summary_cache
     from app.db import Base, get_engine
 
     names = ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables)
     with get_engine().begin() as conn:
         conn.execute(text(f"TRUNCATE {names} RESTART IDENTITY CASCADE"))
+    summary_cache.clear()  # TRUNCATE bypasses the session events that clear it
 
 
 @pytest.fixture
