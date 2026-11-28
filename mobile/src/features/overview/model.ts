@@ -167,13 +167,32 @@ export function verdict(summary: SiteSummary, now: number, lit: Light[] = lights
       text: `Internet replies take ${provider.value}. Video calls and games may stutter.`,
     };
   }
+  const live = `Router ${router.value}, internet ${provider.value}`;
+  // Working now, but a D or F for the last 24 hours: say both, so the verdict never reads
+  // "All good" above a failing grade (critique, Nov 29: "All good" over 20/100 F).
+  if (POOR_GRADES.has(summary.grade)) {
+    const today = summary.deductions.filter((d) => CONNECTION.has(d.factor)).map((d) => d.reason);
+    return {
+      tone: 'new',
+      chip: 'Working now',
+      title: 'Working now',
+      text: [`${live} right now.`, ...(today.length ? today : [summary.grade_summary])].filter(Boolean).join(' '),
+    };
+  }
+  // With the connection fine, the open problems below can only be new devices or open alerts.
+  const somethingBelow = summary.needs_review > 0 || summary.open_alerts > 0;
   return {
     tone: 'ok',
     chip: 'Healthy',
     title: 'All good',
-    text: `Router ${router.value}, internet ${provider.value}. Nothing needs attention.`,
+    text: `${live}. ${somethingBelow ? 'One thing to look at below.' : 'Nothing needs attention.'}`,
   };
 }
+
+/** Grades that mean the last 24 hours went badly, whatever the lights say now. */
+const POOR_GRADES = new Set(['D', 'F']);
+/** Deductions about the connection itself (the others, devices and ports, are open problems). */
+const CONNECTION = new Set(['latency', 'loss', 'outages']);
 
 export type Problem = {
   key: string;
