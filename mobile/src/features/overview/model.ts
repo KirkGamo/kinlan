@@ -185,7 +185,13 @@ export type Problem = {
 };
 
 /** Open problems, most urgent first. Empty when nothing needs attention. */
-export function problems(summary: SiteSummary, now: number, v: Verdict = verdict(summary, now)): Problem[] {
+/** `manage`: an owner or admin. A viewer can't acknowledge or trust, so their next step is to read. */
+export function problems(
+  summary: SiteSummary,
+  now: number,
+  v: Verdict = verdict(summary, now),
+  manage = true,
+): Problem[] {
   const out: Problem[] = [];
   if (isStale(summary, now)) {
     out.push({
@@ -204,7 +210,7 @@ export function problems(summary: SiteSummary, now: number, v: Verdict = verdict
     out.push({
       key: 'review',
       title: `${n} new ${n === 1 ? 'device' : 'devices'} to review`,
-      next: 'Say whose it is, or mark it as trusted.',
+      next: manage ? 'Say whose it is, or mark it as trusted.' : 'An admin can name them and mark them as trusted.',
       tone: 'new',
       chip: 'New',
       to: '/devices',
@@ -217,7 +223,7 @@ export function problems(summary: SiteSummary, now: number, v: Verdict = verdict
     out.push({
       key: 'alerts',
       title: `${n} open ${n === 1 ? 'alert' : 'alerts'}`,
-      next: 'Read and acknowledge them in Alerts.',
+      next: manage ? 'Read and acknowledge them in Alerts.' : 'Read them in Alerts.',
       tone: 'new',
       chip: 'Open',
       to: '/alerts',
