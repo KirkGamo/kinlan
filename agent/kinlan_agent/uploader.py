@@ -15,6 +15,7 @@ import json
 import logging
 import random
 import threading
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -110,6 +111,7 @@ class Uploader:
         self.batch_size = batch_size
         self.version = version
         self.scan_interval_s = scan_interval_s
+        self._wake = threading.Event()
         self.failures = 0
         self.stopped_reason: str | None = None
 
@@ -179,6 +181,12 @@ class Uploader:
         log.info("server busy or down (HTTP %s); will retry", r.status_code)
         return Outcome.RETRY
 
+    def wake(self) -> None:
+        """The network is back: try now, and start any later backoff from the beginning.
+        After a long outage the wait has grown to minutes, which would hold the backlog back."""
+        self.failures = 0
+        self._wake.set()
+
     def backoff_s(self) -> float:
         base = min(BACKOFF_MAX_S, BACKOFF_START_S * 2 ** max(0, self.failures - 1))
         return base * random.uniform(0.8, 1.2)
@@ -191,7 +199,21 @@ class Uploader:
                 return
             if outcome is Outcome.SENT and self.buffer.count():
                 continue  # more backlog: keep going
-            stop.wait(self.backoff_s() if outcome is Outcome.RETRY else interval_s)
+            nap(stop, self._wake, self.backoff_s() if outcome is Outcome.RETRY else interval_s)
+
+
+def nap(stop: threading.Event, wake: threading.Event, seconds: float) -> bool:
+    """Wait up to ``seconds``, returning early once ``stop`` or ``wake`` is set.
+    Returns whether ``wake`` ended it, and clears it."""
+    deadline = time.monotonic() + seconds
+    while not stop.is_set() and not wake.is_set():
+        left = deadline - time.monotonic()
+        if left <= 0:
+            break
+        stop.wait(min(0.5, left))
+    woken = wake.is_set()
+    wake.clear()
+    return woken
 
 
 def _error_message(r: httpx.Response) -> str:

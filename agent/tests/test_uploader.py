@@ -3,12 +3,20 @@
 import gzip
 import json
 import threading
+import time
 
 import httpx
 import pytest
 
 from kinlan_agent.buffer import Buffer
-from kinlan_agent.uploader import INFLIGHT_KEY, LAST_UPLOAD_KEY, Outcome, Uploader, build_payload
+from kinlan_agent.uploader import (
+    INFLIGHT_KEY,
+    LAST_UPLOAD_KEY,
+    Outcome,
+    Uploader,
+    build_payload,
+    nap,
+)
 
 API = "https://api.example"
 
@@ -197,3 +205,37 @@ def test_run_drains_a_backlog_then_waits(buffer):
     up.send_once = send_and_stop_when_empty
     up.run(stop, interval_s=0.01)
     assert [len(b["samples"]) for b in server.batches] == [2, 2, 1] and buffer.count() == 0
+
+
+def test_waking_ends_a_long_backoff_at_once(buffer):
+    """After a long outage the backoff is minutes long; the network coming back cuts it short."""
+    buffer.add("sample", sample(0))
+    server = FakeServer(httpx.ConnectError("no network"))
+    up = uploader(buffer, server)
+    up.failures = 9  # about 5 minutes of backoff after the next failure
+    stop = threading.Event()
+    worker = threading.Thread(target=up.run, args=(stop, 60.0))
+    worker.start()
+    try:
+        deadline = time.monotonic() + 5
+        while len(server.batches) < 1 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert up.backoff_s() > 200  # it is now asleep for minutes
+        started = time.monotonic()
+        up.wake()
+        while buffer.count() and time.monotonic() - started < 5:
+            time.sleep(0.01)
+        assert buffer.count() == 0 and time.monotonic() - started < 2
+        assert up.failures == 0
+    finally:
+        stop.set()
+        worker.join(5)
+
+
+def test_nap_reports_whether_it_was_woken():
+    stop, wake = threading.Event(), threading.Event()
+    assert nap(stop, wake, 0.01) is False
+    wake.set()
+    assert nap(stop, wake, 60) is True and not wake.is_set()
+    stop.set()
+    assert nap(stop, wake, 60) is False
