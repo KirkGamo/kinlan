@@ -334,3 +334,12 @@ def test_randomised(mac, random):
 )
 def test_a_hotspot_with_a_new_random_mac_is_matched_by_its_subnet(site, net, expected):
     assert homenet.where(site, net) is expected
+
+
+def test_no_web_check_away_from_the_site(buffer):
+    laptop = Laptop()
+    laptop.go(SCHOOL)
+    rt = runtime(buffer, laptop)
+    rt.start()
+    rt.check_web()
+    assert buffer.count() == 0

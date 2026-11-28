@@ -21,11 +21,13 @@ backlog and answer the app's commands with "not on this site's network right now
 from __future__ import annotations
 
 import logging
+import socket
 import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -53,6 +55,8 @@ CHECK_NETWORK_EVERY_S = 60
 # Failures while the router can't be identified are held this long: a laptop changing
 # networks reconnects within it, while a dead router at home outlasts it.
 HOLD_DOUBTFUL_S = 120
+NO_IP = "0.0.0.0"  # a sample must name an address; this one means "none resolved"
+WEB_HOST = urlsplit(diagnose.HTTPS_PROBE_URL).hostname or "www.google.com"
 
 
 @dataclass
@@ -69,6 +73,9 @@ class CloudDeps:
     load_config: Callable[[], AgentConfig] = config_module.load
     route: Callable[[], tuple[str | None, str | None]] = netinfo.route_now
     local_ips: Callable[[], list[str]] = netinfo.local_ipv4s
+    dns_lookup: Callable[[str, str | None], list[str]] = diagnose._dns_lookup
+    https_status: Callable[[str, float], int] = diagnose._https_status
+    host_ip: Callable[[str], str] = socket.gethostbyname
 
 
 def scan_item(info: netinfo.NetInfo, result: discovery.ScanResult) -> dict:
@@ -402,6 +409,33 @@ class Runtime:
             except Exception:
                 log.exception("waking the uploader failed")
 
+    def check_web(self) -> None:
+        """One name lookup and one HTTPS request, timed, so the app's DNS and Web lights are live
+        rather than lit only by a diagnose (#96). Diagnose runs the same probes as steps 5 and 6.
+        Skipped while the PC is elsewhere and during an outage, which they would only repeat."""
+        if not self.active or self.monitor is None or self.monitor.detector.current is not None:
+            return
+        now = monitor.now_utc()
+        dns_ip = self.info.dns_servers[0] if self.info and self.info.dns_servers else NO_IP
+        try:
+            _, dns_ms = diagnose._timed(lambda: self.deps.dns_lookup(diagnose.DNS_TEST_NAME, None))
+            dns_ok = True
+        except Exception:
+            dns_ms, dns_ok = None, False
+        self._queue("sample", monitor.Sample(now, "dns", dns_ip, dns_ms, dns_ok).to_dict(), now)
+        if not dns_ok:
+            return  # without names the web check can only fail the same way
+        try:
+            web_ip = self.deps.host_ip(WEB_HOST)
+            probe = diagnose.HTTPS_PROBE_URL
+            status, web_ms = diagnose._timed(lambda: self.deps.https_status(probe, 5.0))
+            web_ok = status == 204
+        except Exception:
+            web_ip, web_ms, web_ok = NO_IP, None, False
+        if not web_ok:
+            web_ms = None
+        self._queue("sample", monitor.Sample(now, "web", web_ip, web_ms, web_ok).to_dict(), now)
+
     def recheck_targets(self) -> bool:
         """Pick the internet targets again (not mid-outage, when none would answer).
         Returns True if they changed."""
@@ -600,6 +634,12 @@ def _start_site(
             name="network",
             daemon=True,
             args=(stop, CHECK_NETWORK_EVERY_S, runtime.check_network, "network check"),
+        ),
+        threading.Thread(
+            target=_loop,
+            name="web",
+            daemon=True,
+            args=(stop, config.web_check_interval_s, runtime.check_web, "web check"),
         ),
         threading.Thread(
             target=_daily,

@@ -41,7 +41,7 @@ class Sample:
     """One measurement, as stored in the outbox and sent in the ingest payload."""
 
     ts: datetime
-    target: str  # "gateway" or "internet"
+    target: str  # "gateway", "internet", "dns" or "web"
     ip: str
     rtt_ms: float | None
     ok: bool
