@@ -95,19 +95,23 @@ def _record(settings: config.AgentConfig, data: dict, network, api_url: str):
         home_network=network.cidr,
     )
 
-    def same(site_id: str | None, mac: str | None) -> bool:
-        here = homenet.where(config.AgentConfig(home_gateway_mac=mac), network)
-        return site_id == entry.site_id or here is homenet.Where.HOME
+    def same(site_id: str | None, mac: str | None, cidr: str | None) -> bool:
+        recorded = config.AgentConfig(home_gateway_mac=mac, home_network=cidr)
+        return site_id == entry.site_id or homenet.where(recorded, network) is homenet.Where.HOME
 
     settings.api_url = api_url
     first = not settings.paired or not settings.home_gateway_mac
-    if first or same(settings.site_id, settings.home_gateway_mac):
+    if first or same(settings.site_id, settings.home_gateway_mac, settings.home_network):
         for key in config.SITE_FIELDS:
             setattr(settings, key, getattr(entry, key))
         tokenstore.save_token(data["agent_token"])  # agent.token: the first site's
     else:
         index = next(
-            (i for i, s in enumerate(settings.sites) if same(s.site_id, s.home_gateway_mac)),
+            (
+                i
+                for i, s in enumerate(settings.sites)
+                if same(s.site_id, s.home_gateway_mac, s.home_network)
+            ),
             None,
         )
         if index is None:

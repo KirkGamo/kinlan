@@ -145,3 +145,27 @@ def test_run_sites_runs_each_site_with_its_own_buffer():
         runner.join(timeout=10)
         assert not runner.is_alive()
         assert home_buffer.count() >= 2 and lab_buffer.count() == 0
+
+
+def test_pairing_on_a_hotspot_whose_mac_changed_replaces_its_site(home_dir):
+    """Android gave the hotspot a new random MAC; pairing there again mustn't add a second
+    site for the same network."""
+    hotspot = SimpleNamespace(network="10.48.65.0/24", gateway="10.48.65.69")
+    macs = {"10.48.65.69": "06:b5:cb:3d:4b:83"}
+
+    def pair(client):
+        return pairing.pair(
+            "http://api.test", "123456", ask=lambda _: "yes", say=lambda _: None,
+            client=client, get_netinfo=lambda: hotspot, resolve=macs.get,
+        )
+
+    client = server(("home", "Home"), ("phone", "Phone"), ("phone2", "Phone"))
+    assert pair_on(HOME_NET, client) == 0
+    assert pair(client) == 0
+    macs["10.48.65.69"] = "62:4e:31:ef:e4:17"
+    assert pair(client) == 0
+    sites = config.site_configs(config.load())
+    assert [(s.site_id, s.home_gateway_mac) for s in sites] == [
+        ("home", ROUTER),
+        ("phone2", "62:4e:31:ef:e4:17"),
+    ]

@@ -292,3 +292,45 @@ def test_a_drifted_gateway_is_put_back_at_the_next_check(buffer):
     rt.monitor.gateway = "26.0.0.1"  # as an older agent left it
     assert rt.check_network() is Where.HOME
     assert rt.monitor.gateway == "192.168.1.1"
+
+
+PAIRED_HOTSPOT = "06:b5:cb:3d:4b:83"  # the Infinix's hotspot when the Phone site was paired
+LATER_HOTSPOT = "62:4e:31:ef:e4:17"  # the same hotspot in the discovery test, Nov 29
+
+
+def hotspot_site(cidr="10.48.65.0/24", mac=PAIRED_HOTSPOT) -> AgentConfig:
+    return AgentConfig(site_name="Phone", home_gateway_mac=mac, home_network=cidr)
+
+
+@pytest.mark.parametrize(
+    ("mac", "random"),
+    [
+        (PAIRED_HOTSPOT, True),
+        (LATER_HOTSPOT, True),
+        (ROUTER, False),  # 64:f8:8a:…, a vendor's router
+        ("not a mac", False),
+        (None, False),
+    ],
+)
+def test_randomised(mac, random):
+    assert homenet.randomised(mac) is random
+
+
+@pytest.mark.parametrize(
+    ("site", "net", "expected"),
+    [
+        # The hotspot picked a new random MAC on the same subnet: still the site.
+        (hotspot_site(), Network("10.48.65.0/24", "10.48.65.69", LATER_HOTSPOT), Where.HOME),
+        # Another random-MAC network on another subnet (another phone's hotspot).
+        (hotspot_site(), Network("10.185.60.0/24", "10.185.60.210", LATER_HOTSPOT), Where.AWAY),
+        # A vendor router on the same subnet as a hotspot site: needs the exact MAC.
+        (hotspot_site(), Network("10.48.65.0/24", "10.48.65.1", ROUTER), Where.AWAY),
+        # A site behind a vendor router: a guest house on the same addresses is elsewhere.
+        (at_home(), Network("192.168.1.0/24", "192.168.1.1", LATER_HOTSPOT), Where.AWAY),
+        # An older pairing without the subnet: only the exact MAC.
+        (hotspot_site(cidr=None), Network("10.48.65.0/24", "10.48.65.69", LATER_HOTSPOT),
+         Where.AWAY),
+    ],
+)
+def test_a_hotspot_with_a_new_random_mac_is_matched_by_its_subnet(site, net, expected):
+    assert homenet.where(site, net) is expected
