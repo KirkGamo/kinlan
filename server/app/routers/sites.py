@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Response
 from sqlalchemy import delete, func, select
 
+from app import summary_cache
 from app.authz import require_role, require_site
 from app.deps import DB, CurrentUser
 from app.errors import ApiError
@@ -184,10 +185,20 @@ def _last_diagnose(db: DB, site_id: uuid.UUID) -> LastDiagnose | None:
 
 
 @router.get("/sites/{site_id}/summary", response_model=SiteSummary)
-def site_summary(site_id: uuid.UUID, user: CurrentUser, db: DB) -> SiteSummary:
+def site_summary(site_id: uuid.UUID, user: CurrentUser, db: DB) -> Response:
     """Everything the Overview needs for one site: status, grade with its reasons, the latest
-    gateway and internet pings, device counts, open alerts and any outage in progress."""
+    gateway and internet pings, device counts, open alerts and any outage in progress.
+
+    The same for every member, so it's cached per site for a few seconds (`summary_cache`);
+    the role check above it runs on every request."""
     site = require_site(db, user, site_id, Role.viewer)
+    body = summary_cache.get_or_compute(
+        site.id, lambda: _summary(db, site).model_dump_json().encode()
+    )
+    return Response(body, media_type="application/json")
+
+
+def _summary(db: DB, site: Site) -> SiteSummary:
     now = datetime.now(UTC)
     inputs, needs_review = health_inputs(db, site.id, now)
     health = compute(inputs)
