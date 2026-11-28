@@ -10,6 +10,8 @@ import type { ChipTone } from '@/components/ui';
 export const STALE_MS = 2 * 60_000;
 /** A diagnose run lights DNS and Web for this long; after that they read "Not checked". */
 export const DIAGNOSE_FRESH_MS = 60 * 60_000;
+/** The agent checks DNS and Web every 5 minutes; a check counts for three of those. */
+export const CHECK_FRESH_MS = 15 * 60_000;
 /** Above this, internet latency reads as slow (the server's default alert threshold). */
 export const SLOW_MS = 150;
 
@@ -39,13 +41,13 @@ export const LAYERS = [
     name: 'DNS',
     title: 'Name lookup (DNS)',
     layer: 'Application (DNS)',
-    what: 'Website names turn into addresses. Checked each time a diagnose runs.',
+    what: 'Website names turn into addresses. The agent checks it every 5 minutes and in every diagnose.',
   },
   {
     name: 'Web',
     title: 'Secure web',
     layer: 'Transport + application',
-    what: 'A secure connection to a website works (TCP port 443, then HTTPS). Checked each time a diagnose runs.',
+    what: 'A secure connection to a website works (TCP port 443, then HTTPS). The agent checks it every 5 minutes and in every diagnose.',
   },
 ] as const;
 
@@ -99,7 +101,7 @@ export function lights(summary: SiteSummary, now: number): Light[] {
   else if (!i) provider = off;
   else provider = { state: (i.rtt_ms ?? 0) > SLOW_MS ? 'warn' : 'pass', value: ms(i.rtt_ms) };
 
-  // DNS and Web are only measured by a diagnose run, so they light only from a recent one.
+  // DNS and Web come from the agent's 5-minute checks (agent 1.2.0), else from a recent diagnose.
   const d = summary.last_diagnose;
   const fresh = d && now - Date.parse(d.finished_at) < DIAGNOSE_FRESH_MS;
   const fromDiagnose = (n: number): Light => {
@@ -110,7 +112,17 @@ export function lights(summary: SiteSummary, now: number): Light[] {
     return step.status === 'pass' ? { state: 'pass', value: 'OK' } : { state: 'fail', value: 'Failing' };
   };
 
-  return [pc, router, provider, fromDiagnose(5), fromDiagnose(6)];
+  const fromCheck = (sample: SiteSummary['dns'], n: number): Light => {
+    if (provider.state === 'fail' || provider.state === 'unlit') return notChecked;
+    if (sample && now - Date.parse(sample.ts) < CHECK_FRESH_MS) {
+      return sample.ok ? { state: 'pass', value: ms(sample.rtt_ms) } : { state: 'fail', value: 'Failing' };
+    }
+    return fromDiagnose(n);
+  };
+  const dns = fromCheck(summary.dns, 5);
+  // Without names the web check can't run, so a failing DNS leaves Web unchecked.
+  const web = dns.state === 'fail' ? notChecked : fromCheck(summary.web, 6);
+  return [pc, router, provider, dns, web];
 }
 
 export type Verdict = { tone: ChipTone; chip: string; title: string; text: string };
@@ -148,7 +160,7 @@ export function verdict(summary: SiteSummary, now: number, lit: Light[] = lights
       tone: 'down',
       chip: 'Down',
       title: 'Websites can’t be found',
-      text: 'The internet works, but name lookup (DNS) failed in the last diagnose.',
+      text: 'The internet works, but name lookup (DNS) is failing, so apps can’t find websites by name.',
     };
   }
   if (web.state === 'fail') {
@@ -156,7 +168,7 @@ export function verdict(summary: SiteSummary, now: number, lit: Light[] = lights
       tone: 'down',
       chip: 'Down',
       title: 'Secure websites don’t open',
-      text: 'Names resolve, but the secure web check failed in the last diagnose. A firewall may be blocking it.',
+      text: 'Names resolve, but secure websites don’t open. A Wi-Fi sign-in page or a firewall may be blocking them.',
     };
   }
   if (provider.state === 'warn' || summary.status === 'degraded') {
