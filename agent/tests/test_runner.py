@@ -204,3 +204,18 @@ def test_poller_runs_commands_and_reports_results(buffer):
     assert poller.poll_once() is True
     assert reported["url"].endswith("/api/v1/agent/commands/c-1/result")
     assert reported["body"]["ok"] is True and reported["body"]["result"]["root_cause_step"] == 4
+
+
+def test_the_internet_coming_back_wakes_the_uploader(buffer):
+    net, woken = Net(), []
+    rt = Runtime(at_home(), buffer, deps(net))
+    rt.on_reconnect = lambda: woken.append(1)
+    rt.start()
+    net.internet_up = False
+    for _ in range(3):
+        rt.tick()
+    assert woken == []
+    net.internet_up = True
+    for _ in range(2):
+        rt.tick()
+    assert woken == [1]

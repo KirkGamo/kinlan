@@ -189,3 +189,18 @@ def test_setup_doesnt_guess_without_a_router(paired_before_1_0_1):
     said = []
     assert homenet.confirm(answers("yes"), said.append, Network(None, None, None)) is False
     assert config.load().home_gateway_mac is None and "will wait" in said[-1]
+
+
+def test_coming_back_to_the_network_wakes_the_uploader(buffer):
+    """Nov 29 outage test: the laptop was off Home's network for 14 min, the uploader's backoff
+    grew to 5 min, and the backlog waited 81 s after the laptop was back. Now it's woken."""
+    laptop, woken = Laptop(), []
+    laptop.go(SCHOOL)
+    rt = runtime(buffer, laptop)
+    rt.on_reconnect = lambda: woken.append(1)
+    rt.start()
+    assert woken == []
+    laptop.go(INFO)
+    assert rt.check_network() is Where.HOME and woken == [1]
+    rt.check_network()
+    assert woken == [1]  # only on the way back, not at every check

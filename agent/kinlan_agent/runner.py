@@ -44,7 +44,7 @@ from kinlan_agent.buffer import Buffer
 from kinlan_agent.config import AgentConfig
 from kinlan_agent.homenet import Where
 from kinlan_agent.icmp import EchoReply, echo
-from kinlan_agent.uploader import Uploader
+from kinlan_agent.uploader import Uploader, nap
 
 log = logging.getLogger("kinlan.runner")
 PRUNE_EVERY_S = 3600
@@ -137,6 +137,11 @@ class CommandPoller:
         self.headers = {"Authorization": f"Bearer {token}"}
         self.client = client or httpx.Client(timeout=wait_s + 15)
         self.wait_s = wait_s
+        self._wake = threading.Event()
+
+    def wake(self) -> None:
+        """The network is back: poll now instead of finishing a backoff of up to a minute."""
+        self._wake.set()
 
     def poll_once(self) -> bool | None:
         """One long-poll. True: ran commands; False: none waiting; None: failed."""
@@ -168,8 +173,8 @@ class CommandPoller:
                 log.error("server refused this agent's command polling; stopping it")
                 return
             if outcome is None:
-                stop.wait(delay)
-                delay = min(60.0, delay * 2)
+                woken = nap(stop, self._wake, delay)
+                delay = 5.0 if woken else min(60.0, delay * 2)
             else:
                 delay = 5.0
 
@@ -192,6 +197,9 @@ class Runtime:
     route: tuple[str | None, str | None] | None = None  # (local IP, gateway) at the last check
     held: list[tuple[str, dict, datetime]] = field(default_factory=list)
     held_since: datetime | None = None
+    # Called when the site's network or its internet comes back, so uploads and command polls
+    # retry at once instead of sleeping out a backoff that grew during the outage.
+    on_reconnect: Callable[[], None] | None = None
     _scan_lock: threading.Lock = field(default_factory=threading.Lock)
 
     def start(self) -> None:
@@ -250,6 +258,8 @@ class Runtime:
             if info is not None and self.monitor is not None:
                 self.info, self.monitor.gateway = info, info.gateway
             log.info("on %s's network, %s: monitoring it", self._site(), net.describe())
+            if was is not Where.UNKNOWN:  # back from elsewhere, not starting up
+                self._reconnected()
         elif state is Where.UNSET:
             log.warning("%s", self.not_here())
         else:
@@ -356,6 +366,14 @@ class Runtime:
             self.buffer.close_outage(self.open_outage_id, event.outage.ended_at)
             log.warning("internet back after %.0f s", event.outage.duration_s or 0)
             self.open_outage_id = None
+            self._reconnected()
+
+    def _reconnected(self) -> None:
+        if self.on_reconnect is not None:
+            try:
+                self.on_reconnect()
+            except Exception:
+                log.exception("waking the uploader failed")
 
     def recheck_targets(self) -> bool:
         """Pick the internet targets again (not mid-outage, when none would answer).
@@ -502,6 +520,12 @@ def _start_site(
     runtime.start()
     uploader = Uploader(buffer, config.api_url, token, scan_interval_s=config.scan_interval_s)
     poller = CommandPoller(runtime, config.api_url, token)
+
+    def reconnected() -> None:
+        uploader.wake()
+        poller.wake()
+
+    runtime.on_reconnect = reconnected
     last_prune = [0.0]
     last_targets = [time.monotonic()]
 
