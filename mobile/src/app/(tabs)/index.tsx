@@ -93,9 +93,9 @@ function Live({ circle, site, sites }: { circle: Circle; site: Site; sites: Site
   const lightIndex = failing >= 0 ? failing : isStale(s, now) ? 0 : -1;
   const lightRequest = askedLight === 'failing' && lightIndex >= 0 ? { id: at ?? 'failing', index: lightIndex } : undefined;
   const v = verdict(s, now, lit);
-  const open = problems(s, now, v);
-  const stale = staleNow;
   const canManage = manages(circle);
+  const open = problems(s, now, v, canManage);
+  const stale = staleNow;
   const diagnose = () => router.push({ pathname: '/diagnose', params: { site: site.id, run: stale ? '0' : '1' } });
   // Each problem opens exactly where it's dealt with: an outage runs Diagnose (owners and admins),
   // new devices open Devices filtered to Needs review, anything else opens Alerts.

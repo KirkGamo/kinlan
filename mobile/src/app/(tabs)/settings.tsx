@@ -31,6 +31,9 @@ const ROLES: { key: Role; label: string }[] = [
   { key: 'admin', label: 'Admin' },
   { key: 'owner', label: 'Owner' },
 ];
+/** One Circle has one or more owners, admins and viewers: "you’re a viewer", not "the". */
+const YOU_ARE: Record<Role, string> = { owner: 'an owner', admin: 'an admin', viewer: 'a viewer' };
+
 const ROLE_MEANS: Record<Role, string> = {
   viewer: 'Sees everything, changes nothing.',
   admin: 'Runs checks, names devices and changes alert settings.',
@@ -61,7 +64,7 @@ export default function SettingsScreen() {
           </Text>
           {circle ? (
             <Text role="bodySmall" color="text2">
-              {`${circle.name} · you’re ${circle.role === 'admin' ? 'an' : 'the'} ${circle.role}`}
+              {`${circle.name} · you’re ${YOU_ARE[circle.role]}`}
             </Text>
           ) : null}
         </View>
