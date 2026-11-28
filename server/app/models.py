@@ -89,6 +89,8 @@ class DeviceType(enum.StrEnum):
 class Target(enum.StrEnum):
     gateway = "gateway"
     internet = "internet"
+    dns = "dns"  # a name lookup every few minutes; rtt_ms is the lookup time (agent 1.2.0)
+    web = "web"  # an HTTPS request every few minutes; rtt_ms is the request time
 
 
 class OutageCause(enum.StrEnum):

@@ -192,6 +192,8 @@ class SiteSummary(BaseModel):
     deductions: list[DeductionOut]
     internet: LatestSample | None
     gateway: LatestSample | None
+    dns: LatestSample | None = Field(None, description="The newest name lookup (agent 1.2.0+)")
+    web: LatestSample | None = Field(None, description="The newest HTTPS check (agent 1.2.0+)")
     devices_total: int
     devices_online: int
     needs_review: int = Field(description="Untrusted devices first seen after the baseline")
