@@ -58,6 +58,8 @@ class AgentConfig(BaseModel):
     monitor_interval_s: float = Field(10, ge=1)
     upload_interval_s: float = Field(30, ge=1)
     scan_interval_s: float = Field(300, ge=30)
+    # Name lookup and HTTPS, so the app's DNS and Web lights are live (#96).
+    web_check_interval_s: float = Field(300, ge=60)
     internet_targets: list[str] = Field(default_factory=lambda: list(DEFAULT_INTERNET_CANDIDATES))
     port_check_time: str = "03:00"
     max_scan_prefix: int = Field(22, ge=16, le=30)

@@ -73,6 +73,10 @@ def deps(net: Net, diagnoses: list | None = None) -> CloudDeps:
         load_config=AgentConfig,
         route=lambda: (INFO.local_ip, INFO.gateway),
         local_ips=lambda: [],  # never this machine's real adapters
+        # Never the real DNS or web: the web check's thread runs once as soon as a site starts.
+        dns_lookup=lambda name, server: ["93.184.215.14"],
+        https_status=lambda url, timeout: 204,
+        host_ip=lambda host: "142.250.4.99",
     )
 
 
@@ -220,3 +224,53 @@ def test_the_internet_coming_back_wakes_the_uploader(buffer):
     for _ in range(2):
         rt.tick()
     assert woken == [1]
+
+
+def web_samples(buffer) -> list[dict]:
+    return [i.payload for i in buffer.peek(100) if i.payload.get("target") in ("dns", "web")]
+
+
+def test_the_web_check_queues_a_dns_and_a_web_sample(buffer):
+    rt = Runtime(at_home(), buffer, deps(Net()))
+    rt.start()
+    rt.check_web()
+    dns, web = web_samples(buffer)
+    assert (dns["target"], dns["ok"], web["target"], web["ok"]) == ("dns", True, "web", True)
+    assert dns["rtt_ms"] is not None and web["ip"] == "142.250.4.99"
+
+
+def test_failed_name_lookup_skips_the_web_check(buffer):
+    d = deps(Net())
+
+    def no_dns(name, server):
+        raise OSError("no answer")
+
+    d.dns_lookup = no_dns
+    rt = Runtime(at_home(), buffer, d)
+    rt.start()
+    rt.check_web()
+    [dns] = web_samples(buffer)
+    assert dns["ok"] is False and dns["rtt_ms"] is None
+
+
+def test_a_web_answer_other_than_204_is_a_failure(buffer):
+    """A Wi-Fi sign-in page answers the probe with its own page (diagnose step 6)."""
+    d = deps(Net())
+    d.https_status = lambda url, timeout: 302
+    rt = Runtime(at_home(), buffer, d)
+    rt.start()
+    rt.check_web()
+    _, web = web_samples(buffer)
+    assert web["ok"] is False and web["rtt_ms"] is None
+
+
+def test_no_web_check_during_an_outage(buffer):
+    net = Net()
+    rt = Runtime(at_home(), buffer, deps(net))
+    rt.start()
+    net.internet_up = False
+    for _ in range(3):
+        rt.tick()
+    assert buffer.current_outage() is not None
+    rt.check_web()
+    assert web_samples(buffer) == []
