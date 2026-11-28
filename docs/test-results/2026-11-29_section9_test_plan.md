@@ -14,7 +14,7 @@ elsewhere link to their own record. The scripts used are in [`scripts/`](scripts
 | Protocol validation | Every test step visible in Wireshark | Every step seen ([record](2026-11-07_wireshark_validation.md)) | Pass |
 | Scan performance | ARP ≤ 10 s, fallback ≤ 30 s | ARP **9.5 s** average (one run of 3 took 10.2 s), fallback **15.4 s** | Pass, ARP at the limit |
 | Outage handling | Detect ≤ 30 s, push ≤ 3 min, backlog ≤ 60 s, 0 lost samples | | Pending (WAN unplug at home) |
-| Remote command delay | Diagnose result ≤ 15 s, 10 runs | | Pending (10 taps on a phone) |
+| Remote command delay | Diagnose result ≤ 15 s, 10 runs | 10 of 10 done: **1.53 s** average on the server (0.95–2.36 s), at most about 4 s on screen | Pass |
 | API performance | 50 concurrent `/summary`, p95 < 500 ms warm | With the summary cache (#126): locally p95 **442 ms**, on Render **3.8–4.1 s** (7.7 s before) | Pass locally, **fail on the free instance** (see below) |
 | Multi-user | Each role can do exactly what §4.2 allows | All checks pass ([record](2026-11-29_roles_and_two_sites.md)) | Pass |
 | Usability (SUS) | SUS ≥ 68, task success ≥ 80 % | | Issue #96 |
@@ -134,6 +134,34 @@ For the report's Future Work: a paid instance (Render Starter, 0.5 CPU) or more 
 processes, with the cache moved to a shared store (such as Redis) once there is more than one
 process.
 
+## Remote command delay
+
+Ten Diagnose runs on the Home site, Nov 29 01:16–01:19 (UTC+8), from the Overview's Diagnose
+button on the Infinix (owner, development build). The laptop agent was on home Wi-Fi.
+Each run was given 12 s before the next; a screenshot after each shows "Finished … all six
+passed".
+
+The server records when the app created the command and when the agent's result arrived:
+
+| Run | Created (UTC) | Finished (UTC) | Server time | Checks passed |
+|---:|---|---|---:|---|
+| 1 | 17:16:36.007 | 17:16:38.370 | 2.36 s | 6 of 6 |
+| 2 | 17:16:59.475 | 17:17:00.754 | 1.28 s | 6 of 6 |
+| 3 | 17:17:14.764 | 17:17:15.979 | 1.22 s | 6 of 6 |
+| 4 | 17:17:30.073 | 17:17:31.101 | 1.03 s | 6 of 6 |
+| 5 | 17:17:45.255 | 17:17:46.204 | 0.95 s | 6 of 6 |
+| 6 | 17:18:00.571 | 17:18:02.385 | 1.81 s | 6 of 6 |
+| 7 | 17:18:15.801 | 17:18:17.559 | 1.76 s | 6 of 6 |
+| 8 | 17:18:31.069 | 17:18:32.771 | 1.70 s | 6 of 6 |
+| 9 | 17:18:46.373 | 17:18:47.992 | 1.62 s | 6 of 6 |
+| 10 | 17:19:01.951 | 17:19:03.571 | 1.62 s | 6 of 6 |
+
+**Average 1.53 s, longest 2.36 s** (target ≤ 15 s). What the person sees adds the app's own
+steps: sending the command (about 0.2 s to Render) and the Diagnose screen's check for the
+result, once a second while a run is in progress. So a result is on screen at most about 1.5 s
+after the server has it: under 4 s for every run here. Most of the server time is the agent
+noticing the command and running the six checks.
+
 ## Pending rows
 
 These need hands on the network or a phone:
@@ -142,6 +170,3 @@ These need hands on the network or a phone:
   hotspot's connected-devices list, each against an agent scan at the same time.
 - **Outage handling**: unplug the home router's WAN cable for 5 minutes with the laptop on
   home Wi-Fi.
-- **Remote command delay**: 10 Diagnose taps on the Overview. The server records each
-  command's `created_at` and `finished_at`; the app checks for the result every second. Earlier
-  manual runs (Nov 22, 26, 28) took 1.5 s, 1.8 s and 2.1 s on the server.
