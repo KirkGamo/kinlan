@@ -7,9 +7,9 @@ elsewhere link to their own record. The scripts used are in [`scripts/`](scripts
 
 | Area | Target | Result | Status |
 |---|---|---|---|
-| Unit tests and coverage | ≥ 70 % line coverage, server and agent | Server **97 %** (176 tests), agent **88 %** (207 tests) | Pass |
-| API integration | All endpoints, role matrix, isolation suite | 176 server tests pass in CI, including the 21-case role matrix | Pass |
-| Discovery accuracy | ≥ 95 % of the router's DHCP clients found, 2 networks | | Pending (needs the router's client lists) |
+| Unit tests and coverage | ≥ 70 % line coverage, server and agent | Server **97 %** (183 tests), agent **88 %** (220 tests) | Pass |
+| API integration | All endpoints, role matrix, isolation suite | 183 server tests pass in CI, including the 21-case role matrix | Pass |
+| Discovery accuracy | ≥ 95 % of the connected devices found, 2 networks | **4 of 4** clients (100 %) on two phone hotspots, plus both hotspots, nothing extra | Pass (small networks; see below) |
 | Latency accuracy | Average difference ≤ 2 ms over 100 samples | **1.50 ms** (hotspot) | Pass |
 | Protocol validation | Every test step visible in Wireshark | Every step seen ([record](2026-11-07_wireshark_validation.md)) | Pass |
 | Scan performance | ARP ≤ 10 s, fallback ≤ 30 s | ARP **9.5 s** average (one run of 3 took 10.2 s), fallback **15.4 s** | Pass, ARP at the limit |
@@ -22,14 +22,14 @@ elsewhere link to their own record. The scripts used are in [`scripts/`](scripts
 
 ## Unit tests and coverage
 
-`pytest --cov`, run on Nov 29 on the laptop (Python 3.12.1, `pytest-cov` 7.1.0, now pinned in both
+`pytest --cov`, run on Nov 29 on the laptop against `main` after agent 1.1.3 and the summary cache (Python 3.12.1, `pytest-cov` 7.1.0, now pinned in both
 `requirements-dev.txt` files). The plan names `services/`; the server keeps that logic in
 `app/` modules (alerts, health, push, reports, jobs, …), so the whole `app` package is measured.
 
 | Package | Statements | Missed | Coverage | Tests |
 |---|---:|---:|---:|---:|
-| `server/app` | 2,514 | 85 | **97 %** | 176 passed |
-| `agent/kinlan_agent` | 2,067 | 250 | **88 %** | 207 passed |
+| `server/app` | 2,571 | 85 | **97 %** | 183 passed |
+| `agent/kinlan_agent` | 2,137 | 266 | **88 %** | 220 passed |
 
 Lowest modules. Server: `jobs.py` 67 % (the scheduler loop that starts the timed jobs; the jobs
 themselves are tested). Agent: `main.py` 45 % (the command-line wiring), `winapi.py` 59 %
@@ -196,9 +196,50 @@ next run:
 | 2, 01:50–01:55 | 1.1.1 | The laptop stayed on the extender ("No internet"). With the router silent, Windows routed through the **Radmin VPN** adapter, whose gateway has a MAC, so the agent decided the laptop had left Home and recorded nothing. Push: 2 min 13 s. Backlog after return: under 1 s (the 1.1.1 fix). | 1.1.2 (#128): if another adapter still holds an address in the site's recorded subnet, the PC hasn't left |
 | 3, 02:05–02:11 | 1.1.2 | All four rows pass (above). But the 5-minute scan ran while the VPN had the route: it scanned the VPN's network as Home's, added the laptop's VPN address as a new device, and pointed router pings at 26.0.0.1. | 1.1.3 (#129): scans run only through the site's own router, and a drifted gateway is put back at the next network check |
 
-## Pending rows
+## Discovery accuracy
 
-These need hands on the network or a phone:
+The plan compares a scan with the router's DHCP client list on two networks. The home router's
+admin password isn't available, so two phone hotspots were used instead: Android lists every
+device connected to its hotspot with its MAC address, which makes an exact reference.
+`scripts/discovery_snapshot.py` ran the agent's own scan (`discovery.scan`, as the agent runs
+it) while the hotspot's connected-devices screen was open, Nov 29.
 
-- **Discovery accuracy**: the router's DHCP client list (home router admin page) and the
-  hotspot's connected-devices list, each against an agent scan at the same time.
+**Network 1, the Infinix's hotspot** (10.48.65.0/24), 18:35:13 UTC, Scapy ARP, 8.1 s:
+
+| Hotspot's list | Agent's scan | |
+|---|---|---|
+| PABIBO (the OPPO), `4a:64:0d:4e:7a:3a` | 10.48.65.189, same MAC | Found |
+| Korkkk (the laptop), `50:84:92:ee:32:66` | 10.48.65.236, same MAC | Found |
+| (the hotspot itself isn't in its own list) | 10.48.65.69, `62:4e:31:ef:e4:17`, marked as the router | Found |
+
+**Network 2, the OPPO's hotspot** (10.185.60.0/24, no SIM, so no internet), 18:39:06 UTC,
+Scapy ARP, 8.8 s:
+
+| Hotspot's list | Agent's scan | |
+|---|---|---|
+| Korkkk (the laptop), `50:84:92:ee:32:66` | 10.185.60.236, same MAC | Found |
+| Infinix-GT-30-Pro, `56:1f:2e:0a:86:e1` | 10.185.60.20, same MAC | Found |
+| (the hotspot itself) | 10.185.60.210, `22:1e:bb:ed:22:d4`, marked as the router | Found |
+
+**4 of 4 connected devices found (100 %)**, both hotspots identified as the router, and no
+device the hotspot didn't list. A scan works without internet, as network 2 shows.
+
+Limits of this result:
+
+- The networks are small (the Infinix's hotspot allows 2 devices, the OPPO's 3), so one missed
+  device would have cost 50 %. The ARP sweep asks every address three times, which is what
+  makes small and large networks alike; the Wireshark record shows it on the 255-address home
+  network.
+- Both phones use private (randomised) Wi-Fi MACs, and the scan reported them exactly as the
+  hotspots did.
+- The agent named only the laptop. The hotspots know the phones' names from DHCP, which the
+  agent can't see; it asks the network's DNS for names (PTR), and phone hotspots don't answer
+  that. In the app, the person names such devices.
+
+### Found while testing: a phone hotspot can change its MAC
+
+The "Phone" site was paired on Nov 29 with the Infinix's hotspot router at `06:b5:cb:3d:4b:83`.
+In this test the same hotspot answered as `62:4e:31:ef:e4:17`, so the agent no longer
+recognised it and waited ("isn't on Phone's network"). Earlier the same night the MAC stayed the
+same across hotspot restarts; Android can still randomise it. A site on a phone hotspot may
+need pairing again after such a change.
