@@ -10,7 +10,7 @@ from kinlan_agent import config, homenet
 from kinlan_agent.buffer import Buffer
 from kinlan_agent.config import AgentConfig
 from kinlan_agent.homenet import Network, Where
-from kinlan_agent.runner import HOLD_DOUBTFUL_S, Runtime, execute
+from kinlan_agent.runner import HOLD_DOUBTFUL_S, NotOnSiteNetwork, Runtime, execute
 from tests.test_runner import INFO, ROUTER, Net, at_home, deps
 
 SCHOOL = replace(
@@ -264,3 +264,31 @@ def test_still_attached(routed, others, attached):
 def test_still_attached_needs_a_recorded_subnet():
     settings = AgentConfig(site_name="Home", home_gateway_mac=ROUTER)
     assert homenet.still_attached(settings, "26.79.195.89", ["192.168.1.13"]) is False
+
+
+def test_no_scan_through_a_vpn_route(buffer):
+    """Nov 29: the 5-minute scan ran while Radmin VPN had the route, scanned its network as
+    Home's, added the laptop's VPN address as a new device and switched the gateway to 26.0.0.1."""
+    laptop, net = Laptop(), Net()
+    rt = runtime(buffer, laptop, net)
+    rt.start()
+    net.internet_up, laptop.router_answers = False, False
+    laptop.go(VPN)
+    laptop.other_ips = [INFO.local_ip]
+    rt.tick()
+    assert rt.active
+    with pytest.raises(NotOnSiteNetwork):
+        rt.scan_now()
+    ok, result, error = execute({"type": "scan"}, rt)
+    assert not ok and result is None and "skipped" in error
+    assert rt.monitor.gateway == "192.168.1.1"
+    assert "scan" not in [i.kind for i in buffer.peek(100)] + [k for k, _, _ in rt.held]
+
+
+def test_a_drifted_gateway_is_put_back_at_the_next_check(buffer):
+    laptop = Laptop()
+    rt = runtime(buffer, laptop)
+    rt.start()
+    rt.monitor.gateway = "26.0.0.1"  # as an older agent left it
+    assert rt.check_network() is Where.HOME
+    assert rt.monitor.gateway == "192.168.1.1"
